@@ -22,7 +22,8 @@
     "dev": "vite",
     "dev:debug": "vite --debug --force",
     "serve": "npm run dev",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepare": "husky"
   },
   "dependencies": {
     "@codingame/monaco-vscode-editor-service-override": "~3.2.3",
@@ -47,7 +48,9 @@
     "eslint": "~9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "http-server": "~14.1.1",
+    "husky": "^9.1.7",
     "langium-cli": "~3.3.0",
+    "lint-staged": "^15.4.2",
     "prettier": "^3.4.2",
     "typescript": "~5.7.3",
     "typescript-eslint": "^8.21.0",
@@ -58,6 +61,12 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
+    ]
+  },
+  "lint-staged": {
+    "**/*": [
+      "eslint",
+      "prettier --write --ignore-unknown"
     ]
   },
   "volta": {
