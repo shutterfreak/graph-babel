@@ -1,0 +1,17 @@
+{
+  "projectName": "Graph",
+  "languages": [
+    {
+      "id": "graph",
+      "grammar": "src/language/graph.langium",
+      "fileExtensions": [".graph"],
+      "textMate": {
+        "out": "syntaxes/graph.tmLanguage.json"
+      },
+      "monarch": {
+        "out": "src/syntaxes/graph.monarch.ts"
+      }
+    }
+  ],
+  "out": "src/language/generated"
+}
