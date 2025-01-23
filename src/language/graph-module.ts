@@ -1,4 +1,14 @@
-import { type Module, inject } from "langium";
+import {
+  AstNode,
+  AstNodeDescription,
+  AstUtils,
+  DefaultScopeComputation,
+  LangiumDocument,
+  type Module,
+  MultiMap,
+  PrecomputedScopes,
+  inject,
+} from "langium";
 import {
   createDefaultModule,
   createDefaultSharedModule,
@@ -12,6 +22,14 @@ import {
   GraphGeneratedSharedModule,
 } from "./generated/module.js";
 import { GraphValidator, registerValidationChecks } from "./graph-validator.js";
+import {
+  isElement,
+  isGraph,
+  isModel,
+  isStyle,
+  Model,
+} from "./generated/ast.js";
+import chalk from "chalk";
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -19,6 +37,9 @@ import { GraphValidator, registerValidationChecks } from "./graph-validator.js";
 export interface GraphAddedServices {
   validation: {
     GraphValidator: GraphValidator;
+  };
+  references: {
+    ScopeComputation: GraphScopeComputation;
   };
 }
 
@@ -39,6 +60,9 @@ export const GraphModule: Module<
 > = {
   validation: {
     GraphValidator: () => new GraphValidator(),
+  },
+  references: {
+    ScopeComputation: (services) => new GraphScopeComputation(services),
   },
 };
 
@@ -80,4 +104,134 @@ export function createGraphServices(context: DefaultSharedModuleContext): {
     );
   }
   return { shared, Graph };
+}
+
+export class GraphScopeComputation extends DefaultScopeComputation {
+  /**
+   * Export all named elements using their name (they are available globally)
+   * NOTE: style definitions exist only at local level (default scoping) and can be overridden
+   */
+  // eslint-disable-next-line @typescript-eslint/require-await
+  override async computeExports(
+    document: LangiumDocument,
+  ): Promise<AstNodeDescription[]> {
+    const prefix = "GraphScopeComputation.computeExports()";
+    const exportedDescriptions: AstNodeDescription[] = [];
+    for (const childNode of AstUtils.streamAllContents(
+      document.parseResult.value,
+    )) {
+      if (isElement(childNode) && childNode.name !== undefined) {
+        // `descriptions` is our `AstNodeDescriptionProvider` defined in `DefaultScopeComputation`
+        // It allows us to easily create descriptions that point to elements using a name.
+        const d = this.descriptions.createDescription(
+          childNode,
+          childNode.name,
+          document,
+        );
+        exportedDescriptions.push(d);
+        console.info(
+          chalk.whiteBright(
+            `${prefix} - ${childNode.$type} ${childNode.name} : exporting description as name(${d.name}) path (${d.path})`,
+          ),
+        );
+      } else {
+        console.info(chalk.gray(`${prefix} - skipping ${childNode.$type}`));
+      }
+    }
+    let i = 1;
+    for (const d of exportedDescriptions) {
+      console.info(
+        chalk.greenBright(
+          `${prefix} - Exported description ${i} : ${d.type} ${d.name} ${d.path}`,
+        ),
+      );
+      i++;
+    }
+    return exportedDescriptions;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  override async computeLocalScopes(
+    document: LangiumDocument,
+  ): Promise<PrecomputedScopes> {
+    const prefix = "GraphScopeComputation::computeLocalScopes()";
+
+    console.log(chalk.cyan(`${prefix} - START`));
+
+    const model = document.parseResult.value as Model;
+    // This multi-map stores a list of descriptions for each node in our document
+    const scopes = new MultiMap<AstNode, AstNodeDescription>();
+    const level = 0;
+    this.processContainer(model, scopes, document, level);
+
+    console.log(chalk.cyan(`${prefix} - END`));
+    return scopes;
+  }
+
+  private processContainer(
+    container: AstNode,
+    scopes: PrecomputedScopes,
+    document: LangiumDocument,
+    level: number,
+  ): AstNodeDescription[] {
+    const preamble = `${"  ".repeat(level)}processContainer(level: ${level}) - ${container.$type}${isGraph(container) || isStyle(container) ? ` ${container.name}` : ""}`;
+    const localDescriptions: AstNodeDescription[] = [];
+
+    console.log(
+      chalk.blue(`${preamble} - processing ${container.$type} -- START`),
+    );
+
+    // Only add style definitions at (1) the current scope and (2) all parent levels
+
+    if (isModel(container) || isGraph(container)) {
+      // Process style definitions at the local scope
+
+      for (const style of container.styles) {
+        const description = this.descriptions.createDescription(
+          style,
+          style.name,
+          document,
+        );
+        console.log(
+          chalk.cyan(
+            `${preamble} - adding to local scope: [style ${style.name}] description: '${description.name}' | path: '${description.path}' | type: '${description.type}'`,
+          ),
+        );
+        localDescriptions.push(description);
+      }
+
+      // Recurse on elements
+      for (const element of container.elements) {
+        console.log(
+          chalk.blue(`${preamble} - processing child ${element.$type}`),
+        );
+        this.processContainer(element, scopes, document, level + 1);
+      }
+    }
+
+    scopes.addAll(container, localDescriptions);
+
+    for (const ld of localDescriptions) {
+      console.log(
+        chalk.gray(
+          `${preamble} >> LocalDescription : name='${ld.name}' type='${ld.type}' path='${ld.path}'`,
+        ),
+      );
+    }
+    for (const scope of scopes) {
+      const node = scope[0];
+      const description = scope[1];
+      console.log(
+        chalk.red(
+          `${preamble} >> scope : type = '${node.$type}' - description = (type: '${description.type}, name: '${description.name}', path: '${description.path}'')`,
+        ),
+      );
+    }
+
+    console.log(
+      chalk.blue(`${preamble} - processing ${container.$type} -- END`),
+    );
+
+    return localDescriptions;
+  }
 }
