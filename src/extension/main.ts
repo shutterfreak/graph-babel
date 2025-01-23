@@ -15,7 +15,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
 // This function is called when the extension is deactivated.
 export function deactivate(): Thenable<void> | undefined {
-  if (client) {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (client !== undefined) {
     return client.stop();
   }
   return undefined;
@@ -31,7 +32,7 @@ function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
   const debugOptions = {
     execArgv: [
       "--nolazy",
-      `--inspect${process.env.DEBUG_BREAK ? "-brk" : ""}=${process.env.DEBUG_SOCKET || "6009"}`,
+      `--inspect${process.env.DEBUG_BREAK != null ? "-brk" : ""}=${process.env.DEBUG_SOCKET ?? "6009"}`,
     ],
   };
 
@@ -60,6 +61,8 @@ function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
   );
 
   // Start the client. This will also launch the server
-  client.start();
+  client.start().catch((exception) => {
+    console.error(exception);
+  });
   return client;
 }

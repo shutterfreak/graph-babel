@@ -30,13 +30,14 @@ export const generateAction = async (
   );
 };
 
-export type GenerateOptions = {
+export interface GenerateOptions {
   destination?: string;
-};
+}
 
 export default function (): void {
   const program = new Command();
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
   program.version(JSON.parse(packageContent).version);
 
   const fileExtensions = GraphLanguageMetaData.fileExtensions.join(", ");

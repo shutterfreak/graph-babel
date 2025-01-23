@@ -12,7 +12,7 @@ export async function extractDocument(
   if (!extensions.includes(path.extname(fileName))) {
     console.error(
       chalk.yellow(
-        `Please choose a file with one of these extensions: ${extensions}.`,
+        `Please choose a file with one of these extensions: ${extensions.join(", ")}.`,
       ),
     );
     process.exit(1);
@@ -53,7 +53,7 @@ export async function extractAstNode<T extends AstNode>(
   fileName: string,
   services: LangiumCoreServices,
 ): Promise<T> {
-  return (await extractDocument(fileName, services)).parseResult?.value as T;
+  return (await extractDocument(fileName, services)).parseResult.value as T;
 }
 
 interface FilePathData {

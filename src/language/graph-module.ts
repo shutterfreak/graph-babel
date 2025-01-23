@@ -16,11 +16,11 @@ import { GraphValidator, registerValidationChecks } from "./graph-validator.js";
 /**
  * Declaration of custom services - add your own service classes here.
  */
-export type GraphAddedServices = {
+export interface GraphAddedServices {
   validation: {
     GraphValidator: GraphValidator;
   };
-};
+}
 
 /**
  * Union of Langium default services and your custom services - use this as constructor parameter
@@ -75,7 +75,9 @@ export function createGraphServices(context: DefaultSharedModuleContext): {
   if (!context.connection) {
     // We don't run inside a language server
     // Therefore, initialize the configuration provider instantly
-    shared.workspace.ConfigurationProvider.initialized({});
+    shared.workspace.ConfigurationProvider.initialized({}).catch((exception) =>
+      console.error(exception),
+    );
   }
   return { shared, Graph };
 }
