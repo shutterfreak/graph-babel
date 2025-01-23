@@ -11,6 +11,7 @@ export default tseslint.config(
       "dist/**",
       "**/*.mjs",
       "eslint.config.mjs",
+      "out/**",
       "**/*.js",
     ],
   },
