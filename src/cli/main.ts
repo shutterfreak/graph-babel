@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { GraphLanguageMetaData } from "../language/generated/module.js";
 import { createGraphServices } from "../language/graph-module.js";
 import { extractAstNode } from "./cli-util.js";
-import { generateJavaScript } from "./generator.js";
+import { generate_cleaned_graph } from "./generator.js";
 import { NodeFileSystem } from "langium/node";
 import * as url from "node:url";
 import * as fs from "node:fs/promises";
@@ -20,11 +20,7 @@ export const generateAction = async (
 ): Promise<void> => {
   const services = createGraphServices(NodeFileSystem).Graph;
   const model = await extractAstNode<Model>(fileName, services);
-  const generatedFilePath = generateJavaScript(
-    model,
-    fileName,
-    opts.destination,
-  );
+  const generatedFilePath = generate_cleaned_graph(model, fileName, opts);
   console.log(
     chalk.green(`JavaScript code generated successfully: ${generatedFilePath}`),
   );
