@@ -13,7 +13,9 @@ import {
   isStyle,
   isStyleBlock,
 } from "../language/generated/ast.js";
-import { AstUtils } from "langium";
+import {
+  AstUtils /* DefaultScopeProvider,Scope,ScopeProvider*/,
+} from "langium";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 // import * as fs from "node:fs";
 import * as path from "node:path";
@@ -40,6 +42,30 @@ export function generate_cleaned_graph(
 
   for (const childNode of AstUtils.streamAllContents(model)) {
     let foo = "";
+
+    const references = AstUtils.findLocalReferences(childNode);
+    let i = 1;
+    for (const ref of references) {
+      const d = ref.$nodeDescription;
+      const parent = ref.$refNode?.astNode.$container;
+
+      console.log(
+        chalk.green(
+          `DBG : node of type '${childNode.$type}' - Found local reference ${i}: [${ref.$refText}] -> ` +
+            (d === undefined
+              ? "<undefiined>"
+              : `type: '${d.type}', name: '${d.name}', path: '${d.path}'}`) +
+            (parent === undefined
+              ? ""
+              : ` within parent of type: '${parent.$type}'`),
+        ),
+        chalk.gray(inspect(ref.$nodeDescription)),
+      );
+      i++;
+    }
+
+    //const x = AstUtils.
+
     // if (childNode.$type === StyleDefinition) {
     if (isGraph(childNode)) {
       const element_count: number = childNode.elements.length;
