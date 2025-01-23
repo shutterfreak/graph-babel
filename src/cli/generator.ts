@@ -13,9 +13,7 @@ import {
   isStyle,
   isStyleBlock,
 } from "../language/generated/ast.js";
-import {
-  AstUtils /* DefaultScopeProvider,Scope,ScopeProvider*/,
-} from "langium";
+import { AstUtils } from "langium";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 // import * as fs from "node:fs";
 import * as path from "node:path";
@@ -23,7 +21,6 @@ import { inspect } from "util";
 import { extractDestinationAndName } from "./cli-util.js";
 import { GenerateOptions } from "./main.js";
 import { Element_get_style_items, Label_get_label } from "./model-helpers.js";
-
 import chalk from "chalk";
 
 export function generate_cleaned_graph(
@@ -43,6 +40,7 @@ export function generate_cleaned_graph(
   for (const childNode of AstUtils.streamAllContents(model)) {
     let foo = "";
 
+    // DEBUG - START
     const references = AstUtils.findLocalReferences(childNode);
     let i = 1;
     for (const ref of references) {
@@ -63,8 +61,7 @@ export function generate_cleaned_graph(
       );
       i++;
     }
-
-    //const x = AstUtils.
+    // DEBUG - END
 
     // if (childNode.$type === StyleDefinition) {
     if (isGraph(childNode)) {
