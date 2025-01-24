@@ -93,7 +93,9 @@ export class GraphValidator {
   /**
    * Check the Style nodes through the entire Model hierarchy:
    *  - Report if multiple Style defintions share the same name at ehe same hierarchy level
-   *  - Report duplicate style redefinitions
+   * TODO:
+   *  - Report duplicate style redefinitions (requires comparing the StyleItem entries in each Style)
+   *  - Warn user to place style definitions before graph elements (Graph / Node / Link)
    *
    * @param model
    * @param accept
