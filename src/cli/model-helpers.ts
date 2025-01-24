@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { AstNode } from "langium";
-import { inspect } from "util";
+// import { inspect } from "util";
 import { integer } from "vscode-languageserver";
 import {
   Element,
@@ -25,124 +25,84 @@ export function Label_get_label(label: Label | undefined): string {
   }
 }
 
+/**
+ * Construct an array of style items that apply to the Element.
+ * If the element has no style, or no style items can be found for the style provided, then an empty array is returned.
+ * In all other cases, a scoped array of style items will be generated, following the following rules:
+ *  - Style items at the same level in the model are combined in the order they appear.
+ *  - When combining style items with the same topic, the last item is kept (overrruling previous topic definitions)
+ *  - Style items at a given nesting level inherit style definitions from previous levels
+ * @param element The element that may have to be styled
+ * @returns The array of unique style items applicable to the element, or undefined if element not defined or style not provided
+ */
 export function Element_get_style_items(
   element: Element,
 ): StyleDefinition[] | undefined {
-  if (element.style !== undefined) {
-    const style_name = element.style.$refText;
-    chalk.cyanBright(
-      `Element_get_style_items() ${element.$type} :::${style_name} '${element.name}' [${Label_get_label(element.label)}]`,
-    );
+  if (element.style === undefined) {
+    return undefined;
+  }
+  // The element has a style
+  const filtered_style_definitions: StyleDefinition[] = [];
 
-    const styles: Style[] = [];
-    let container: AstNode | undefined = element; //.$container
-    let level: integer = 0;
-    interface StyleDefintionDecomposed {
-      topic: string;
-      level: integer;
-      value: string;
-      item: StyleDefinition;
-    }
-    const decomposed_style_definitions: StyleDefintionDecomposed[] = [];
-    const decomposed_style_definitions_filtered: StyleDefintionDecomposed[] =
-      [];
+  //collect the element's ancestry (bottom-up):
+  const ancestry: AstNode[] = [];
+  let container: AstNode = element;
+  while (container.$container) {
+    ancestry.push(container.$container);
+    container = container.$container;
+  }
 
-    while (container !== undefined) {
-      console.log(
-        chalk.cyan(
-          `Element_get_style_items(style=${style_name}) - at level ${level} - found container of type <${container.$type}>`,
-        ),
-      );
-      if (container.$container === undefined) {
-        container = undefined;
-      } else {
-        container = container.$container;
-        // Process the style elements in the parent container
-        if (isModel(container) || isGraph(container)) {
-          for (const s of container.styles) {
-            if (s.name === style_name) {
-              console.log(
-                chalk.greenBright(
-                  `Found matching ${s.$type} '${style_name}' at level ${level}`,
-                ),
-              );
-
-              // Push the style items to decomposed_style_definitions
-
-              const defs: string[] = [];
-              //let def:string = ''
-              for (const it of s.definition.items) {
-                console.log(
-                  chalk.gray(
-                    `At level ${level} - ${s.name}: ${it.topic}: "${it.value}"`,
+  // Process the ancestry top-down:
+  for (const ancestor of ancestry.reverse()) {
+    // Search for style definitions with the proper style identifier:
+    if (isModel(ancestor) || isGraph(ancestor)) {
+      // Useless check (required for linter)
+      for (const s of ancestor.styles) {
+        if (s.name === element.style.$refText) {
+          // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
+          for (const d of s.definition.items) {
+            // First check reset topic:
+            if (d.topic === "Reset") {
+              // Check which topics must be reset
+              if (["All", "*"].includes(d.value)) {
+                // Reset entire style definition:
+                filtered_style_definitions.length = 0;
+              } else {
+                console.error(
+                  chalk.redBright(
+                    `ERROR: NOT YET IMPLEMENTED: reset style with argument '${d.value}'`,
                   ),
                 );
-                defs.push(`[${it.topic}] := [${it.value}]`);
-                decomposed_style_definitions.push({
-                  topic: it.topic,
-                  level,
-                  value: it.value,
-                  item: it,
-                });
-                if (
-                  decomposed_style_definitions_filtered.find(
-                    (dsd) => dsd.topic === it.topic,
-                  ) === undefined
-                ) {
-                  decomposed_style_definitions_filtered.push({
-                    topic: it.topic,
-                    level,
-                    value: it.value,
-                    item: it,
-                  });
-                }
               }
-              //def = defs.join(' ; ')
-
-              styles.push(s);
             } else {
-              console.log(
-                chalk.red(
-                  `Skipping ${s.$type} '${style_name}' at level ${level}`,
-                ),
+              // Retrieve the index of the style definition with the same topic (returns -1 if no match)
+              const index = filtered_style_definitions.findIndex(
+                (it) => it.topic === d.topic,
               );
+              if (index < 0) {
+                // No match: add to array
+                filtered_style_definitions.push(d);
+              } else {
+                // Match: replace existing style defintion with new one
+                filtered_style_definitions.splice(index, 1, d);
+              }
             }
           }
-        } else {
-          console.error(
-            chalk.redBright(`Unexpected container type: ${container.$type}`),
-          );
         }
       }
-      level += 1;
     }
-
-    // Now filter the style items:
-    decomposed_style_definitions.sort((a, b) => {
-      if (a.topic === b.topic) {
-        return a.level - b.level;
-      }
-      return a.topic > b.topic ? -1 : 1;
-    });
-
-    console.log(
-      chalk.greenBright(
-        style_name,
-        "decomposed_style_definitions (before filtering) := ",
-        inspect(decomposed_style_definitions),
-      ),
-    );
-
-    console.log(
-      chalk.yellowBright(
-        style_name,
-        "decomposed_style_definitions (after filtering) := ",
-        inspect(decomposed_style_definitions_filtered),
-      ),
-    );
-
-    //return styles
-    return decomposed_style_definitions_filtered.map((s) => s.item);
   }
-  return undefined;
+
+  // Debug statements:
+  for (const d of filtered_style_definitions) {
+    console.log(
+      chalk.bgWhite.blueBright(`Filtered: ${d.topic}: "${d.value}";`),
+    );
+  }
+
+  return filtered_style_definitions;
+}
+
+export function StyleDefinition_toString(d: StyleDefinition[]): string {
+  return d.map((def) => `${def.topic}: "${def.value}"`).join("; ");
 }

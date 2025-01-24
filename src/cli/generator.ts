@@ -134,7 +134,7 @@ export function generate_cleaned_graph(
     );
 
     return (
-      `${INDENTATION.repeat(level)}${graph.$type} ${graph.name}${label !== "" ? ` "${label}"` : ""} {\n` +
+      `${INDENTATION.repeat(level)}graph${graph.style ? `:${graph.style.$refText}` : ""} ${graph.name}${label !== "" ? ` "${label}"` : ""} {\n` +
       graph.elements
         .map((element) => render_Element(element, level + 1))
         .join("\n") +
@@ -159,7 +159,7 @@ export function generate_cleaned_graph(
       ),
     );
 
-    return `${INDENTATION.repeat(level)}${node.$type} ${node.name}${label !== "" ? ` "${label}"` : ""}`;
+    return `${INDENTATION.repeat(level)}node${node.style ? `:${node.style.$refText}` : ""} ${node.name}${label !== "" ? ` "${label}"` : ""}`;
   }
 
   function render_Link(link: Link, level: number): string {
@@ -176,11 +176,11 @@ export function generate_cleaned_graph(
       ),
     );
 
-    return `${INDENTATION.repeat(level)}${link.$type} ${link.name != null ? `(${link.name}) ` : ""} ${link.src.ref?.name} to ${link.dst.ref?.name}${label !== null ? ` "${label}"` : ""}`;
+    return `${INDENTATION.repeat(level)}link${link.style ? `:${link.style.$refText}` : ""} ${link.name != null ? `(${link.name}) ` : ""}${link.src.ref?.name} to ${link.dst.ref?.name}${label !== "" ? ` "${label}"` : ""}`;
   }
 
   function render_Style(style: Style, level: number): string {
-    return `${INDENTATION.repeat(level)}${style.$type} ${style.name} TODO`;
+    return `${INDENTATION.repeat(level)}style ${style.name} {\n${style.definition.items.map((it) => `${INDENTATION.repeat(level + 1)}${it.topic}: "${it.value}";`).join("\n")}\n${INDENTATION.repeat(level)}}`;
   }
 
   /*
