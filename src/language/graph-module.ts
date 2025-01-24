@@ -187,25 +187,17 @@ export class GraphScopeComputation extends DefaultScopeComputation {
       // Process style definitions at the local scope
 
       for (const style of container.styles) {
-        if (style.name === undefined || style.name.trim() === "") {
-          console.error(
-            chalk.redBright(
-              `ERROR: processContainer() - node of type '${style.$type}' has no name!`,
-            ),
-          );
-        } else {
-          const description = this.descriptions.createDescription(
-            style,
-            style.name,
-            document,
-          );
-          console.log(
-            chalk.cyan(
-              `${preamble} - adding to local scope: [style ${style.name}] description: '${description.name}' | path: '${description.path}' | type: '${description.type}'`,
-            ),
-          );
-          localDescriptions.push(description);
-        }
+        const description = this.descriptions.createDescription(
+          style,
+          style.name,
+          document,
+        );
+        console.log(
+          chalk.cyan(
+            `${preamble} - adding to local scope: [style ${style.name}] description: '${description.name}' | path: '${description.path}' | type: '${description.type}'`,
+          ),
+        );
+        localDescriptions.push(description);
       }
 
       // Recurse on elements

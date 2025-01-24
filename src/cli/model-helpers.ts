@@ -1,14 +1,12 @@
 import chalk from "chalk";
 import { AstNode } from "langium";
 // import { inspect } from "util";
-import { integer } from "vscode-languageserver";
 import {
   Element,
   isGraph,
   isModel,
   Label,
   StringLabel,
-  Style,
   StyleDefinition,
 } from "../language/generated/ast.js";
 
