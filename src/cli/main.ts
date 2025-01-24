@@ -57,6 +57,8 @@ export default function (): void {
   program.version(JSON.parse(packageContent).version);
 
   const fileExtensions = GraphLanguageMetaData.fileExtensions.join(", ");
+
+  // Action: check only
   program
     .command("check")
     .argument(
@@ -66,16 +68,17 @@ export default function (): void {
     .description(
       "Indicates where a program parses & validates successfully, but produces no output code",
     )
-    .action(parseAndValidateAction) // we'll need to implement this function
-    .command("generate")
+    .action(parseAndValidateAction);
+
+  // Action: generate
+  program
+    .command("generate:clean")
     .argument(
       "<file>",
       `source file (possible file extensions: ${fileExtensions})`,
     )
     .option("-d, --destination <dir>", "destination directory of generating")
-    .description(
-      'generates JavaScript code that prints "Hello, {name}!" for each greeting in a source file',
-    )
+    .description("strip comments and clean the input file (indentation etc.)")
     .action(generateAction);
 
   program.parse(process.argv);

@@ -189,7 +189,13 @@ export function generate_cleaned_graph(
   }
   fs.writeFileSync(generatedFilePath, toString(fileNode));
   */
-  console.log(chalk.yellow(inspect(model)));
+  console.log(
+    chalk.yellow(
+      "\ngenerate_cleaned_graph() DEBUG - model::START\n",
+      inspect(model),
+      "\ngenerate_cleaned_graph() DEBUG - model::END\n",
+    ),
+  );
   if (model.$document?.references) {
     for (const ref of model.$document.references) {
       console.log(
