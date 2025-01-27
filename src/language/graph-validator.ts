@@ -1,4 +1,9 @@
-import { type ValidationAcceptor, type ValidationChecks } from "langium";
+import {
+  AstNode,
+  AstUtils,
+  type ValidationAcceptor,
+  type ValidationChecks,
+} from "langium";
 import {
   GraphAstType,
   Element,
@@ -6,6 +11,9 @@ import {
   isModel,
   Style,
   Graph,
+  isElement,
+  isGraph,
+  isStyle,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
 import { StyleDefinition_toString } from "../cli/model-helpers.js";
@@ -103,6 +111,9 @@ export class GraphValidator {
   checkStyles(model: Model, accept: ValidationAcceptor): void {
     console.info(chalk.cyanBright("checkStyles(model)"));
 
+    // Check that style definitions appear before Element definitions
+    check_styles_defined_before_elements(model, accept);
+
     // Traverse the model top-down) and store the graph nodes and their levels:
     const style_dict: _find_style_dict[] = find_styles(model, 0, 0, accept);
     for (const item of style_dict) {
@@ -142,12 +153,12 @@ export class GraphValidator {
           ]) {
             console.warn(
               chalk.red(
-                `Warning: Multiple style definitions with name '${style_name}' at the same level should be merged. Found: ${StyleDefinition_toString(duplicate_style_definition.definition.items)}`,
+                `Error: Multiple style definitions with name '${style_name}' at the same level should be merged. Found: ${StyleDefinition_toString(duplicate_style_definition.definition.items)}`,
               ),
             );
             accept(
-              "warning",
-              `Multiple style definitions with name '${style_name}' at the same level should be merged.`,
+              "error",
+              `Found multiple style definitions with the same name '${style_name}' at the same level.`,
               {
                 node: duplicate_style_definition,
                 property: "name",
@@ -189,4 +200,58 @@ function find_styles(
     style_dict.push(...find_styles(graph, level + 1, seq + 1, accept));
   }
   return style_dict;
+}
+
+function check_styles_defined_before_elements(
+  node: AstNode,
+  accept: ValidationAcceptor,
+  level = 0,
+) {
+  console.debug(
+    `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) - START`,
+  );
+  let elementCount = 0,
+    styleCount = 0;
+  for (const childNode of AstUtils.streamContents(node)) {
+    // Check that all Style nodes appear before Element nodes
+    if (isElement(childNode)) {
+      elementCount++;
+      console.debug(
+        `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Element node #${elementCount} of type '${childNode.$type}' ${childNode.name === undefined ? "" : ` with name '${childNode.name}'`}`,
+      );
+      if (isGraph(childNode)) {
+        // recurse
+        console.debug(
+          `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) -- BEGIN recursion`,
+        );
+        check_styles_defined_before_elements(childNode, accept, level + 1);
+        console.debug(
+          `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) -- END recursion`,
+        );
+      }
+    } else if (isStyle(childNode)) {
+      styleCount++;
+      console.debug(
+        `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Style node #${styleCount} with name '${childNode.name}'`,
+      );
+
+      if (elementCount > 0) {
+        console.error(
+          chalk.red(
+            `Style definitions must appear before any graph elements. Found ${elementCount} graph element(s) so far.`,
+          ),
+        );
+        accept(
+          "error",
+          "Style definitions must appear before any graph elements.",
+          {
+            node: childNode,
+          },
+        );
+      }
+    }
+  }
+  console.debug(
+    `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) - END -  [elements: ${elementCount}, styles: ${styleCount}]`,
+  );
 }
