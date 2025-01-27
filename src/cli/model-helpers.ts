@@ -10,6 +10,11 @@ import {
   StyleDefinition,
 } from "../language/generated/ast.js";
 
+/**
+ * Retrieve the label string from a Label node
+ * @param label the Label item to fetch the label text from
+ * @returns the label text
+ */
 export function Label_get_label(label: Label | undefined): string {
   if (!label) {
     return "";
@@ -101,6 +106,125 @@ export function Element_get_style_items(
   return filtered_style_definitions;
 }
 
+/**
+ * Render a Style definition to string
+ * @param d the style definition as an array of StyleDefinition items
+ * @returns an unparsed, unprocessed (at least for now) string representation of the style definition
+ */
 export function StyleDefinition_toString(d: StyleDefinition[]): string {
   return d.map((def) => `${def.topic}: "${def.value}"`).join("; ");
+}
+
+/**
+ * Get the Shape StyleItem from a style definition
+ * @param items the StyleItem array to explore
+ * @returns the last matching StyleItem
+ */
+export function StyleDefinitions_get_shape(
+  items: StyleDefinition[] | undefined,
+): string | undefined {
+  if (items === undefined) {
+    return undefined;
+  }
+  return items.findLast((def) => def.topic == "Shape")?.value;
+}
+
+/**
+ * Get the Label from a style definition
+ * @param items the StyleItem array to explore
+ * @returns the string representation of the label as found in the last matching StyleItem
+ */
+export function StyleDefinitions_get_label(
+  items: StyleDefinition[] | undefined,
+): string | undefined {
+  if (items === undefined) {
+    return undefined;
+  }
+  return items.findLast((def) => def.topic == "LabelText")?.value;
+}
+
+/**
+ * Get the FillColor StyleItem from a style definition
+ * @param items the StyleItem array to explore
+ * @returns the last matching StyleItem
+ */
+export function StyleDefinitions_get_fill_color(
+  items: StyleDefinition[] | undefined,
+): StyleDefinition | undefined {
+  if (items === undefined) {
+    return undefined;
+  }
+  return items.findLast((def) => def.topic == "FillColor"); //?.value;
+}
+
+/**
+ * Get the LineColor StyleItem from a style definition
+ * @param items the StyleItem array to explore
+ * @returns the last matching StyleItem
+ */
+export function StyleDefinitions_get_line_color(
+  items: StyleDefinition[] | undefined,
+): StyleDefinition | undefined {
+  if (items === undefined) {
+    return undefined;
+  }
+  return items.findLast((def) => def.topic == "LineColor"); //?.value;
+}
+
+/**
+ * Get the BorderColor StyleItem from a style definition
+ * @param items the StyleItem array to explore
+ * @returns the last matching StyleItem
+ */
+export function StyleDefinitions_get_border_color(
+  items: StyleDefinition[] | undefined,
+): StyleDefinition | undefined {
+  if (items === undefined) {
+    return undefined;
+  }
+  return items.findLast((def) => def.topic == "BorderColor"); //?.value;
+}
+
+/**
+ * Get the LabelColor StyleItem from a style definition
+ * @param items the StyleItem array to explore
+ * @returns the last matching StyleItem
+ */
+export function StyleDefinitions_get_label_color(
+  items: StyleDefinition[] | undefined,
+): StyleDefinition | undefined {
+  if (items === undefined) {
+    return undefined;
+  }
+  return items.findLast((def) => def.topic == "LabelColor"); //?.value;
+}
+
+/**
+ * Get the LineWidth StyleItem from a style definition
+ * @param items the StyleItem array to explore
+ * @returns the last matching StyleItem
+ */
+export function StyleDefinitions_get_line_width(
+  items: StyleDefinition[] | undefined,
+): StyleDefinition | undefined {
+  if (items === undefined) {
+    return undefined;
+  }
+  return items.findLast((def) => def.topic == "LineWidth"); //?.value;
+}
+
+/**
+ * Get the LineOpacity StyleItem from a style definition (can be overridden by 'Opacity')
+ * @param items the StyleItem array to explore
+ * @returns the last matching StyleItem
+ */
+export function StyleDefinitions_get_line_opacity(
+  items: StyleDefinition[] | undefined,
+): StyleDefinition | undefined {
+  if (items === undefined) {
+    return undefined;
+  }
+  return items.findLast((def) =>
+    ["LineOpacity", "Opacity"].includes(def.topic),
+  ); //?.value;
 }

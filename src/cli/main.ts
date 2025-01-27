@@ -5,6 +5,7 @@ import { GraphLanguageMetaData } from "../language/generated/module.js";
 import { createGraphServices } from "../language/graph-module.js";
 import { extractAstNode, extractDocument } from "./cli-util.js";
 import { generate_cleaned_graph } from "./generator.js";
+import { generate_mermaid_graph } from "./generate-mmd.js";
 import { NodeFileSystem } from "langium/node";
 import * as url from "node:url";
 import * as fs from "node:fs/promises";
@@ -34,7 +35,7 @@ export const parseAndValidateAction = async (
   }
 };
 
-export const generateAction = async (
+export const generateCleanedGraphAction = async (
   fileName: string,
   opts: GenerateOptions,
 ): Promise<void> => {
@@ -43,6 +44,20 @@ export const generateAction = async (
   const generatedFilePath = generate_cleaned_graph(model, fileName, opts);
   console.log(
     chalk.green(`JavaScript code generated successfully: ${generatedFilePath}`),
+  );
+};
+
+export const generateMermaidGraphAction = async (
+  fileName: string,
+  opts: GenerateOptions,
+): Promise<void> => {
+  const services = createGraphServices(NodeFileSystem).Graph;
+  const model = await extractAstNode<Model>(fileName, services);
+  const generatedFilePath = await generate_mermaid_graph(model, fileName, opts);
+  console.log(
+    chalk.green(
+      `MermaidJS Graph code generated successfully: ${generatedFilePath}`,
+    ),
   );
 };
 
@@ -70,7 +85,7 @@ export default function (): void {
     )
     .action(parseAndValidateAction);
 
-  // Action: generate
+  // Action generate:clean
   program
     .command("generate:clean")
     .argument(
@@ -79,7 +94,18 @@ export default function (): void {
     )
     .option("-d, --destination <dir>", "destination directory of generating")
     .description("strip comments and clean the input file (indentation etc.)")
-    .action(generateAction);
+    .action(generateCleanedGraphAction);
+
+  // Action generate:mmd
+  program
+    .command("generate:mmd")
+    .argument(
+      "<file>",
+      `source file (possible file extensions: ${fileExtensions})`,
+    )
+    .option("-d, --destination <dir>", "destination directory of generating")
+    .description("generate a MermaidJS graph (.mmd)")
+    .action(generateMermaidGraphAction);
 
   program.parse(process.argv);
 }
