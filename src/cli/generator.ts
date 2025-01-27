@@ -38,7 +38,7 @@ export function generate_cleaned_graph(
   const level = 0;
 
   for (const childNode of AstUtils.streamAllContents(model)) {
-    let foo = "";
+    let debug_log_message = "";
 
     // DEBUG - START
     const references = AstUtils.findLocalReferences(childNode);
@@ -63,39 +63,36 @@ export function generate_cleaned_graph(
     }
     // DEBUG - END
 
-    // if (childNode.$type === StyleDefinition) {
     if (isGraph(childNode)) {
       const element_count: number = childNode.elements.length;
       const style_count: number = childNode.styles.length;
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.style ? `:${childNode.style.$refText}` : ""}'`;
-      foo = `${preamble} and name '${childNode.name}' "${Label_get_label(childNode.label)}" -- ${element_count} element(s), ${style_count} style(s)`;
+      debug_log_message = `${preamble} and name '${childNode.name}' "${Label_get_label(childNode.label)}" -- ${element_count} element(s), ${style_count} style(s)`;
     } else if (isNode(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.style ? `:${childNode.style.$refText}` : ""}'`;
-      foo = `${preamble} "${Label_get_label(childNode.label)}"`;
+      debug_log_message = `${preamble} "${Label_get_label(childNode.label)}"`;
     } else if (isLink(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.style ? `:${childNode.style.$refText}` : ""}'`;
-      foo = `${preamble} ${childNode.src.$refText} --> ${childNode.dst.$refText} "${Label_get_label(childNode.label)}"`;
+      debug_log_message = `${preamble} ${childNode.src.$refText} ${childNode.kind} ${childNode.dst.$refText} "${Label_get_label(childNode.label)}"`;
     } else if (isStyle(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
-      foo = `${preamble} with name '${childNode.name}' (no direct access to StyleBlock)`;
+      debug_log_message = `${preamble} with name '${childNode.name}' (no direct access to StyleBlock)`;
     } else if (isStyleBlock(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
-      foo = `${preamble} -- ${childNode.items.length | 0} item(s)`;
+      debug_log_message = `${preamble} -- ${childNode.items.length | 0} item(s)`;
     } else if (isStyleDefinition(childNode)) {
       const topic = childNode.topic;
       const def = childNode.value;
-      // let props = childNode.$containerProperty
-      // let i = childNode.$container.$containerIndex
-      foo = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.name}: ${topic}: "${def}"`;
+      debug_log_message = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.name}: ${topic}: "${def}"`;
     } else if (isStringLabel(childNode)) {
-      foo = `${childNode.$type} "${Label_get_label(childNode)}"`;
+      debug_log_message = `${childNode.$type} "${Label_get_label(childNode)}"`;
     } else {
-      foo = ` --- generic '${childNode.$type}' (not yet processed)`;
+      debug_log_message = ` --- generic '${childNode.$type}' (not yet processed)`;
     }
     console.info(
       chalk.magentaBright(`generate_cleaned_graph - [${childNode.$type}]`),
     );
-    console.info(chalk.gray(foo));
+    console.info(chalk.gray(debug_log_message));
     console.log(
       chalk.magenta(
         `generate_cleaned_graph() - childNode.$cstNode?.text := '${childNode.$cstNode?.text ?? "<not defined>"}' -- END`,
