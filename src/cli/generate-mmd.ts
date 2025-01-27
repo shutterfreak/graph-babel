@@ -75,7 +75,7 @@ function _generateMMD(
   filePath: string,
 ): string {
   // We must keep track of links since they aren't identifiable in MermaidJS (they are numbered sequentially as they are defined)
-  const links: _mmd_link_info = { count: 0, style: {} };
+  const link_style_dict: __mmd_link_style_dict = { count: 0, styled_links: {} };
   // Construct the mermaidJS document from a collection of text lines:
   const lines: string[] = [];
 
@@ -84,21 +84,20 @@ function _generateMMD(
     `  title: ${filePath}`,
     "---",
     "graph",
-    ...render_node_contents(model, level + 1, links),
+    ...render_node_contents(model, level + 1, link_style_dict),
     "%% END",
   );
 
-  console.info(chalk.yellow(inspect(links)));
-  // Get the keys of the links (edges) that have styling defined:
-  const indexes = Object.keys(links.style);
+  console.info(chalk.yellow(inspect(link_style_dict)));
 
-  if (indexes.length > 0) {
+  // Render the link styling (if applicable):
+  const link_style_list = Object.keys(link_style_dict.styled_links);
+  if (link_style_list.length > 0) {
     lines.push("\n%% Link styles:");
-    // We will now group the link styles based on the defined style:
-    for (const value of new Set(indexes.map((key) => links.style[key]))) {
-      // Combine the indexes for identical style definitions
-      const keys = indexes.filter((key) => links.style[key] == value);
-      lines.push(`linkStyle ${keys.join(",")} ${value};`);
+    for (const key of link_style_list) {
+      lines.push(
+        `linkStyle ${link_style_dict.styled_links[key].join(",")} ${key};`,
+      );
     }
   }
 
@@ -108,7 +107,7 @@ function _generateMMD(
 function render_node_contents(
   node: Model | Graph,
   nesting_level: number,
-  links: _mmd_link_info,
+  link_style_dict: __mmd_link_style_dict,
 ): string[] {
   const lines: string[] = [];
 
@@ -118,7 +117,7 @@ function render_node_contents(
   }
   // Then the graph elements
   for (const element of node.elements) {
-    lines.push(...render_element(element, nesting_level, links));
+    lines.push(...render_element(element, nesting_level, link_style_dict));
   }
 
   return lines;
@@ -126,15 +125,15 @@ function render_node_contents(
 function render_element(
   element: Element,
   nesting_level: number,
-  links: _mmd_link_info,
+  link_style_dict: __mmd_link_style_dict,
 ): string[] {
   if (isGraph(element)) {
-    return render_graph(element, nesting_level, links);
+    return render_graph(element, nesting_level, link_style_dict);
   } else if (isNode(element)) {
     return [render_node(element, nesting_level)];
   } else {
     // isLink(element)
-    return [render_link(element, nesting_level, links)];
+    return [render_link(element, nesting_level, link_style_dict)];
   }
 }
 
@@ -169,12 +168,14 @@ function render_node(node: Node, nesting_level: number): string {
  * Reason: there is no explicit Link (edge) identifier in a MermaidJS Graph, so we must keep track of styling information
  * of styled links, and keep track of the link creation sequence number (implicit identifier in a MermaidJS Graph)
  * @count the implicit sequence number of link (edge) creation for MermaidJS
- * @style the stringified link styling to assign later on to links
+ * @styled_links a dict with the stringified link styling as key pointing to an array of styled links
  */
-interface _mmd_link_info {
+interface __mmd_link_style_dict {
   count: number;
-  style: Record<string, string>; // id --> array of mmd link style statements
+  styled_links: Record<string, number[]>;
 }
+
+// type __mmd_link_style_dict = Record<string, number[]>;
 
 /**
  *
@@ -186,7 +187,7 @@ interface _mmd_link_info {
 function render_link(
   link: Link,
   nesting_level: number,
-  links: _mmd_link_info,
+  link_style_dict: __mmd_link_style_dict,
 ): string {
   // TODO: first check label definition in Styles
   let label: string | undefined = Label_get_label(link.label);
@@ -238,7 +239,15 @@ function render_link(
 
   // Collapse string array of style fragments to string:
   if (style_items.length > 0) {
-    links.style[links.count] = style_items.join(","); // TODO TODO TODO
+    const link_style = style_items.join(",");
+
+    // A styled link will be added to the link_style_dict.styled_links array
+    if (!(link_style in link_style_dict.styled_links)) {
+      // Initialize new entry
+      link_style_dict.styled_links[link_style] = [];
+    }
+    // Add link index:
+    link_style_dict.styled_links[link_style].push(link_style_dict.count);
   }
 
   let start = "",
@@ -260,7 +269,7 @@ function render_link(
       end = "???";
   }
   const arrow = `${start}${label !== undefined && label.length == 0 ? "" : `- "${label}" -`}${end}`;
-  links.count++; // Increment the link count before returning
+  link_style_dict.count++; // Increment the link count before returning
   return (
     INDENTATION.repeat(nesting_level) +
     `${link.src.$refText} ${arrow} ${link.dst.$refText}` +
@@ -278,11 +287,11 @@ function render_link(
 function render_graph(
   graph: Graph,
   nesting_level: number,
-  links: _mmd_link_info,
+  link_style_dict: __mmd_link_style_dict,
 ): string[] {
   return [
     `\n${INDENTATION.repeat(nesting_level)}subgraph ${graph.name}\n`,
-    ...render_node_contents(graph, nesting_level + 1, links),
+    ...render_node_contents(graph, nesting_level + 1, link_style_dict),
     INDENTATION.repeat(nesting_level) + "end\n\n",
   ];
 }
