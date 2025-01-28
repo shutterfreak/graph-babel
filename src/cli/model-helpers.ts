@@ -4,7 +4,10 @@ import { AstNode } from "langium";
 import {
   Element,
   isGraph,
+  isLabelStyleDefinition,
   isModel,
+  isResetStyleDefinition,
+  isShapeStyleDefinition,
   Label,
   StringLabel,
   StyleDefinition,
@@ -65,7 +68,8 @@ export function Element_get_style_items(
           // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
           for (const d of s.definition.items) {
             // First check reset topic:
-            if (d.topic === "Reset") {
+            // if (d.topic === "Reset") {
+            if (isResetStyleDefinition(d)) {
               // Check which topics must be reset
               if (["All", "*"].includes(d.value)) {
                 // Reset entire style definition:
@@ -73,7 +77,7 @@ export function Element_get_style_items(
               } else {
                 console.error(
                   chalk.redBright(
-                    `ERROR: NOT YET IMPLEMENTED: reset style with argument '${d.value}'`,
+                    `ERROR: NOT YET IMPLEMENTED: reset style argument '${d.value}'`,
                   ),
                 );
               }
@@ -126,7 +130,7 @@ export function StyleDefinitions_get_shape(
   if (items === undefined) {
     return undefined;
   }
-  return items.findLast((def) => def.topic == "Shape")?.value;
+  return items.findLast((def) => isShapeStyleDefinition(def))?.value;
 }
 
 /**
@@ -140,7 +144,10 @@ export function StyleDefinitions_get_label(
   if (items === undefined) {
     return undefined;
   }
-  return items.findLast((def) => def.topic == "LabelText")?.value;
+  // return items.findLast((def) => def.topic == "Label")?.value;
+  return items.findLast(
+    (def) => isLabelStyleDefinition(def) && def.topic == "Label",
+  )?.value;
 }
 
 /**
