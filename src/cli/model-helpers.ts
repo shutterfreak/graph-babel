@@ -3,10 +3,16 @@ import { AstNode } from "langium";
 // import { inspect } from "util";
 import {
   Element,
+  isColorDefinition,
+  isColorStyleDefinition,
   isGraph,
+  isHexColorDefinition,
   isLabelStyleDefinition,
+  isLineStyleDefinition,
   isModel,
+  isOpacityStyleDefinition,
   isResetStyleDefinition,
+  isRgbColorDefinition,
   isShapeStyleDefinition,
   Label,
   StringLabel,
@@ -103,7 +109,7 @@ export function Element_get_style_items(
   // Debug statements:
   for (const d of filtered_style_definitions) {
     console.log(
-      chalk.bgWhite.blueBright(`Filtered: ${d.topic}: "${d.value}";`),
+      chalk.bgWhite.blueBright(`Filtered: ${d.topic}: "${d.$cstNode?.text}";`),
     );
   }
 
@@ -116,7 +122,7 @@ export function Element_get_style_items(
  * @returns an unparsed, unprocessed (at least for now) string representation of the style definition
  */
 export function StyleDefinition_toString(d: StyleDefinition[]): string {
-  return d.map((def) => `${def.topic}: "${def.value}"`).join("; ");
+  return d.map((def) => `${def.topic}: "${def.$cstNode?.text}"`).join("; ");
 }
 
 /**
@@ -144,94 +150,74 @@ export function StyleDefinitions_get_label(
   if (items === undefined) {
     return undefined;
   }
-  // return items.findLast((def) => def.topic == "Label")?.value;
-  return items.findLast(
-    (def) => isLabelStyleDefinition(def) && def.topic == "Label",
-  )?.value;
+  return items
+    .filter((def) => isLabelStyleDefinition(def))
+    .findLast((def) => def.topic == "LabelText")?.value;
 }
 
 /**
- * Get the FillColor StyleItem from a style definition
+ * Get the olor value of a ColorStyleItem from a style definition that matches any token in matching_tokens
  * @param items the StyleItem array to explore
+ * @param matching_tokens the array of tokens to check (BorderColor, FillColor, LabelColor, LineColor)
  * @returns the last matching StyleItem
  */
-export function StyleDefinitions_get_fill_color(
+export function StyleDefinitions_get_color_value(
   items: StyleDefinition[] | undefined,
+  matching_tokens: string[],
 ): StyleDefinition | undefined {
   if (items === undefined) {
     return undefined;
   }
-  return items.findLast((def) => def.topic == "FillColor"); //?.value;
-}
-
-/**
- * Get the LineColor StyleItem from a style definition
- * @param items the StyleItem array to explore
- * @returns the last matching StyleItem
- */
-export function StyleDefinitions_get_line_color(
-  items: StyleDefinition[] | undefined,
-): StyleDefinition | undefined {
-  if (items === undefined) {
-    return undefined;
-  }
-  return items.findLast((def) => def.topic == "LineColor"); //?.value;
-}
-
-/**
- * Get the BorderColor StyleItem from a style definition
- * @param items the StyleItem array to explore
- * @returns the last matching StyleItem
- */
-export function StyleDefinitions_get_border_color(
-  items: StyleDefinition[] | undefined,
-): StyleDefinition | undefined {
-  if (items === undefined) {
-    return undefined;
-  }
-  return items.findLast((def) => def.topic == "BorderColor"); //?.value;
-}
-
-/**
- * Get the LabelColor StyleItem from a style definition
- * @param items the StyleItem array to explore
- * @returns the last matching StyleItem
- */
-export function StyleDefinitions_get_label_color(
-  items: StyleDefinition[] | undefined,
-): StyleDefinition | undefined {
-  if (items === undefined) {
-    return undefined;
-  }
-  return items.findLast((def) => def.topic == "LabelColor"); //?.value;
+  return items
+    .filter((def) => isColorStyleDefinition(def))
+    .findLast((def) => matching_tokens.includes(def.topic)); //?.value;
 }
 
 /**
  * Get the LineWidth StyleItem from a style definition
  * @param items the StyleItem array to explore
+ * @param matching_tokens the array of tokens to check (BorderWidth, LineWidth)
  * @returns the last matching StyleItem
  */
-export function StyleDefinitions_get_line_width(
+export function StyleDefinitions_get_line_width_value(
   items: StyleDefinition[] | undefined,
+  matching_tokens: string[],
 ): StyleDefinition | undefined {
   if (items === undefined) {
     return undefined;
   }
-  return items.findLast((def) => def.topic == "LineWidth"); //?.value;
+  return items
+    .filter((def) => isLineStyleDefinition(def))
+    .findLast((def) => matching_tokens.includes(def.topic)); //?.value;
 }
 
 /**
  * Get the LineOpacity StyleItem from a style definition (can be overridden by 'Opacity')
  * @param items the StyleItem array to explore
+ * @param matching_tokens the array of tokens to check (BorderAlpha, FillAlpha, LabelAlpha, LineAlpha, BorderOpacity, FillOpacity, LabelOpacity, LineOpacity)
  * @returns the last matching StyleItem
  */
-export function StyleDefinitions_get_line_opacity(
+export function StyleDefinitions_get_opacity_value(
   items: StyleDefinition[] | undefined,
+  matching_tokens: string[],
 ): StyleDefinition | undefined {
   if (items === undefined) {
     return undefined;
   }
-  return items.findLast((def) =>
-    ["LineOpacity", "Opacity"].includes(def.topic),
-  ); //?.value;
+  return items
+    .filter((def) => isOpacityStyleDefinition(def))
+    .findLast((def) => matching_tokens.includes(def.topic)); //?.value;
+}
+
+function Color_toString(d: StyleDefinition) {
+  if (isColorDefinition(d.value)) {
+    const color = d.value.color;
+    if (isRgbColorDefinition(color)) {
+      return `rgb(${color.red},${color.green},${color.blue})`;
+    } else if (isHexColorDefinition(color)) {
+      return color.hex_color;
+    }
+    return color.color_name;
+  }
+  return undefined;
 }

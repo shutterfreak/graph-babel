@@ -33,12 +33,12 @@ Link:
         ')'
     )?
     src=[Element:ID]
-    kind=LinkType
+    kind=LINK_TYPE
     dst=[Element:ID]
     label=Label?
 ;
 
-terminal LinkType:
+terminal LINK_TYPE:
     'to' | 'and' | /[<xo]?(--|\.\.|==|~~)[>xo]?/
 ;
 
@@ -65,34 +65,41 @@ StyleBlock:
 ;
 
 StyleDefinition:
-    ColorStyleDefinition
+    LabelStyleDefinition
+    | ColorStyleDefinition
     | OpacityStyleDefinition
-    | LabelStyleDefinition
     | LineStyleDefinition
+    | LineWidthDefinition
     | ShapeStyleDefinition
     | ResetStyleDefinition
     | UnknownStyleDefinition
 ;
 
-ColorStyleDefinition:
-    topic=COLOR_STYLE_TOPIC
-    ':'
-    value=( STRING | ID )
-;
-OpacityStyleDefinition:
-    topic=COLOR_ALPHA_TOPIC
-    ':'
-    value=(STRING|ID)
-;
 LabelStyleDefinition:
     topic=LABEL_STYLE_TOPIC
     ':'
     value=STRING
 ;
+ColorStyleDefinition:
+    topic=COLOR_STYLE_TOPIC
+    ':'
+    // value=( STRING | ID )
+    value=ColorDefinition
+;
+OpacityStyleDefinition:
+    topic=COLOR_ALPHA_TOPIC
+    ':'
+    value=OpacityDefinition
+;
 LineStyleDefinition:
     topic=LINE_STYLE_TOPIC
     ':'
     value=STRING
+;
+LineWidthDefinition:
+    topic=LINE_WIDTH_TOPIC
+    ':'
+    value=WidthDefinition
 ;
 ShapeStyleDefinition:
     topic=SHAPE_STYLE_TOPIC
@@ -110,25 +117,79 @@ UnknownStyleDefinition:
     value=( STRING | ID )
 ;
 
+
+ColorDefinition:
+    color=(TextColorDefinition | RgbColorDefinition | HexColorDefinition)
+;
+TextColorDefinition:
+    color_name=(STRING|ID)
+;
+RgbColorDefinition:
+    'rgb(' red=INT ',' green=INT ',' blue=INT')'
+;
+HexColorDefinition:
+    hex_color=HEX_COLOR_DEFINITION
+;
+terminal HEX_COLOR_DEFINITION:
+    /\#[0-9a-f]+/i
+;
+
+WidthDefinition:
+    width=WidthValue
+;
+WidthValue:
+    value=(INT|NUMBER) unit=WIDTH_UNIT
+;
+terminal WIDTH_UNIT:
+    'mm' |
+    'cm' |
+    'pc' |
+    'pt' |
+    'em' |
+    'ex' |
+    'rem' |
+    'rex'
+;
+
+
+OpacityDefinition:
+    opacity=OneValue
+;
+
+
+OneValue:
+    value_one=NUMBER
+;
+
 terminal COLOR_STYLE_TOPIC:
-    /(Border|Fill|Line|Label)Color/
+    'BorderColor' | 'FillColor' | 'LineColor' | 'LabelColor'
 ;
 terminal COLOR_ALPHA_TOPIC:
-    /(Border|Fill|Line|Label)(Alpha|Opacity)/
+    'BorderAlpha' | 'FillAlpha' | 'LineAlpha' | 'LabelAlpha' |
+    'BorderOpacity' | 'FillOpacity' | 'LineOpacity' | 'LabelOpacity'
 ;
 terminal LABEL_STYLE_TOPIC:
-// NOTE: /(Src|Dst)?Label/ will match e.g. 'LabelText' and throw an error
-    /(Src|Dst|)(Label)/
+    'LabelText' | 'SrcLabelText' | 'DstLabelText'
 ;
 terminal LINE_STYLE_TOPIC:
-    /(Border|Line)(Style|Width)/
+    'BorderStyle' | 'LineStyle'
 ;
+terminal LINE_WIDTH_TOPIC:
+    'BorderWidth' | 'LineWidth'
+;
+
+
 terminal SHAPE_STYLE_TOPIC:
-    /Shape/
+    'Shape'
 ;
 terminal RESET_STYLE_TOPIC:
-    /Reset/
+    'Reset'
 ;
+
+StringValue:
+    value_string=STRING
+;
+
 
 Label:
     BracketedLabel | StringLabel;
@@ -145,9 +206,18 @@ terminal BRACKETED_STRING:
 ;
 
 hidden terminal WS: /\s+/;
+
 terminal ID: /[_a-zA-Z][\w_]*/;
-terminal INT returns number: /[0-9]+/;
 terminal STRING: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
+
+terminal INT returns number: // /(0|[1-9][0-9]*)/;
+    /\d+/
+;
+terminal NUMBER returns number:
+   /(\d*(\.\d+))|\d+/
+;
+
+
 
 hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
 hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;

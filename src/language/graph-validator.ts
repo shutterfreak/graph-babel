@@ -14,6 +14,11 @@ import {
   isElement,
   isGraph,
   isStyle,
+  HexColorDefinition,
+  LineStyleDefinition,
+  OpacityStyleDefinition,
+  // isPercentageValue,
+  isOneValue,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
 import { StyleDefinition_toString } from "../cli/model-helpers.js";
@@ -28,6 +33,9 @@ export function registerValidationChecks(services: GraphServices) {
   const checks: ValidationChecks<GraphAstType> = {
     // Person: validator.checkPersonStartsWithCapital
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
+    HexColorDefinition: [validator.checkHexColorDefinitions],
+    LineStyleDefinition: [validator.checkLineWidthDefinitions],
+    OpacityStyleDefinition: [validator.checkOpacityStyleDefinition],
   };
   registry.register(checks, validator);
 }
@@ -168,6 +176,116 @@ export class GraphValidator {
         }
       }
     }
+  }
+
+  checkHexColorDefinitions(
+    hex_color_definition: HexColorDefinition,
+    accept: ValidationAcceptor,
+  ): void {
+    const code_length = hex_color_definition.hex_color.length;
+    console.info(
+      chalk.cyanBright(
+        `checkHexColorDefinitions(${hex_color_definition.$cstNode?.text}): hex_color='${hex_color_definition.hex_color}' (length=${code_length})}`,
+      ),
+    );
+    if (![4, 7].includes(code_length)) {
+      console.warn(
+        chalk.red(
+          `Error: invalid hexadecimal color code '${hex_color_definition.hex_color}' (expecting '#' plus 3 or 6 hexadecimal digits, found ${code_length - 1}).`,
+        ),
+      );
+      accept(
+        "error",
+        `Error: invalid hexadecimal color code '${hex_color_definition.hex_color}' (expecting '#' plus 3 or 6 hexadecimal digits, found ${code_length - 1}).`,
+        {
+          node: hex_color_definition,
+          property: "hex_color",
+        },
+      );
+    }
+  }
+
+  checkLineWidthDefinitions(
+    line_style_item: LineStyleDefinition,
+    accept: ValidationAcceptor,
+  ): void {
+    if (["BorderWidth", "LineWidth"].includes(line_style_item.topic)) {
+      // Check the line style definition
+      const match = /^(\d+|\.\d+|\d*\.\d+)( *([a-z]{2,3}))?$/.exec(
+        line_style_item.value,
+      );
+      if (match) {
+        const value = match[1];
+        const unit = match[3];
+        const allowed_units = [
+          "mm",
+          "cm",
+          "pc",
+          "pt",
+          "em",
+          "ex",
+          "rem",
+          "rex",
+        ];
+        if (value.length == 0) {
+          console.error(
+            chalk.red(
+              `Link width has invalid numeric value: '${line_style_item.value}'.`,
+            ),
+          );
+          accept(
+            "error",
+            `Link width has invalid numeric value: '${line_style_item.value}'.`,
+            { node: line_style_item, property: "value" },
+          );
+        }
+        if (unit.length > 0 && !allowed_units.includes(unit)) {
+          console.error(
+            `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${allowed_units.join(", ")}.`,
+          );
+          accept(
+            "error",
+            `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${allowed_units.join(", ")}.`,
+            { node: line_style_item, property: "value" },
+          );
+        }
+      }
+    }
+  }
+
+  checkOpacityStyleDefinition(
+    opacity_style_item: OpacityStyleDefinition,
+    accept: ValidationAcceptor,
+  ): void {
+    const value = opacity_style_item.value.opacity;
+    if (isOneValue(value)) {
+      if (value.value_one < 0.0 || value.value_one > 1.0) {
+        // Out of bounds (one)
+        console.error(
+          `Link opacity value out of range (0...1): found '${value.value_one}'`,
+        );
+        accept(
+          "error",
+          `Link opacity value out of range (0...1): found '${value.value_one}'`,
+          { node: opacity_style_item, property: "value" },
+        );
+      }
+    }
+    /* Can't get PercentageValue to work in the langium grammar definition:
+    if (isPercentageValue(value)) {
+      if (value.value_pct < 0 || value.value_pct > 100) {
+        // Out of bounds (percentage)
+        console.error(
+          `Link opacity value out of range (0%...100%): found '${value.value_pct}'`,
+        );
+        accept(
+          "error",
+          `Link opacity value out of range (0%...100%): found '${value.value_pct}'`,
+          { node: opacity_style_item, property: "value" },
+        );
+      }
+    }
+    */
   }
 }
 

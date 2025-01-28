@@ -9,6 +9,13 @@ import {
   isNode,
   Style,
   StyleDefinition,
+  isColorStyleDefinition,
+  isRgbColorDefinition,
+  isHexColorDefinition,
+  isLineStyleDefinition,
+  isOpacityStyleDefinition,
+  // isPercentageValue,
+  isOneValue,
 } from "../language/generated/ast.js";
 import { createGraphServices } from "../language/graph-module.js";
 import { extractDestinationAndName, extractDocument } from "./cli-util.js";
@@ -20,10 +27,9 @@ import {
   Label_get_label,
   StyleDefinitions_get_shape,
   StyleDefinitions_get_label,
-  StyleDefinitions_get_line_color,
-  StyleDefinitions_get_label_color,
-  StyleDefinitions_get_line_width,
-  StyleDefinitions_get_line_opacity,
+  StyleDefinitions_get_color_value,
+  StyleDefinitions_get_opacity_value,
+  StyleDefinitions_get_line_width_value,
 } from "./model-helpers.js";
 import { inspect } from "util";
 
@@ -175,8 +181,6 @@ interface __mmd_link_style_dict {
   styled_links: Record<string, number[]>;
 }
 
-// type __mmd_link_style_dict = Record<string, number[]>;
-
 /**
  *
  * @param link the AST node representing a Link Element that will be rendered
@@ -189,44 +193,50 @@ function render_link(
   nesting_level: number,
   link_style_dict: __mmd_link_style_dict,
 ): string {
-  // TODO: first check label definition in Styles
-  let label: string | undefined = Label_get_label(link.label);
   const style_definitions: StyleDefinition[] | undefined =
     Element_get_style_items(link);
 
+  let label: string | undefined = Label_get_label(link.label);
   if (label.length == 0 && link.style !== undefined) {
+    // Try obtaining the label definition from the link Style
     console.log(
       chalk.bgBlueBright(
         `render_link() - label not defined at Link level - processing relevant style definitions (${link.style.$refText})`,
       ),
     );
-    // label = get_label_from_style(link.type);
     label = StyleDefinitions_get_label(style_definitions);
+    console.log(
+      chalk.bgBlueBright(
+        `render_link() - label after checking style definitions (${link.style.$refText}): "${label}"`,
+      ),
+    );
   }
 
   // The following items define the link style (which needs to be set at link level):
 
   // Link color:
   const link_color = to_mmd_color(
-    StyleDefinitions_get_line_color(style_definitions),
+    //StyleDefinitions_get_line_color(style_definitions),
+    StyleDefinitions_get_color_value(style_definitions, ["LineColor"]),
     "stroke",
   ); // MermaidJS: 'stroke'
 
   // Label (text) color:
   const label_color = to_mmd_color(
-    StyleDefinitions_get_label_color(style_definitions),
+    //StyleDefinitions_get_label_color(style_definitions),
+    StyleDefinitions_get_color_value(style_definitions, ["LabelColor"]),
     "color",
   ); // MermaidJS: 'color' (named or #rgb or #rrggbb)
 
   // Link width:
   const stroke_width = to_mmd_line_width(
-    StyleDefinitions_get_line_width(style_definitions),
+    StyleDefinitions_get_line_width_value(style_definitions, ["LineWidth"]),
     "stroke-width",
   ); // MermaidJS: 'width' (with unit)
 
   // Line opacity:
   const link_opacity = to_mmd_opacity(
-    StyleDefinitions_get_line_opacity(style_definitions),
+    StyleDefinitions_get_opacity_value(style_definitions, ["LineOpacity"]),
     "stroke-opacity",
   ); // MermaidJS: 'stroke-opacity' (0..1) or 0%..100%)
 
@@ -250,29 +260,48 @@ function render_link(
     link_style_dict.styled_links[link_style].push(link_style_dict.count);
   }
 
-  let start = "",
-    end = "";
-  switch (link.kind) {
-    case "to":
-    case "->":
-    case "-->":
-      start = "-";
-      end = "->";
-      break;
-    case "with":
-    case "--":
-      start = "-";
-      end = "-";
-      break;
-    default:
-      start = "???";
-      end = "???";
+  // Render link type --- AST: LINK_TYPE = /[<xo]?(--|\.\.|==|~~)[>xo]?/
+  // Mermaid: A -->|label| B
+  let edge: string | undefined = undefined;
+  if (label === undefined || label.length == 0) {
+    label = "";
+  } else {
+    // Escape '|' characters in the edge label:
+    label = `|${label.replaceAll("|", "\|")}|`;
   }
-  const arrow = `${start}${label !== undefined && label.length == 0 ? "" : `- "${label}" -`}${end}`;
+  if (link.kind == "to") {
+    //edge = `-${label === undefined || label.length == 0 ? "" : `- "${label}" -`}>`
+    edge = "-->";
+  } else if (link.kind == "with") {
+    edge = "---";
+  } else {
+    let match = /(--[-]?|\.\.[\.]?|==[=]?|~~[~]?|-\.-)/.exec(link.kind);
+    if (match) {
+      if (match[1].length == 2) {
+        // Ensure length of (at least) 3
+        edge = link.kind + link.kind.charAt(0);
+      } else {
+        edge = link.kind;
+      }
+    } else if (
+      (match = /([<xo])?(--[-]?|\.\.[\.]?|==[=]?|~~[~]?|-\.-)([>xo])?/.exec(
+        link.kind,
+      ))
+    ) {
+      edge = link.kind;
+    } else {
+      console.warn(
+        chalk.red(
+          `Warning: link style '${link.kind}' is not (yet) implemented. Will render as '...`,
+        ),
+      );
+      edge = "...";
+    }
+  }
   link_style_dict.count++; // Increment the link count before returning
   return (
     INDENTATION.repeat(nesting_level) +
-    `${link.src.$refText} ${arrow} ${link.dst.$refText}` +
+    `${link.src.$refText} ${edge}${label} ${link.dst.$refText}` +
     "\n"
   );
 }
@@ -289,8 +318,18 @@ function render_graph(
   nesting_level: number,
   link_style_dict: __mmd_link_style_dict,
 ): string[] {
+  let label = Label_get_label(graph.label);
+  if (label.length > 0) {
+    label = label.trim();
+  } else {
+    label = "";
+  }
+  // Only render non-empty graph labels as MMD subgraph title:
+  if (label.length > 0) {
+    label = ` [${label}]`;
+  }
   return [
-    `\n${INDENTATION.repeat(nesting_level)}subgraph ${graph.name}\n`,
+    `\n${INDENTATION.repeat(nesting_level)}subgraph ${graph.name}${label}\n`,
     ...render_node_contents(graph, nesting_level + 1, link_style_dict),
     INDENTATION.repeat(nesting_level) + "end\n\n",
   ];
@@ -305,7 +344,61 @@ function render_graph(
  */
 function render_style(style: Style, nesting_level: number): string {
   // TODO transform the styles into mermaid styles (some properties must propagate to the nodes, e.g. shape)
-  return INDENTATION.repeat(nesting_level) + `%% classDef ${style.name} TODO`;
+
+  // The following items define the link style (which needs to be set at link level):
+
+  // Link color:
+  const fill_color = to_mmd_color(
+    //StyleDefinitions_get_fill_color(style.definition.items),
+    StyleDefinitions_get_color_value(style.definition.items, ["FillColor"]),
+    "fill",
+  ); // MermaidJS: 'fill'
+
+  const border_color = to_mmd_color(
+    //StyleDefinitions_get_fill_color(style.definition.items),
+    StyleDefinitions_get_color_value(style.definition.items, ["BorderColor"]),
+    "stroke",
+  ); // MermaidJS: 'stroke'
+
+  // Label (text) color:
+  const label_color = to_mmd_color(
+    //StyleDefinitions_get_label_color(style.definition.items),
+    StyleDefinitions_get_color_value(style.definition.items, ["LabelColor"]),
+    "color",
+  ); // MermaidJS: 'color' (named or #rgb or #rrggbb)
+
+  // Link width:
+  const border_width = to_mmd_line_width(
+    StyleDefinitions_get_line_width_value(style.definition.items, [
+      "BorderWidth",
+    ]),
+    "stroke-width",
+  ); // MermaidJS: 'width' (with unit)
+
+  // Line opacity:
+  const border_opacity = to_mmd_opacity(
+    StyleDefinitions_get_opacity_value(style.definition.items, ["LineOpacity"]),
+    "stroke-opacity",
+  ); // MermaidJS: 'stroke-opacity' (0..1) or 0%..100%)
+
+  const style_items: string[] = [
+    fill_color,
+    border_color,
+    label_color,
+    border_width,
+    border_opacity,
+  ].filter((s) => s !== undefined); // TODO
+
+  let result =
+    INDENTATION.repeat(nesting_level) +
+    `%% ${style.definition.$cstNode?.text.replaceAll(/[\r\n\s]+/g, " ")}`;
+  if (style_items.length > 0) {
+    result +=
+      "\n" +
+      INDENTATION.repeat(nesting_level) +
+      `classDef ${style.name} ${style_items.join(",")};`;
+  }
+  return result;
 }
 
 /**
@@ -322,8 +415,24 @@ function shape_to_mmd_shape(shape: string | undefined): string | undefined {
     case "roundrect":
     case "rect-rounded":
     case "rounded-rect":
-      shape = "rounded";
-      break;
+      return "rounded";
+    case "diamond":
+    case "circle":
+    case "trap-b":
+    case "trap-t":
+    case "cylinder":
+    case "rect":
+    case "hourglass":
+    case "collate":
+      return shape;
+    // TODO
+    default:
+      console.warn(
+        chalk.red(
+          `shape_to_mmd_shape(${shape}) - not yet implemented (will use 'rect')`,
+        ),
+      );
+      return "rect";
   }
   return shape;
 }
@@ -338,48 +447,47 @@ function to_mmd_color(
   style_item: StyleDefinition | undefined,
   mmd_style_topic: string | undefined,
 ) {
-  let match: RegExpMatchArray | null | undefined = null;
   let color: string | undefined = undefined;
   let errors = 0;
 
-  if ((match = style_item?.value.match(/^rgb\(([\d]+),([\d]+),([\d]+)\)$/i))) {
-    const red = Number(match[1]);
-    if (red < 0 || red > 255) {
-      errors++;
-      console.error(`RGB color value for red is out of range: ${red}`);
+  if (isColorStyleDefinition(style_item)) {
+    // Check the color definition
+    const colorValue = style_item.value.color;
+
+    if (isRgbColorDefinition(colorValue)) {
+      const red = colorValue.red;
+      if (red < 0 || red > 255) {
+        errors++;
+        console.error(`RGB color value for red is out of range: ${red}`);
+      }
+      const green = colorValue.green;
+      if (green < 0 || green > 255) {
+        errors++;
+        console.error(`RGB color value for green is out of range: ${green}`);
+      }
+      const blue = colorValue.blue;
+      if (blue < 0 || blue > 255) {
+        errors++;
+        console.error(`RGB color value for blue is out of range: ${blue}`);
+      }
+      if (errors == 0) {
+        color = `#${("00" + red.toString(16)).slice(-2)}${("00" + green.toString(16)).slice(-2)}${("00" + blue.toString(16)).slice(-2)}`;
+      }
+    } else if (isHexColorDefinition(colorValue)) {
+      color = colorValue.hex_color;
+    } else {
+      color = colorValue.color_name;
     }
-    const green = Number(match[2]);
-    if (green < 0 || green > 255) {
-      errors++;
-      console.error(`RGB color value for green is out of range: ${green}`);
-    }
-    const blue = Number(match[3]);
-    if (blue < 0 || blue > 255) {
-      errors++;
-      console.error(`RGB color value for blue is out of range: ${blue}`);
-    }
-    if (errors == 0) {
-      color = `#${("00" + red.toString(16)).slice(-2)}${("00" + green.toString(16)).slice(-2)}${("00" + blue.toString(16)).slice(-2)}`;
-    }
-  } else if ((match = style_item?.value.match(/^#[0-9a-f]{3}$/i))) {
-    // rgb hex-3
-    color = style_item?.value.toLowerCase();
-  } else if ((match = style_item?.value.match(/^#[0-9a-f]{6}$/i))) {
-    // rgb hex-3
-    color = style_item?.value.toLowerCase();
-  } else if ((match = style_item?.value.match(/^[a-z]+$/i))) {
-    // color name -- TODO: filter
-    color = style_item?.value.toLowerCase();
   }
   if (color !== undefined) {
-    return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${color}`;
+    return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${color}`;
   }
   return undefined;
 }
 
 /**
  * Render a StyleDefinition LineWidth item in a style definition for MermaidJS
- * @param style_item the StyleDefinition LinkWidth item to be rendered as MermaidJS color
+ * @param style_item the StyleDefinition LineWidth item to be rendered as MermaidJS color
  * @param mmd_style_topic the MermaidJS style topic to which the LineWidth applies
  * @returns the entire MermaidJS line width style definition ("<topic>: <line-width-value>")
  */
@@ -390,33 +498,36 @@ function to_mmd_line_width(
   let match: RegExpMatchArray | null | undefined = null;
   let errors = 0;
 
-  if (
-    (match = style_item?.value.match(/^(\d+|\.\d+|\d*\.\d+)( *([a-z]{2,3}))?$/))
-  ) {
-    const value = match[1];
-    const unit = match[3];
-    const allowed_units = ["mm", "cm", "pc", "pt", "em", "ex", "rem", "rex"];
-    if (value.length == 0) {
-      console.error(
-        chalk.red(
-          `Link width has invalid numeric value: '${style_item?.value}'`,
-        ),
-      );
-      errors++;
-    }
-    if (unit.length > 0 && !allowed_units.includes(unit)) {
-      console.error(
-        chalk.red(`Link width has invalid unit: '${style_item?.value}'`),
-      );
-      errors++;
-    }
-    if (errors == 0) {
-      if (unit.length > 0) {
-        return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${value}${unit}`;
+  if (isLineStyleDefinition(style_item) && style_item.topic == "LineWidth") {
+    // Check the line style definition -- already checked in graph-validator.ts
+    match = /^(\d+|\.\d+|\d*\.\d+)( *([a-z]{2,3}))?$/.exec(style_item.value);
+    if (match) {
+      const value = match[1];
+      const unit = match[3];
+      const allowed_units = ["mm", "cm", "pc", "pt", "em", "ex", "rem", "rex"];
+      if (value.length == 0) {
+        console.error(
+          chalk.red(
+            `Link width has invalid numeric value: '${style_item.value}'`,
+          ),
+        );
+        errors++;
       }
-      return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${value}`;
+      if (unit.length > 0 && !allowed_units.includes(unit)) {
+        console.error(
+          chalk.red(`Link width has invalid unit: '${style_item.value}'`),
+        );
+        errors++;
+      }
+      if (errors == 0) {
+        if (unit.length > 0) {
+          return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${value}${unit}`;
+        }
+        return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${value}`;
+      }
     }
   }
+
   return undefined;
 }
 
@@ -430,22 +541,21 @@ function to_mmd_opacity(
   style_item: StyleDefinition | undefined,
   mmd_style_topic: string | undefined,
 ) {
-  let match: RegExpMatchArray | null | undefined = null;
-  let errors = 0;
+  if (
+    isOpacityStyleDefinition(style_item) &&
+    ["LineAlpha", "LineOpacity"].includes(style_item.topic)
+  ) {
+    // NOTE: checking already happened in graph-validator.ts
+    const value = style_item.value.opacity;
+    if (isOneValue(value)) {
+      return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${value.value_one}`;
+    }
+    /* Can't get this up and running in the langium grammar:
+    if (isPercentageValue(value)) {
+      return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${value.value_pct}%`;
 
-  if ((match = style_item?.value.match(/^(1|0?\.\d+)$/))) {
-    // number between 0 and 1
-    return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${match[1]}`;
-  } else if ((match = style_item?.value.match(/^(\d+) *\%$/))) {
-    // Percentage
-    const pct = match[1];
-    if (parseInt(pct) > 100) {
-      console.error(`Link opacity value out of range: '${style_item?.value}'`);
-      errors++;
     }
-    if (errors === 0) {
-      return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${pct}%`;
-    }
+    */
   }
   return undefined;
 }
