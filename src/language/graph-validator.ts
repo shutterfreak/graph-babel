@@ -19,9 +19,10 @@ import {
   OpacityStyleDefinition,
   isOneValue,
   RgbColorDefinition,
+  TextColorDefinition,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
-import { StyleDefinition_toString } from "./model-helpers.js";
+import { NAMED_COLORS, StyleDefinition_toString } from "./model-helpers.js";
 import chalk from "chalk";
 
 /**
@@ -35,6 +36,7 @@ export function registerValidationChecks(services: GraphServices) {
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
     HexColorDefinition: [validator.checkHexColorDefinitions],
     RgbColorDefinition: [validator.checkRgbColorDefinitions],
+    TextColorDefinition: [validator.checkTextColorDefinitions],
     LineStyleDefinition: [validator.checkLineWidthDefinitions],
     OpacityStyleDefinition: [validator.checkOpacityStyleDefinition],
   };
@@ -176,6 +178,23 @@ export class GraphValidator {
           }
         }
       }
+    }
+  }
+
+  checkTextColorDefinitions(
+    color_definition: TextColorDefinition,
+    accept: ValidationAcceptor,
+  ) {
+    const value = color_definition.color_name.toLowerCase();
+    if (!NAMED_COLORS.includes(value)) {
+      accept(
+        "error",
+        `The color '${color_definition.color_name}' is not defined. Please use a CSS named color.`,
+        {
+          node: color_definition,
+          property: "color_name",
+        },
+      );
     }
   }
 

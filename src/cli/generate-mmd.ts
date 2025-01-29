@@ -275,20 +275,25 @@ function render_link(
   } else if (link.kind == "with") {
     edge = "---";
   } else {
-    let match = /(--[-]?|\.\.[\.]?|==[=]?|~~[~]?|-\.-)/.exec(link.kind);
+    // let match = /(--[-]?|\.\.[\.]?|==[=]?|~~[~]?|-\.-)/.exec(link.kind);
+    const match = /([<xo]?)(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)([>xo])?/.exec(
+      link.kind,
+    );
     if (match) {
-      if (match[1].length == 2) {
-        // Ensure length of (at least) 3
-        edge = link.kind + link.kind.charAt(0);
-      } else {
-        edge = link.kind;
+      const src: string = match[1] ?? "";
+      let line = match[2] ?? "";
+      const dst = match[3] ?? "";
+
+      if (line.length > 0) {
+        if (src == "" && dst == "") {
+          // ensure line length is 3 characters:
+          if (line.length < 3) {
+            // Only if identical characters - duplicate 1st characer:
+            line = line + line.charAt(0);
+          }
+        }
+        edge = src + line + dst;
       }
-    } else if (
-      (match = /([<xo])?(--[-]?|\.\.[\.]?|==[=]?|~~[~]?|-\.-)([>xo])?/.exec(
-        link.kind,
-      ))
-    ) {
-      edge = link.kind;
     } else {
       console.warn(
         chalk.red(
@@ -448,37 +453,31 @@ function to_mmd_color(
   mmd_style_topic: string | undefined,
 ) {
   let color: string | undefined = undefined;
-  let errors = 0;
-
   if (isColorStyleDefinition(style_item)) {
     // Check the color definition
     const colorValue = style_item.value.color;
 
     if (isRgbColorDefinition(colorValue)) {
+      // Not supported by MermaidJS - Convert to hex color code
       const red = colorValue.red;
-      if (red < 0 || red > 255) {
-        errors++;
-        console.error(`RGB color value for red is out of range: ${red}`);
-      }
       const green = colorValue.green;
-      if (green < 0 || green > 255) {
-        errors++;
-        console.error(`RGB color value for green is out of range: ${green}`);
-      }
       const blue = colorValue.blue;
-      if (blue < 0 || blue > 255) {
-        errors++;
-        console.error(`RGB color value for blue is out of range: ${blue}`);
-      }
-      if (errors == 0) {
-        color = `#${("00" + red.toString(16)).slice(-2)}${("00" + green.toString(16)).slice(-2)}${("00" + blue.toString(16)).slice(-2)}`;
-      }
+      color =
+        "#" +
+        ("00" + red.toString(16)).slice(-2) +
+        ("00" + green.toString(16)).slice(-2) +
+        ("00" + blue.toString(16)).slice(-2);
     } else if (isHexColorDefinition(colorValue)) {
       color = colorValue.hex_color;
     } else {
       color = colorValue.color_name;
     }
   }
+  console.info(
+    chalk.gray(
+      `to_mmd_color(${style_item?.topic}: ${style_item?.$cstNode?.text ?? "<$cstNode undefined>"}): mmd style: [ ${mmd_style_topic} ] -> color = "${color ?? "<undefined>"}"`,
+    ),
+  );
   if (color !== undefined) {
     return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${color}`;
   }

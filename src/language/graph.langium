@@ -39,7 +39,8 @@ Link:
 ;
 
 terminal LINK_TYPE:
-    'to' | 'and' | /[<xo]?(--|\.\.|==|~~)[>xo]?/
+    'to' | 'with' |
+    /[<xo]?(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)[>xo]?/
 ;
 
 fragment StyleID:
@@ -122,7 +123,7 @@ ColorDefinition:
     color=(TextColorDefinition | RgbColorDefinition | HexColorDefinition)
 ;
 TextColorDefinition:
-    color_name=(STRING|ID)
+    color_name=ID // (STRING|ID)
 ;
 RgbColorDefinition:
     'rgb(' red=INT ',' green=INT ',' blue=INT')'
