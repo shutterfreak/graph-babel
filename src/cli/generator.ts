@@ -20,7 +20,11 @@ import * as path from "node:path";
 import { inspect } from "util";
 import { extractDestinationAndName } from "./cli-util.js";
 import { GenerateOptions } from "./main.js";
-import { Element_get_style_items, Label_get_label } from "./model-helpers.js";
+import {
+  Element_get_style_items,
+  Label_get_label,
+  StyleDefinition_toString,
+} from "../language/model-helpers.js";
 import chalk from "chalk";
 
 export function generate_cleaned_graph(
@@ -81,9 +85,12 @@ export function generate_cleaned_graph(
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
       debug_log_message = `${preamble} -- ${childNode.items.length | 0} item(s)`;
     } else if (isStyleDefinition(childNode)) {
+      /*
+      NOTE: incomplete implementation: value (def) is currently not parsed in StyleDefinition_toString() - it rather returns the source text for the value.
       const topic = childNode.topic;
       const def = childNode.value;
-      debug_log_message = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.name}: ${topic}: "${def}"`;
+      */
+      debug_log_message = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.name}: ${StyleDefinition_toString([childNode])}"`;
     } else if (isStringLabel(childNode)) {
       debug_log_message = `${childNode.$type} "${Label_get_label(childNode)}"`;
     } else {
@@ -123,8 +130,8 @@ export function generate_cleaned_graph(
       chalk.magenta(
         `render_Graph(${graph.name}) - style := `,
         inspect(
-          Element_get_style_items(graph)?.map(
-            (s) => `${s.topic} : "${s.value}"`,
+          Element_get_style_items(graph)?.map((s) =>
+            StyleDefinition_toString([s]),
           ),
         ),
       ),
@@ -149,8 +156,8 @@ export function generate_cleaned_graph(
       chalk.magenta(
         `render_Node(${node.name}) - style := `,
         inspect(
-          Element_get_style_items(node)?.map(
-            (s) => `${s.topic} : "${s.value}"`,
+          Element_get_style_items(node)?.map((s) =>
+            StyleDefinition_toString([s]),
           ),
         ),
       ),
@@ -166,8 +173,8 @@ export function generate_cleaned_graph(
       chalk.magenta(
         `render_Link(${link.name ?? "<no name>"}) - style := `,
         inspect(
-          Element_get_style_items(link)?.map(
-            (s) => `${s.topic} : "${s.value}"`,
+          Element_get_style_items(link)?.map((s) =>
+            StyleDefinition_toString([s]),
           ),
         ),
       ),
@@ -177,7 +184,12 @@ export function generate_cleaned_graph(
   }
 
   function render_Style(style: Style, level: number): string {
-    return `${INDENTATION.repeat(level)}style ${style.name} {\n${style.definition.items.map((it) => `${INDENTATION.repeat(level + 1)}${it.topic}: "${it.value}";`).join("\n")}\n${INDENTATION.repeat(level)}}`;
+    return `${INDENTATION.repeat(level)}style ${style.name} {\n${style.definition.items
+      .map(
+        (it) =>
+          `${INDENTATION.repeat(level + 1)}${StyleDefinition_toString([it])}";`,
+      )
+      .join("\n")}\n${INDENTATION.repeat(level)}}`;
   }
 
   /*

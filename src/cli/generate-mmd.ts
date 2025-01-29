@@ -30,7 +30,7 @@ import {
   StyleDefinitions_get_color_value,
   StyleDefinitions_get_opacity_value,
   StyleDefinitions_get_line_width_value,
-} from "./model-helpers.js";
+} from "../language/model-helpers.js";
 import { inspect } from "util";
 
 export async function generate_mermaid_graph(

@@ -18,7 +18,7 @@ import {
   Label,
   StringLabel,
   StyleDefinition,
-} from "../language/generated/ast.js";
+} from "./generated/ast.js";
 
 /**
  * Retrieve the label string from a Label node
@@ -123,6 +123,11 @@ export function Element_get_style_items(
  * @returns an unparsed, unprocessed (at least for now) string representation of the style definition
  */
 export function StyleDefinition_toString(d: StyleDefinition[]): string {
+  console.warn(
+    chalk.yellowBright(
+      `[WARN] StyleDefinition_toString(topics: ${d.map((sd) => sd.topic).join(", ")}) - values NOT YET PARSED (falling back to '$CstNode.text')`,
+    ),
+  );
   return d.map((def) => `${def.topic}: "${def.$cstNode?.text}"`).join("; ");
 }
 

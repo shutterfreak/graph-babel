@@ -21,7 +21,7 @@ import {
   RgbColorDefinition,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
-import { StyleDefinition_toString } from "../cli/model-helpers.js";
+import { StyleDefinition_toString } from "./model-helpers.js";
 import chalk from "chalk";
 
 /**
