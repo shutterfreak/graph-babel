@@ -174,6 +174,145 @@ export const NAMED_COLORS_AND_HEX_DEFINITIONS = {
 
 export const NAMED_COLORS = Object.keys(NAMED_COLORS_AND_HEX_DEFINITIONS);
 
+/** Named shapes originate from MermaidJS:
+ * url: https://mermaid.js.org/syntax/flowchart.html
+ */
+export const NAMED_SHAPES = [
+  "notch_rect",
+  "card",
+  "notched_rectangle", // Card - Represents a card
+  "hourglass",
+  "collate",
+  "hourglass", // Collate - Represents a collate operation
+  "bolt",
+  "com_link",
+  "lightning_bolt", // Com Link - Communication link
+  "brace",
+  "brace_l",
+  "comment", // Comment - Adds a comment
+  "brace_r", // Comment Right - Adds a comment
+  "braces", // Comment with braces on both sides - Adds a comment
+  "lean_r",
+  "in_out",
+  "lean_right", // Data Input/Output - Represents input or output
+  "lean_l",
+  "lean_left",
+  "out_in", // Data Input/Output - Represents output or input
+  "cyl",
+  "cylinder",
+  "database",
+  "db", // Database - Database storage
+  "diam",
+  "decision",
+  "diamond",
+  "question", // Decision - Decision-making step
+  "delay",
+  "half_rounded_rectangle", // Delay - Represents a delay
+  "h_cyl",
+  "das",
+  "horizontal_cylinder", // Direct Access Storage - Direct access storage
+  "lin_cyl",
+  "disk",
+  "lined_cylinder", // Disk Storage - Disk storage
+  "curv_trap",
+  "curved_trapezoid",
+  "display", // Display - Represents a display
+  "div_rect",
+  "div_proc",
+  "divided_process",
+  "divided_rectangle", // Divided Process - Divided process shape
+  "doc",
+  "doc",
+  "document", // Document - Represents a document
+  "rounded",
+  "event", // Event - Represents an event
+  "tri",
+  "extract",
+  "triangle", // Extract - Extraction process
+  "fork",
+  "join", // Fork/Join - Fork or join in process flow
+  "win_pane",
+  "internal_storage",
+  "window_pane", // Internal Storage - Internal storage
+  "f_circ",
+  "filled_circle",
+  "junction", // Junction - Junction point
+  "lin_doc",
+  "lined_document", // Lined Document - Lined document
+  "lin_rect",
+  "lin_proc",
+  "lined_process",
+  "lined_rectangle",
+  "shaded_process", // Lined/Shaded Process - Lined process shape
+  "notch_pent",
+  "loop_limit",
+  "notched_pentagon", // Loop Limit - Loop limit step
+  "flip_tri",
+  "flipped_triangle",
+  "manual_file", // Manual File - Manual file operation
+  "sl_rect",
+  "manual_input",
+  "sloped_rectangle", // Manual Input - Manual input step
+  "trap_t",
+  "inv_trapezoid",
+  "manual",
+  "trapezoid_top", // Manual Operation - Represents a manual task
+  "docs",
+  "documents",
+  "st_doc",
+  "stacked_document", // Multi-Document - Multiple documents
+  "st_rect",
+  "processes",
+  "procs",
+  "stacked_rectangle", // Multi-Process - Multiple processes
+  "odd", // Odd - Odd shape
+  "flag",
+  "paper_tape", // Paper Tape - Paper tape
+  "hex",
+  "hexagon",
+  "prepare", // Prepare Conditional - Preparation or condition step
+  "trap_b",
+  "priority",
+  "trapezoid",
+  "trapezoid_bottom", // Priority Action - Priority action
+  "rect",
+  "proc",
+  "process",
+  "rectangle", // Process - Standard process shape
+  "circle",
+  "circ", // Start - Starting point
+  "sm_circ",
+  "small_circle",
+  "start", // Start - Small starting point
+  "dbl_circ",
+  "double_circle", // Stop - Represents a stop point
+  "fr_circ",
+  "framed_circle",
+  "stop", // Stop - Stop point
+  "bow_rect",
+  "bow_tie_rectangle",
+  "stored_data", // Stored Data - Stored data
+  "fr_rect",
+  "framed_rectangle",
+  "subproc",
+  "subprocess",
+  "subroutine", // Subprocess - Subprocess
+  "cross_circ",
+  "crossed_circle",
+  "summary", // Summary - Summary
+  "tag_doc",
+  "tag_doc",
+  "tagged_document", // Tagged Document - Tagged document
+  "tag_rect",
+  "tag_proc",
+  "tagged_process",
+  "tagged_rectangle", // Tagged Process - Tagged process
+  "stadium",
+  "pill",
+  "terminal", // Terminal Point - Terminal point
+  "text", // Text Block - Text block
+];
+
 /**
  * Retrieve the label string from a Label node
  * @param label the Label item to fetch the label text from

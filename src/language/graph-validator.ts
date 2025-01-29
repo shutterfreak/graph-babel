@@ -20,9 +20,14 @@ import {
   isOneValue,
   RgbColorDefinition,
   TextColorDefinition,
+  ShapeStyleDefinition,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
-import { NAMED_COLORS, StyleDefinition_toString } from "./model-helpers.js";
+import {
+  NAMED_COLORS,
+  NAMED_SHAPES,
+  StyleDefinition_toString,
+} from "./model-helpers.js";
 import chalk from "chalk";
 
 /**
@@ -38,6 +43,7 @@ export function registerValidationChecks(services: GraphServices) {
     TextColorDefinition: [validator.checkTextColorDefinitions],
     LineStyleDefinition: [validator.checkLineWidthDefinitions],
     OpacityStyleDefinition: [validator.checkOpacityStyleDefinition],
+    ShapeStyleDefinition: [validator.checkShapeStyleDefinitions],
   };
   registry.register(checks, validator);
 }
@@ -160,6 +166,23 @@ export class GraphValidator {
           }
         }
       }
+    }
+  }
+
+  checkShapeStyleDefinitions(
+    shape_definition: ShapeStyleDefinition,
+    accept: ValidationAcceptor,
+  ) {
+    const value = shape_definition.value.toLowerCase();
+    if (!NAMED_SHAPES.includes(value)) {
+      accept(
+        "error",
+        `The shape '${shape_definition.value}' is not recognized.`,
+        {
+          node: shape_definition,
+          property: "value",
+        },
+      );
     }
   }
 
