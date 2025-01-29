@@ -46,36 +46,45 @@ The [grammar](src/language/graph.langium) allows to describe graphs as follows:
 ```text
 // NOTE: the style object is still under active development
 style decision {
-    LineColor: blue;
-    Shape: "diamond";
+    BorderColor: blue;
+    BorderWidth: 2pt;
     FillColor: "rgb(240,120,24)";
-    LabelColor: "#CCDDeE";
-    LineOpacity: "25%";
+    LabelColor: "black";
+    Shape: "diamond";
 }
 style yes {
-    LineColor: "red";
+    LabelColor: #ff0000;
     LabelText: "yes";
-    LabelColor: "red";
+    LineColor: "red";
+    LineOpacity: .75;
+    LineWidth: 2pt;
 }
 style no {
-    LineColor: "green";
     LabelColor: "green";
     LabelText: "no";
+    LineColor: "green";
+    LineOpacity: .75;
+    LineWidth: 2pt;
 }
 
 graph g1 "Main graph title" {
+    style decision { // Override style in this scope:
+        FillColor: "darkorange";
+        BorderColor: "red";
+    }
     node:decision n1 "a node in a graph"
     node n2 [bracketed node label]
     node n3 /* Empty node */
 
+    // Links don't have to have a name (identifier) defined:
     link:yes n1 to n2
     link:no n1 to n3
 
     graph g2 "Graph g2 in graph g1" {
         node g2n1 "graph 2 node 1"
-        node g2n2 "graph 2 node 1"
-        link (l1g2) from g2n1 to g2n2 "edge label in g2"
-        // Comment
+        node g2n2 "graph 2 node 2"
+        // A named link has the identifier between round brackets:
+        link (l1g2) g2n1 -- g2n2 "edge label in g2"
     }
 }
 ```
