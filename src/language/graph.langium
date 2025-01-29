@@ -32,9 +32,9 @@ Link:
         name=ID
         ')'
     )?
-    src=[Element:ID]
+    src+=[Element:ID] ( ',' src+=[Element:ID] )*
     kind=LINK_TYPE
-    dst=[Element:ID]
+    dst+=[Element:ID] ( ',' dst+=[Element:ID] )*
     label=Label?
 ;
 

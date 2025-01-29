@@ -13,7 +13,7 @@ import {
   isStyle,
   isStyleBlock,
 } from "../language/generated/ast.js";
-import { AstUtils } from "langium";
+import { AstUtils, Reference } from "langium";
 import { expandToNode, joinToNode, toString } from "langium/generate";
 // import * as fs from "node:fs";
 import * as path from "node:path";
@@ -77,7 +77,18 @@ export function generate_cleaned_graph(
       debug_log_message = `${preamble} "${Label_get_label(childNode.label)}"`;
     } else if (isLink(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.style ? `:${childNode.style.$refText}` : ""}'`;
-      debug_log_message = `${preamble} ${childNode.src.$refText} ${childNode.kind} ${childNode.dst.$refText} "${Label_get_label(childNode.label)}"`;
+
+      const src_links: string[] = [];
+      let s: Reference<Element> | undefined = undefined;
+      for (s of childNode.src) {
+        src_links.push(s.$refText);
+      }
+      const dst_links: string[] = [];
+      for (s of childNode.dst) {
+        dst_links.push(s.$refText);
+      }
+
+      debug_log_message = `${preamble} ${src_links.join(",")} ${childNode.kind} ${dst_links.join(",")} "${Label_get_label(childNode.label)}"`;
     } else if (isStyle(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
       debug_log_message = `${preamble} with name '${childNode.name}' (no direct access to StyleBlock)`;
@@ -180,7 +191,17 @@ export function generate_cleaned_graph(
       ),
     );
 
-    return `${INDENTATION.repeat(level)}link${link.style ? `:${link.style.$refText}` : ""} ${link.name != null ? `(${link.name}) ` : ""}${link.src.ref?.name} to ${link.dst.ref?.name}${label !== "" ? ` "${label}"` : ""}`;
+    const src_links: string[] = [];
+    let s: Reference<Element> | undefined = undefined;
+    for (s of link.src) {
+      src_links.push(s.$refText);
+    }
+    const dst_links: string[] = [];
+    for (s of link.dst) {
+      dst_links.push(s.$refText);
+    }
+
+    return `${INDENTATION.repeat(level)}link${link.style ? `:${link.style.$refText}` : ""} ${link.name != null ? `(${link.name}) ` : ""}${src_links.join(",")} ${link.kind} ${dst_links.join(",")}${label !== "" ? ` "${label}"` : ""}`;
   }
 
   function render_Style(style: Style, level: number): string {

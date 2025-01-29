@@ -53,16 +53,16 @@ style decision {
     Shape: "diamond";
 }
 style yes {
-    LabelColor: #ff0000;
-    LabelText: "yes";
-    LineColor: "red";
+    LabelColor: "green";
+    LabelText: "no";
+    LineColor: "green";
     LineOpacity: .75;
     LineWidth: 2pt;
 }
 style no {
-    LabelColor: "green";
-    LabelText: "no";
-    LineColor: "green";
+    LabelColor: #ff0000;
+    LabelText: "yes";
+    LineColor: "red";
     LineOpacity: .75;
     LineWidth: 2pt;
 }
@@ -77,7 +77,7 @@ graph g1 "Main graph title" {
     node n3 /* Empty node */
 
     // Links don't have to have a name (identifier) defined:
-    link:yes n1 to n2
+    link:yes n1 to n2,g2n1 /* separate identifiers with commas to specify multiple sources / destinations */
     link:no n1 to n3
 
     graph g2 "Graph g2 in graph g1" {

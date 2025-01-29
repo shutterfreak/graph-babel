@@ -32,6 +32,7 @@ import {
   StyleDefinitions_get_line_width_value,
 } from "../language/model-helpers.js";
 import { inspect } from "util";
+import { Reference } from "langium";
 
 export async function generate_mermaid_graph(
   model: Model,
@@ -64,7 +65,7 @@ export async function generate_mermaid_graph(
     console.log(chalk.red(`Failed to parse and validate ${filePath}!`));
   }
 
-  console.log(chalk.greenBright(_generateMMD(model, 0, filePath)));
+  console.log(chalk.whiteBright(_generateMMD(model, 0, filePath)));
   console.log(
     chalk.green(`Mermaid graph generated successfully to ${generatedFilePath}`),
   );
@@ -91,7 +92,6 @@ function _generateMMD(
     "---",
     "graph",
     ...render_node_contents(model, level + 1, link_style_dict),
-    "%% END",
   );
 
   console.info(chalk.yellow(inspect(link_style_dict)));
@@ -106,6 +106,7 @@ function _generateMMD(
       );
     }
   }
+  lines.push("%% END");
 
   return lines.join("\n");
 }
@@ -247,19 +248,6 @@ function render_link(
     link_opacity,
   ].filter((s) => s !== undefined); // TODO
 
-  // Collapse string array of style fragments to string:
-  if (style_items.length > 0) {
-    const link_style = style_items.join(",");
-
-    // A styled link will be added to the link_style_dict.styled_links array
-    if (!(link_style in link_style_dict.styled_links)) {
-      // Initialize new entry
-      link_style_dict.styled_links[link_style] = [];
-    }
-    // Add link index:
-    link_style_dict.styled_links[link_style].push(link_style_dict.count);
-  }
-
   // Render link type --- AST: LINK_TYPE = /[<xo]?(--|\.\.|==|~~)[>xo]?/
   // Mermaid: A -->|label| B
   let edge: string | undefined = undefined;
@@ -303,11 +291,43 @@ function render_link(
       edge = "...";
     }
   }
-  link_style_dict.count++; // Increment the link count before returning
+
+  const src_links: string[] = [];
+  let s: Reference<Element> | undefined = undefined;
+  for (s of link.src) {
+    src_links.push(s.$refText);
+  }
+  const dst_links: string[] = [];
+  for (s of link.dst) {
+    dst_links.push(s.$refText);
+  }
+
+  // Collapse string array of style fragments to string:
+  if (style_items.length > 0) {
+    const link_style = style_items.join(",");
+
+    // A styled link will be added to the link_style_dict.styled_links array
+    if (!(link_style in link_style_dict.styled_links)) {
+      // Initialize new entry
+      link_style_dict.styled_links[link_style] = [];
+    }
+
+    // Add link indexes:
+    link_style_dict.styled_links[link_style].push(
+      ...Array.from(
+        { length: src_links.length * dst_links.length },
+        (value, index) => link_style_dict.count + index,
+      ),
+    );
+  }
+
+  // Increment the number of links (for styling purposes):
+  link_style_dict.count += src_links.length * dst_links.length;
+
+  //TODO: assign styling to ALL links (not only the first one)
   return (
     INDENTATION.repeat(nesting_level) +
-    `${link.src.$refText} ${edge}${label} ${link.dst.$refText}` +
-    "\n"
+    `${src_links.join(" & ")} ${edge}${label} ${dst_links.join(" & ")}\n`
   );
 }
 
