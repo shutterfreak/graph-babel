@@ -17,8 +17,8 @@ import {
   HexColorDefinition,
   LineStyleDefinition,
   OpacityStyleDefinition,
-  // isPercentageValue,
   isOneValue,
+  RgbColorDefinition,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
 import { StyleDefinition_toString } from "../cli/model-helpers.js";
@@ -34,6 +34,7 @@ export function registerValidationChecks(services: GraphServices) {
     // Person: validator.checkPersonStartsWithCapital
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
     HexColorDefinition: [validator.checkHexColorDefinitions],
+    RgbColorDefinition: [validator.checkRgbColorDefinitions],
     LineStyleDefinition: [validator.checkLineWidthDefinitions],
     OpacityStyleDefinition: [validator.checkOpacityStyleDefinition],
   };
@@ -200,6 +201,77 @@ export class GraphValidator {
         {
           node: hex_color_definition,
           property: "hex_color",
+        },
+      );
+    }
+  }
+
+  checkRgbColorDefinitions(
+    rgb_color_definition: RgbColorDefinition,
+    accept: ValidationAcceptor,
+  ): void {
+    // NOTE:; code duplication to circumvent access problems to 'property: "red" | "green" | "blue"' as those aren't strings but types.
+
+    // Check red:
+    const red = rgb_color_definition.red;
+    /* Grammar currently implemented with INT
+    if (!Number.isInteger(red)) {
+      accept("error", `RGB color value for red is not an integer: '${red}'`, {
+        node: rgb_color_definition,
+        property: "red",
+      });
+    } else */
+    if (red < 0 || red > 255) {
+      accept(
+        "error",
+        `RGB color value for red out of range: '${red}' (expecting an integer value (0 ≤ red ≤ 255)`,
+        {
+          node: rgb_color_definition,
+          property: "red",
+        },
+      );
+    }
+
+    // Check green:
+    const green = rgb_color_definition.green;
+    /* Grammar currently implemented with INT
+    if (!Number.isInteger(green)) {
+      accept(
+        "error",
+        `RGB color value for green is not an integer: '${green}'`,
+        {
+          node: rgb_color_definition,
+          property: "green",
+        },
+      );
+    } else */
+    if (green < 0 || green > 255) {
+      accept(
+        "error",
+        `RGB color value for green out of range: '${green}' (expecting an integer value (0 ≤ green ≤ 255)`,
+        {
+          node: rgb_color_definition,
+          property: "green",
+        },
+      );
+    }
+
+    // Check blue:
+    const blue = rgb_color_definition.blue;
+    /* Grammar currently implemented with INT
+    if (!Number.isInteger(blue)) {
+      accept("error", `RGB color value for blue is not an integer: '${blue}'`, {
+        node: rgb_color_definition,
+        property: "blue",
+      });
+    } else */
+    if (blue < 0 || blue > 255) {
+      accept(
+        "error",
+        `RGB color value for blue out of range: '${blue}' (expecting an integer value (0 ≤ blue ≤ 255)`,
+        {
+          node: rgb_color_definition,
+          property: "blue",
         },
       );
     }

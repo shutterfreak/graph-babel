@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { AstNode } from "langium";
 // import { inspect } from "util";
 import {
+  ColorDefinition,
   Element,
   isColorDefinition,
   isColorStyleDefinition,
@@ -209,9 +210,9 @@ export function StyleDefinitions_get_opacity_value(
     .findLast((def) => matching_tokens.includes(def.topic)); //?.value;
 }
 
-function Color_toString(d: StyleDefinition) {
-  if (isColorDefinition(d.value)) {
-    const color = d.value.color;
+export function ColorDefinition_toString(d: ColorDefinition) {
+  if (isColorDefinition(d)) {
+    const color = d.color;
     if (isRgbColorDefinition(color)) {
       return `rgb(${color.red},${color.green},${color.blue})`;
     } else if (isHexColorDefinition(color)) {
