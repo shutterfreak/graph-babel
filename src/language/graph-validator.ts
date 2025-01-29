@@ -32,7 +32,6 @@ export function registerValidationChecks(services: GraphServices) {
   const registry = services.validation.ValidationRegistry;
   const validator = services.validation.GraphValidator;
   const checks: ValidationChecks<GraphAstType> = {
-    // Person: validator.checkPersonStartsWithCapital
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
     HexColorDefinition: [validator.checkHexColorDefinitions],
     RgbColorDefinition: [validator.checkRgbColorDefinitions],
@@ -47,23 +46,6 @@ export function registerValidationChecks(services: GraphServices) {
  * Implementation of custom validations.
  */
 export class GraphValidator {
-  /*
-  checkPersonStartsWithCapital(
-    person: Person,
-    accept: ValidationAcceptor,
-  ): void {
-    if (person.name !== "") {
-      const firstChar = person.name.substring(0, 1);
-      if (firstChar.toUpperCase() !== firstChar) {
-        accept("warning", "Person name should start with a capital.", {
-          node: person,
-          property: "name",
-        });
-      }
-    }
-  }
-  */
-
   checkUniqueElementNames(model: Model, accept: ValidationAcceptor): void {
     // Create a set of identifiers while traversing the AST
     const identifiers = new Set<string>();
@@ -362,21 +344,6 @@ export class GraphValidator {
         );
       }
     }
-    /* Can't get PercentageValue to work in the langium grammar definition:
-    if (isPercentageValue(value)) {
-      if (value.value_pct < 0 || value.value_pct > 100) {
-        // Out of bounds (percentage)
-        console.error(
-          `Link opacity value out of range (0%...100%): found '${value.value_pct}'`,
-        );
-        accept(
-          "error",
-          `Link opacity value out of range (0%...100%): found '${value.value_pct}'`,
-          { node: opacity_style_item, property: "value" },
-        );
-      }
-    }
-    */
   }
 }
 

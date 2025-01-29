@@ -14,7 +14,6 @@ import {
   isHexColorDefinition,
   isLineStyleDefinition,
   isOpacityStyleDefinition,
-  // isPercentageValue,
   isOneValue,
 } from "../language/generated/ast.js";
 import { createGraphServices } from "../language/graph-module.js";
@@ -248,8 +247,8 @@ function render_link(
     link_opacity,
   ].filter((s) => s !== undefined); // TODO
 
-  // Render link type --- AST: LINK_TYPE = /[<xo]?(--|\.\.|==|~~)[>xo]?/
-  // Mermaid: A -->|label| B
+  // Render link type --- AST: LINK_TYPE = /([<xo]?)(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)([>xo])?/
+  // MermaidJS: A -->|label| B
   let edge: string | undefined = undefined;
   if (label === undefined || label.length == 0) {
     label = "";
@@ -258,12 +257,10 @@ function render_link(
     label = `|${label.replaceAll("|", "\|")}|`;
   }
   if (link.kind == "to") {
-    //edge = `-${label === undefined || label.length == 0 ? "" : `- "${label}" -`}>`
     edge = "-->";
   } else if (link.kind == "with") {
     edge = "---";
   } else {
-    // let match = /(--[-]?|\.\.[\.]?|==[=]?|~~[~]?|-\.-)/.exec(link.kind);
     const match = /([<xo]?)(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)([>xo])?/.exec(
       link.kind,
     );
@@ -569,12 +566,6 @@ function to_mmd_opacity(
     if (isOneValue(value)) {
       return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${value.value_one}`;
     }
-    /* Can't get this up and running in the langium grammar:
-    if (isPercentageValue(value)) {
-      return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${value.value_pct}%`;
-
-    }
-    */
   }
   return undefined;
 }

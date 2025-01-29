@@ -152,11 +152,9 @@ terminal WIDTH_UNIT:
     'rex'
 ;
 
-
 OpacityDefinition:
     opacity=OneValue
 ;
-
 
 OneValue:
     value_one=NUMBER
@@ -178,19 +176,12 @@ terminal LINE_STYLE_TOPIC:
 terminal LINE_WIDTH_TOPIC:
     'BorderWidth' | 'LineWidth'
 ;
-
-
 terminal SHAPE_STYLE_TOPIC:
     'Shape'
 ;
 terminal RESET_STYLE_TOPIC:
     'Reset'
 ;
-
-StringValue:
-    value_string=STRING
-;
-
 
 Label:
     BracketedLabel | StringLabel;
@@ -217,8 +208,6 @@ terminal INT returns number: // /(0|[1-9][0-9]*)/;
 terminal NUMBER returns number:
    /(\d*(\.\d+))|\d+/
 ;
-
-
 
 hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
 hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;

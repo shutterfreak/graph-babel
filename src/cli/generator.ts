@@ -96,11 +96,6 @@ export function generate_cleaned_graph(
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
       debug_log_message = `${preamble} -- ${childNode.items.length | 0} item(s)`;
     } else if (isStyleDefinition(childNode)) {
-      /*
-      NOTE: incomplete implementation: value (def) is currently not parsed in StyleDefinition_toString() - it rather returns the source text for the value.
-      const topic = childNode.topic;
-      const def = childNode.value;
-      */
       debug_log_message = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.name}: ${StyleDefinition_toString([childNode])}"`;
     } else if (isStringLabel(childNode)) {
       debug_log_message = `${childNode.$type} "${Label_get_label(childNode)}"`;
