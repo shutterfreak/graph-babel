@@ -17,7 +17,6 @@ import {
   HexColorDefinition,
   LineStyleDefinition,
   OpacityStyleDefinition,
-  isOneValue,
   RgbColorDefinition,
   TextColorDefinition,
   ShapeStyleDefinition,
@@ -353,7 +352,47 @@ export class GraphValidator {
     opacity_style_item: OpacityStyleDefinition,
     accept: ValidationAcceptor,
   ): void {
-    const value = opacity_style_item.value.opacity;
+    const value = opacity_style_item.value;
+    const opacity: number = value.opacity;
+    if (value.isPct === true) {
+      // Opacity as integer percentage value (0--100)
+      if (Number.isInteger(opacity)) {
+        if (opacity < 0 || opacity > 100) {
+          // Out of bounds
+          console.error(
+            `Link opacity value out of range (0% - 100%): found '${opacity}%'`,
+          );
+          accept(
+            "error",
+            `Link opacity value out of range (0% - 100%): found '${opacity}%'`,
+            { node: opacity_style_item, property: "value" },
+          );
+        }
+      } else {
+        console.error(
+          `Expecting integer percentage value: found '${opacity}%'`,
+        );
+        accept(
+          "error",
+          `Expecting integer percentage value: found '${opacity}%'`,
+          { node: opacity_style_item, property: "value" },
+        );
+      }
+    } else {
+      // Opacity as float value (0--1)
+      if (opacity < 0.0 || opacity > 1.0) {
+        // Out of bounds (one)
+        console.error(
+          `Link opacity value out of range (0...1): found '${opacity}'`,
+        );
+        accept(
+          "error",
+          `Link opacity value out of range (0...1): found '${opacity}'`,
+          { node: opacity_style_item, property: "value" },
+        );
+      }
+    }
+    /*
     if (isOneValue(value)) {
       if (value.value_one < 0.0 || value.value_one > 1.0) {
         // Out of bounds (one)
@@ -367,6 +406,7 @@ export class GraphValidator {
         );
       }
     }
+    */
   }
 }
 

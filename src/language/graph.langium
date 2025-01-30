@@ -90,7 +90,7 @@ ColorStyleDefinition:
 OpacityStyleDefinition:
     topic=COLOR_ALPHA_TOPIC
     ':'
-    value=OpacityDefinition
+    value=OpacityDefinition<true>
 ;
 LineStyleDefinition:
     topic=LINE_STYLE_TOPIC
@@ -152,12 +152,8 @@ terminal WIDTH_UNIT:
     'rex'
 ;
 
-OpacityDefinition:
-    opacity=OneValue
-;
-
-OneValue:
-    value_one=NUMBER
+OpacityDefinition<isPct>:
+    opacity=NUMBER (isPct?='%')?
 ;
 
 terminal COLOR_STYLE_TOPIC:
