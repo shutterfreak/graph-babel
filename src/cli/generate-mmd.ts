@@ -14,7 +14,6 @@ import {
   isHexColorDefinition,
   isLineStyleDefinition,
   isOpacityStyleDefinition,
-  isOneValue,
 } from "../language/generated/ast.js";
 import { createGraphServices } from "../language/graph-module.js";
 import { extractDestinationAndName, extractDocument } from "./cli-util.js";
@@ -548,7 +547,7 @@ function to_mmd_line_width(
 }
 
 /**
- * Render a StyleDefinition *Opacity item in a style definition for MermaidJS
+ * Render a StyleDefinition *Opacity item in a style definition for MermaidJS (can be percentage or fraction of 1)
  * @param style_item the StyleDefinition LineOpacity item to be rendered as MermaidJS line-opacity
  * @param mmd_style_topic the MermaidJS style topic to which the LineOpacity applies
  * @returns the entire MermaidJS opacity style definition ("<topic>: <color-value>")
@@ -562,10 +561,9 @@ function to_mmd_opacity(
     ["LineAlpha", "LineOpacity"].includes(style_item.topic)
   ) {
     // NOTE: checking already happened in graph-validator.ts
-    const value = style_item.value.opacity;
-    if (isOneValue(value)) {
-      return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${value.value_one}`;
-    }
+    const value = style_item.value;
+    const opacity: number = value.opacity;
+    return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${opacity}${value.isPct == true ? "%" : ""}`;
   }
   return undefined;
 }
