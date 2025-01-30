@@ -311,7 +311,18 @@ export const NAMED_SHAPES = [
   "pill",
   "terminal", // Terminal Point - Terminal point
   "text", // Text Block - Text block
-];
+].sort();
+
+export const LENGTH_UNITS = [
+  "mm",
+  "cm",
+  "pc",
+  "pt",
+  "em",
+  "ex",
+  "rem",
+  "rex",
+].sort();
 
 /**
  * Retrieve the label string from a Label node

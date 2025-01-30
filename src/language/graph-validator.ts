@@ -23,6 +23,7 @@ import {
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
 import {
+  LENGTH_UNITS,
   NAMED_COLORS,
   NAMED_SHAPES,
   StyleDefinition_toString,
@@ -51,6 +52,11 @@ export function registerValidationChecks(services: GraphServices) {
  * Implementation of custom validations.
  */
 export class GraphValidator {
+  /**
+   * Verify that Elements have unique names (all nodes and graphs, named edges)
+   * @param model
+   * @param accept
+   */
   checkUniqueElementNames(model: Model, accept: ValidationAcceptor): void {
     // Create a set of identifiers while traversing the AST
     const identifiers = new Set<string>();
@@ -101,7 +107,6 @@ export class GraphValidator {
    *  - Report if multiple Style defintions share the same name at ehe same hierarchy level
    * TODO:
    *  - Report duplicate style redefinitions (requires comparing the StyleItem entries in each Style)
-   *  - Warn user to place style definitions before graph elements (Graph / Node / Link)
    *
    * @param model
    * @param accept
@@ -168,6 +173,11 @@ export class GraphValidator {
     }
   }
 
+  /**
+   * Verify that the shape names provided are valid (exhaustive list defined in NAMED_SHAPES)
+   * @param shape_definition
+   * @param accept
+   */
   checkShapeStyleDefinitions(
     shape_definition: ShapeStyleDefinition,
     accept: ValidationAcceptor,
@@ -185,6 +195,11 @@ export class GraphValidator {
     }
   }
 
+  /**
+   * Check that the named colors provided are valid (exhaustive list defined in NAMED_COLORS)
+   * @param color_definition
+   * @param accept
+   */
   checkTextColorDefinitions(
     color_definition: TextColorDefinition,
     accept: ValidationAcceptor,
@@ -202,6 +217,11 @@ export class GraphValidator {
     }
   }
 
+  /**
+   * Check that the hexadecimal color definitions provided are valid (3 or 6 hexadecimal characters)
+   * @param hex_color_definition
+   * @param accept
+   */
   checkHexColorDefinitions(
     hex_color_definition: HexColorDefinition,
     accept: ValidationAcceptor,
@@ -229,6 +249,11 @@ export class GraphValidator {
     }
   }
 
+  /**
+   * Check that the hexadecimal color definitions provided are valid (integer values in range 0-255)
+   * @param rgb_color_definition
+   * @param accept
+   */
   checkRgbColorDefinitions(
     rgb_color_definition: RgbColorDefinition,
     accept: ValidationAcceptor,
@@ -300,6 +325,11 @@ export class GraphValidator {
     }
   }
 
+  /**
+   * Check that the line style definitions are valid (number + valid unit)
+   * @param line_style_item
+   * @param accept
+   */
   checkLineWidthDefinitions(
     line_style_item: LineStyleDefinition,
     accept: ValidationAcceptor,
@@ -312,16 +342,6 @@ export class GraphValidator {
       if (match) {
         const value = match[1];
         const unit = match[3];
-        const allowed_units = [
-          "mm",
-          "cm",
-          "pc",
-          "pt",
-          "em",
-          "ex",
-          "rem",
-          "rex",
-        ];
         if (value.length == 0) {
           console.error(
             chalk.red(
@@ -334,13 +354,13 @@ export class GraphValidator {
             { node: line_style_item, property: "value" },
           );
         }
-        if (unit.length > 0 && !allowed_units.includes(unit)) {
+        if (unit.length > 0 && !LENGTH_UNITS.includes(unit)) {
           console.error(
-            `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${allowed_units.join(", ")}.`,
+            `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
           );
           accept(
             "error",
-            `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${allowed_units.join(", ")}.`,
+            `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
             { node: line_style_item, property: "value" },
           );
         }
@@ -348,6 +368,11 @@ export class GraphValidator {
     }
   }
 
+  /**
+   * Check that the opacity / alpha style definitions are valid (number in range 0-1 or integer percentage in range 0%-100%)
+   * @param opacity_style_item
+   * @param accept
+   */
   checkOpacityStyleDefinition(
     opacity_style_item: OpacityStyleDefinition,
     accept: ValidationAcceptor,
@@ -392,21 +417,6 @@ export class GraphValidator {
         );
       }
     }
-    /*
-    if (isOneValue(value)) {
-      if (value.value_one < 0.0 || value.value_one > 1.0) {
-        // Out of bounds (one)
-        console.error(
-          `Link opacity value out of range (0...1): found '${value.value_one}'`,
-        );
-        accept(
-          "error",
-          `Link opacity value out of range (0...1): found '${value.value_one}'`,
-          { node: opacity_style_item, property: "value" },
-        );
-      }
-    }
-    */
   }
 }
 
