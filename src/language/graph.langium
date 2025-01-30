@@ -153,7 +153,8 @@ terminal WIDTH_UNIT:
 ;
 
 OpacityDefinition<isPct>:
-    opacity=NUMBER (isPct?='%')?
+    opacity=NUMBER
+    (<isPct> isPct?='%')?
 ;
 
 terminal COLOR_STYLE_TOPIC:
