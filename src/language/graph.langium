@@ -123,10 +123,10 @@ ColorDefinition:
     color=(TextColorDefinition | RgbColorDefinition | HexColorDefinition)
 ;
 TextColorDefinition:
-    color_name=ID // (STRING|ID)
+    color_name=ID
 ;
 RgbColorDefinition:
-    'rgb(' red=INT ',' green=INT ',' blue=INT')'
+    'rgb(' red=NUMBER ',' green=NUMBER ',' blue=NUMBER')'
 ;
 HexColorDefinition:
     hex_color=HEX_COLOR_DEFINITION
@@ -139,7 +139,7 @@ WidthDefinition:
     width=WidthValue
 ;
 WidthValue:
-    value=(INT|NUMBER) unit=WIDTH_UNIT
+    value=NUMBER unit=WIDTH_UNIT
 ;
 terminal WIDTH_UNIT:
     'mm' |
@@ -199,9 +199,6 @@ hidden terminal WS: /\s+/;
 terminal ID: /[_a-zA-Z][\w_]*/;
 terminal STRING: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
 
-terminal INT returns number: // /(0|[1-9][0-9]*)/;
-    /\d+/
-;
 terminal NUMBER returns number:
    /(\d*(\.\d+))|\d+/
 ;
