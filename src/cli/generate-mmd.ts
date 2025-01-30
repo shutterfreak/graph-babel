@@ -264,9 +264,9 @@ function render_link(
       link.kind,
     );
     if (match) {
-      const src: string = match[1] ?? "";
-      let line = match[2] ?? "";
-      const dst = match[3] ?? "";
+      const src: string = match[1];
+      let line: string = match[2];
+      const dst: string = match[3];
 
       if (line.length > 0) {
         if (src == "" && dst == "") {

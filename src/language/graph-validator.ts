@@ -57,7 +57,10 @@ export class GraphValidator {
    * @param model
    * @param accept
    */
-  checkUniqueElementNames(model: Model, accept: ValidationAcceptor): void {
+  checkUniqueElementNames = (
+    model: Model,
+    accept: ValidationAcceptor,
+  ): void => {
     // Create a set of identifiers while traversing the AST
     const identifiers = new Set<string>();
 
@@ -100,8 +103,7 @@ export class GraphValidator {
     }
 
     console.log(chalk.whiteBright("checkUniqueElementNames() - END"));
-  }
-
+  };
   /**
    * Check the Style nodes through the entire Model hierarchy:
    *  - Report if multiple Style defintions share the same name at ehe same hierarchy level
@@ -111,7 +113,7 @@ export class GraphValidator {
    * @param model
    * @param accept
    */
-  checkStyles(model: Model, accept: ValidationAcceptor): void {
+  checkStyles = (model: Model, accept: ValidationAcceptor): void => {
     console.info(chalk.cyanBright("checkStyles(model)"));
 
     // Check that style definitions appear before Element definitions
@@ -171,17 +173,16 @@ export class GraphValidator {
         }
       }
     }
-  }
-
+  };
   /**
    * Verify that the shape names provided are valid (exhaustive list defined in NAMED_SHAPES)
    * @param shape_definition
    * @param accept
    */
-  checkShapeStyleDefinitions(
+  checkShapeStyleDefinitions = (
     shape_definition: ShapeStyleDefinition,
     accept: ValidationAcceptor,
-  ) {
+  ) => {
     const value = shape_definition.value.toLowerCase();
     if (!NAMED_SHAPES.includes(value)) {
       accept(
@@ -193,17 +194,16 @@ export class GraphValidator {
         },
       );
     }
-  }
-
+  };
   /**
    * Check that the named colors provided are valid (exhaustive list defined in NAMED_COLORS)
    * @param color_definition
    * @param accept
    */
-  checkTextColorDefinitions(
+  checkTextColorDefinitions = (
     color_definition: TextColorDefinition,
     accept: ValidationAcceptor,
-  ) {
+  ) => {
     const value = color_definition.color_name.toLowerCase();
     if (!NAMED_COLORS.includes(value)) {
       accept(
@@ -215,17 +215,16 @@ export class GraphValidator {
         },
       );
     }
-  }
-
+  };
   /**
    * Check that the hexadecimal color definitions provided are valid (3 or 6 hexadecimal characters)
    * @param hex_color_definition
    * @param accept
    */
-  checkHexColorDefinitions(
+  checkHexColorDefinitions = (
     hex_color_definition: HexColorDefinition,
     accept: ValidationAcceptor,
-  ): void {
+  ): void => {
     const code_length = hex_color_definition.hex_color.length;
     console.info(
       chalk.cyanBright(
@@ -247,17 +246,16 @@ export class GraphValidator {
         },
       );
     }
-  }
-
+  };
   /**
    * Check that the hexadecimal color definitions provided are valid (integer values in range 0-255)
    * @param rgb_color_definition
    * @param accept
    */
-  checkRgbColorDefinitions(
+  checkRgbColorDefinitions = (
     rgb_color_definition: RgbColorDefinition,
     accept: ValidationAcceptor,
-  ): void {
+  ): void => {
     // NOTE:; code duplication to circumvent access problems to 'property: "red" | "green" | "blue"' as those aren't strings but types.
 
     // Check red:
@@ -323,17 +321,16 @@ export class GraphValidator {
         );
       }
     }
-  }
-
+  };
   /**
    * Check that the line style definitions are valid (number + valid unit)
    * @param line_style_item
    * @param accept
    */
-  checkLineWidthDefinitions(
+  checkLineWidthDefinitions = (
     line_style_item: LineStyleDefinition,
     accept: ValidationAcceptor,
-  ): void {
+  ): void => {
     if (["BorderWidth", "LineWidth"].includes(line_style_item.topic)) {
       // Check the line style definition
       const match = /^(\d+|\.\d+|\d*\.\d+)( *([a-z]{2,3}))?$/.exec(
@@ -366,17 +363,16 @@ export class GraphValidator {
         }
       }
     }
-  }
-
+  };
   /**
    * Check that the opacity / alpha style definitions are valid (number in range 0-1 or integer percentage in range 0%-100%)
    * @param opacity_style_item
    * @param accept
    */
-  checkOpacityStyleDefinition(
+  checkOpacityStyleDefinition = (
     opacity_style_item: OpacityStyleDefinition,
     accept: ValidationAcceptor,
-  ): void {
+  ): void => {
     const value = opacity_style_item.value;
     const opacity: number = value.opacity;
     if (value.isPct === true) {
@@ -417,7 +413,7 @@ export class GraphValidator {
         );
       }
     }
-  }
+  };
 }
 
 interface _find_style_dict {
