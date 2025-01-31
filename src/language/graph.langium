@@ -49,6 +49,7 @@ fragment StyleID:
 
 Style:
     'style'
+    StyleID?
 	name=ID
 	definition=StyleBlock
     // { infer Style }

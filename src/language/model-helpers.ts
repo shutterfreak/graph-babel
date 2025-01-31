@@ -365,6 +365,43 @@ export function Element_get_style_items(
   // Collect the element's (and linked style's)  ancestry (bottom-up):
   const ancestry: AstNode[] = Element_get_ancestry(element);
 
+  // DEBUG START
+  function traverse_ancestry_for_style(
+    style_name: string,
+    ancestry: AstNode[],
+    level: number,
+  ): void {
+    for (const ancestor of ancestry) {
+      if (isModel(ancestor) || isGraph(ancestor)) {
+        // Useless check (required for linter)
+        for (const s of ancestor.styles) {
+          if (s.name === style_name) {
+            // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
+            console.info(
+              chalk.yellowBright(
+                `DBG::Element_get_style_items(level: ${level}) - Found style '${s.name}'`,
+              ),
+              chalk.redBright(
+                `${s.style === undefined ? "" : ` REFERRING TO style '${s.style.$refText}'`}\n`,
+              ),
+            );
+            console.info(chalk.yellow(s.definition.$cstNode?.text));
+            if (s.style !== undefined) {
+              traverse_ancestry_for_style(s.style.$refText, ancestry, level);
+            }
+          }
+        }
+      }
+      // Next level:
+      level += 1;
+    }
+  }
+
+  // Traverse the style tree
+  traverse_ancestry_for_style(element.style.$refText, ancestry, 0);
+
+  // DEBUG END
+
   // Process the ancestry top-down:
   for (const ancestor of ancestry.reverse()) {
     // Search for style definitions with the proper style identifier:

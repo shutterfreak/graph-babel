@@ -38,6 +38,7 @@ export function registerValidationChecks(services: GraphServices) {
   const validator = services.validation.GraphValidator;
   const checks: ValidationChecks<GraphAstType> = {
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
+    Style: [validator.checkStyleNames, validator.checkStyleSubstyles],
     HexColorDefinition: [validator.checkHexColorDefinitions],
     RgbColorDefinition: [validator.checkRgbColorDefinitions],
     TextColorDefinition: [validator.checkTextColorDefinitions],
@@ -106,7 +107,7 @@ export class GraphValidator {
   };
   /**
    * Check the Style nodes through the entire Model hierarchy:
-   *  - Report if multiple Style defintions share the same name at ehe same hierarchy level
+   *  - Report if multiple Style defintions share the same name at the same hierarchy level
    * TODO:
    *  - Report duplicate style redefinitions (requires comparing the StyleItem entries in each Style)
    *
@@ -174,6 +175,11 @@ export class GraphValidator {
       }
     }
   };
+  checkStyleNames = (style: Style, accept: ValidationAcceptor) => {
+    if (style.name === undefined || style.name.length == 0) {
+      accept("error", "A style must have a nonempty name.", { node: style });
+    }
+  };
   /**
    * Verify that the shape names provided are valid (exhaustive list defined in NAMED_SHAPES)
    * @param shape_definition
@@ -191,6 +197,28 @@ export class GraphValidator {
         {
           node: shape_definition,
           property: "value",
+        },
+      );
+    }
+  };
+  checkStyleSubstyles = (style: Style, accept: ValidationAcceptor) => {
+    if (style.style !== undefined) {
+      accept(
+        "info",
+        `Referring to another style is not yet implemented for style definitions: style '${style.name}'. Please remove ":${style.style.$refText}"`,
+        {
+          node: style,
+          property: "style",
+        },
+      );
+    }
+    if (style.name == style.style?.$refText) {
+      accept(
+        "error",
+        `Style '${style.name}' cannot refer to itself. Please remove ":${style.style.$refText}"`,
+        {
+          node: style,
+          property: "style",
         },
       );
     }
