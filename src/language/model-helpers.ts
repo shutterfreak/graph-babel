@@ -170,7 +170,7 @@ export const NAMED_COLORS_AND_HEX_DEFINITIONS = {
   whitesmoke: "#f5f5f5",
   yellow: "#ffff00",
   yellowgreen: "#9acd32",
-};
+}; // Already sorted alphabetically
 
 export const NAMED_COLORS = Object.keys(NAMED_COLORS_AND_HEX_DEFINITIONS);
 
@@ -345,10 +345,10 @@ export function Label_get_label(label: Label | undefined): string {
 /**
  * Construct an array of style items that apply to the Element.
  * If the element has no style, or no style items can be found for the style provided, then an empty array is returned.
- * In all other cases, a scoped array of style items will be generated, following the following rules:
- *  - Style items at the same level in the model are combined in the order they appear.
- *  - When combining style items with the same topic, the last item is kept (overrruling previous topic definitions)
- *  - Style items at a given nesting level inherit style definitions from previous levels
+ * In all other cases, a scoped array of style items will be generated 'top down': the entries at a lower level enhance or replace
+ * The styles adhere to CSS logic: top-down inheritance, and selective overruling of style items at lower levels.
+ * Style items at a given nesting level inherit style definitions from previous levels.
+ * A 'Reset' token allows selective resetting of parts or all style elements defined in parent styles.
  * @param element The element that may have to be styled
  * @returns The array of unique style items applicable to the element, or undefined if element not defined or style not provided
  */
@@ -356,18 +356,14 @@ export function Element_get_style_items(
   element: Element,
 ): StyleDefinition[] | undefined {
   if (element.style === undefined) {
+    // The element has no style assigned
     return undefined;
   }
   // The element has a style
   const filtered_style_definitions: StyleDefinition[] = [];
 
-  //collect the element's ancestry (bottom-up):
-  const ancestry: AstNode[] = [];
-  let container: AstNode = element;
-  while (container.$container) {
-    ancestry.push(container.$container);
-    container = container.$container;
-  }
+  // Collect the element's (and linked style's)  ancestry (bottom-up):
+  const ancestry: AstNode[] = Element_get_ancestry(element);
 
   // Process the ancestry top-down:
   for (const ancestor of ancestry.reverse()) {
@@ -377,6 +373,7 @@ export function Element_get_style_items(
       for (const s of ancestor.styles) {
         if (s.name === element.style.$refText) {
           // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
+
           for (const d of s.definition.items) {
             // First check reset topic:
             // if (d.topic === "Reset") {
@@ -530,4 +527,14 @@ export function ColorDefinition_toString(d: ColorDefinition) {
     return color.color_name;
   }
   return undefined;
+}
+
+function Element_get_ancestry(element: Element): AstNode[] {
+  const ancestry: AstNode[] = [];
+  let container: AstNode = element;
+  while (container.$container) {
+    ancestry.push(container.$container);
+    container = container.$container;
+  }
+  return ancestry;
 }
