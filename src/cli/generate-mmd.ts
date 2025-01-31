@@ -148,7 +148,7 @@ function render_node(node: Node, nesting_level: number): string {
   let shape: string | undefined = StyleDefinitions_get_shape(style_definitions);
   let result =
     INDENTATION.repeat(nesting_level) +
-    `${node.name}${node.style ? `:::${node.style.$refText}` : ""}`;
+    `${node.id}${node.styleref === undefined ? "" : `:::${node.styleref.$refText}`}`;
   let label: string | undefined = Label_get_label(node.label);
   if (label.length == 0) {
     label = StyleDefinitions_get_label(style_definitions);
@@ -196,17 +196,17 @@ function render_link(
     Element_get_style_items(link);
 
   let label: string | undefined = Label_get_label(link.label);
-  if (label.length == 0 && link.style !== undefined) {
+  if (label.length == 0 && link.styleref !== undefined) {
     // Try obtaining the label definition from the link Style
     console.log(
       chalk.bgBlueBright(
-        `render_link() - label not defined at Link level - processing relevant style definitions (${link.style.$refText})`,
+        `render_link() - label not defined at Link level - processing relevant style definitions (${link.styleref.$refText})`,
       ),
     );
     label = StyleDefinitions_get_label(style_definitions);
     console.log(
       chalk.bgBlueBright(
-        `render_link() - label after checking style definitions (${link.style.$refText}): "${label}"`,
+        `render_link() - label after checking style definitions (${link.styleref.$refText}): "${label}"`,
       ),
     );
   }
@@ -350,7 +350,7 @@ function render_graph(
     label = ` [${label}]`;
   }
   return [
-    `\n${INDENTATION.repeat(nesting_level)}subgraph ${graph.name}${label}\n`,
+    `\n${INDENTATION.repeat(nesting_level)}subgraph ${graph.id}${label}\n`,
     ...render_node_contents(graph, nesting_level + 1, link_style_dict),
     INDENTATION.repeat(nesting_level) + "end\n\n",
   ];
@@ -417,7 +417,7 @@ function render_style(style: Style, nesting_level: number): string {
     result +=
       "\n" +
       INDENTATION.repeat(nesting_level) +
-      `classDef ${style.name} ${style_items.join(",")};`;
+      `classDef ${style.id} ${style_items.join(",")};`;
   }
   return result;
 }

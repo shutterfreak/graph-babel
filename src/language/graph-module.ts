@@ -120,18 +120,18 @@ export class GraphScopeComputation extends DefaultScopeComputation {
     for (const childNode of AstUtils.streamAllContents(
       document.parseResult.value,
     )) {
-      if (isElement(childNode) && childNode.name !== undefined) {
+      if (isElement(childNode) && childNode.id !== undefined) {
         // `descriptions` is our `AstNodeDescriptionProvider` defined in `DefaultScopeComputation`
         // It allows us to easily create descriptions that point to elements using a name.
         const d = this.descriptions.createDescription(
           childNode,
-          childNode.name,
+          childNode.id,
           document,
         );
         exportedDescriptions.push(d);
         console.info(
           chalk.whiteBright(
-            `${prefix} - ${childNode.$type} ${childNode.name} : exporting description as name(${d.name}) path (${d.path})`,
+            `${prefix} - ${childNode.$type} ${childNode.id} : exporting description as name (${d.name}) path (${d.path})`,
           ),
         );
       } else {
@@ -174,7 +174,20 @@ export class GraphScopeComputation extends DefaultScopeComputation {
     document: LangiumDocument,
     level: number,
   ): AstNodeDescription[] {
-    const preamble = `${"  ".repeat(level)}processContainer(level: ${level}) - ${container.$type}${isGraph(container) || isStyle(container) ? ` ${container.name}` : ""}`;
+    let id: string | undefined;
+    try {
+      if (isElement(container) || isStyle(container)) {
+        id = container.id;
+      }
+    } catch (e) {
+      console.error(e);
+      id = undefined;
+    }
+    if (id?.length === 0) {
+      id = undefined;
+    }
+
+    const preamble = `${"  ".repeat(level)}processContainer(level: ${level}) - ${container.$type}${isGraph(container) || isStyle(container) ? ` ${id ?? "<ID not set>"}` : ""}`;
     const localDescriptions: AstNodeDescription[] = [];
 
     console.log(
@@ -187,17 +200,25 @@ export class GraphScopeComputation extends DefaultScopeComputation {
       // Process style definitions at the local scope
 
       for (const style of container.styles) {
-        const description = this.descriptions.createDescription(
-          style,
-          style.name,
-          document,
-        );
-        console.log(
-          chalk.cyan(
-            `${preamble} - adding to local scope: [style ${style.name}] description: '${description.name}' | path: '${description.path}' | type: '${description.type}'`,
-          ),
-        );
-        localDescriptions.push(description);
+        if (style.id !== undefined && style.id.length > 0) {
+          const description = this.descriptions.createDescription(
+            style,
+            style.id,
+            document,
+          );
+          console.log(
+            chalk.cyan(
+              `${preamble} - adding to local scope: [style ${style.id}] description: '${description.name}' | path: '${description.path}' | type: '${description.type}'`,
+            ),
+          );
+          localDescriptions.push(description);
+        } else {
+          console.error(
+            chalk.redBright(
+              `${preamble} ERROR: Found style without ID : [${style.$cstNode?.text}]`,
+            ),
+          );
+        }
       }
 
       // Recurse on elements

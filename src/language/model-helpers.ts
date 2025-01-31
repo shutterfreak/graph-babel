@@ -355,7 +355,7 @@ export function Label_get_label(label: Label | undefined): string {
 export function Element_get_style_items(
   element: Element,
 ): StyleDefinition[] | undefined {
-  if (element.style === undefined) {
+  if (element.styleref === undefined) {
     // The element has no style assigned
     return undefined;
   }
@@ -375,19 +375,19 @@ export function Element_get_style_items(
       if (isModel(ancestor) || isGraph(ancestor)) {
         // Useless check (required for linter)
         for (const s of ancestor.styles) {
-          if (s.name === style_name) {
+          if (s.id === style_name) {
             // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
             console.info(
               chalk.yellowBright(
-                `DBG::Element_get_style_items(level: ${level}) - Found style '${s.name}'`,
+                `DBG::Element_get_style_items(level: ${level}) - Found style '${s.id}'`,
               ),
               chalk.redBright(
-                `${s.style === undefined ? "" : ` REFERRING TO style '${s.style.$refText}'`}\n`,
+                `${s.styleref === undefined ? "" : ` REFERRING TO style '${s.styleref.$refText}'`}\n`,
               ),
             );
             console.info(chalk.yellow(s.definition.$cstNode?.text));
-            if (s.style !== undefined) {
-              traverse_ancestry_for_style(s.style.$refText, ancestry, level);
+            if (s.styleref !== undefined) {
+              traverse_ancestry_for_style(s.styleref.$refText, ancestry, level);
             }
           }
         }
@@ -398,7 +398,7 @@ export function Element_get_style_items(
   }
 
   // Traverse the style tree
-  traverse_ancestry_for_style(element.style.$refText, ancestry, 0);
+  traverse_ancestry_for_style(element.styleref.$refText, ancestry, 0);
 
   // DEBUG END
 
@@ -408,7 +408,7 @@ export function Element_get_style_items(
     if (isModel(ancestor) || isGraph(ancestor)) {
       // Useless check (required for linter)
       for (const s of ancestor.styles) {
-        if (s.name === element.style.$refText) {
+        if (s.id === element.styleref.$refText) {
           // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
 
           for (const d of s.definition.items) {

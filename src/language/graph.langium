@@ -10,7 +10,7 @@ Element:
 Graph:
     'graph'
     StyleID?
-    name=ID
+    id=ID
     label=Label?
     '{'
     (elements+=Element | styles+=Style)*
@@ -20,7 +20,7 @@ Graph:
 Node:
     'node'
     StyleID?
-    name=ID
+    id=ID
     label=Label?
 ;
 
@@ -29,7 +29,7 @@ Link:
     StyleID?
     (
         '('
-        name=ID
+        id=ID
         ')'
     )?
     src+=[Element:ID] ( ',' src+=[Element:ID] )*
@@ -44,13 +44,13 @@ terminal LINK_TYPE:
 ;
 
 fragment StyleID:
-    ':' style=[Style:ID]
+    ':' styleref=[Style:ID]
 ;
 
 Style:
     'style'
     StyleID?
-	name=ID
+	id=ID
 	definition=StyleBlock
     // { infer Style }
 ;

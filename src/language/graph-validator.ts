@@ -20,6 +20,7 @@ import {
   RgbColorDefinition,
   TextColorDefinition,
   ShapeStyleDefinition,
+  isNode,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
 import {
@@ -66,23 +67,39 @@ export class GraphValidator {
     const identifiers = new Set<string>();
 
     function traverseElement(element: Element): void {
-      const preamble = `traverseElement(${element.$type} element (${element.name ?? "<no name>"}))`;
+      const preamble = `traverseElement(${element.$type} element (${element.id ?? "<no name>"}))`;
       console.log(chalk.white(`${preamble} - START`));
-      if (element.name !== undefined) {
+      if (
+        (isNode(element) || isGraph(element)) &&
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        (element.id === undefined || element.id.length == 0)
+      ) {
+        console.error(
+          chalk.redBright(
+            `${element.$type} must have a nonempty id [${element.$cstNode?.text}]`,
+          ),
+        );
+        accept(
+          "error",
+          `${element.$type} must have a nonempty id [${element.$cstNode?.text}]`,
+          { node: element },
+        );
+      }
+      if (element.id !== undefined) {
         // The element has a name (note: links have an optional name)
-        if (identifiers.has(element.name)) {
+        if (identifiers.has(element.id)) {
           // report an error if the identifier is not unique
           console.warn(
             chalk.red(
-              `${preamble} - Duplicate name ${element.name} found for ${element.$type}.`,
+              `${preamble} - Duplicate name ${element.id} found for ${element.$type}.`,
             ),
           );
-          accept("error", `Duplicate name '${element.name}'`, {
+          accept("error", `Duplicate name '${element.id}'`, {
             node: element,
-            property: "name",
+            property: "id",
           });
         } else {
-          identifiers.add(element.name);
+          identifiers.add(element.id);
         }
       }
 
@@ -125,7 +142,7 @@ export class GraphValidator {
     for (const item of style_dict) {
       console.info(
         chalk.cyan(
-          `checkStyles(model): ${item.containerID} - ${item.level} : Style '${item.style.name}' : [ ${StyleDefinition_toString(item.style.definition.items)} ]`,
+          `checkStyles(model): ${item.containerID} - ${item.level} : Style '${item.style.id}' : [ ${StyleDefinition_toString(item.style.definition.items)} ]`,
         ),
       );
     }
@@ -141,11 +158,11 @@ export class GraphValidator {
         // Initialize:
         d[item.containerID] = {};
       }
-      if (!(item.style.name in d[item.containerID])) {
-        d[item.containerID][item.style.name] = [];
+      if (!(item.style.id in d[item.containerID])) {
+        d[item.containerID][item.style.id] = [];
       }
       // Push to array:
-      d[item.containerID][item.style.name].push(item.style);
+      d[item.containerID][item.style.id].push(item.style);
     }
 
     // Now compute counts per node:
@@ -167,7 +184,7 @@ export class GraphValidator {
               `Found multiple style definitions with the same name '${style_name}' at the same level.`,
               {
                 node: duplicate_style_definition,
-                property: "name",
+                property: "id",
               },
             );
           }
@@ -176,7 +193,12 @@ export class GraphValidator {
     }
   };
   checkStyleNames = (style: Style, accept: ValidationAcceptor) => {
-    if (style.name === undefined || style.name.length == 0) {
+    if (style.id === undefined || style.id.length == 0) {
+      console.error(
+        chalk.redBright(
+          `ERROR: checkStyleNames() - style has no id: [${style.$cstNode?.text}]`,
+        ),
+      );
       accept("error", "A style must have a nonempty name.", { node: style });
     }
   };
@@ -202,23 +224,27 @@ export class GraphValidator {
     }
   };
   checkStyleSubstyles = (style: Style, accept: ValidationAcceptor) => {
-    if (style.style !== undefined) {
+    if (style.styleref !== undefined && style.styleref.$refText.length > 0) {
       accept(
         "info",
-        `Referring to another style is not yet implemented for style definitions: style '${style.name}'. Please remove ":${style.style.$refText}"`,
+        `Referring to another style is not yet implemented for style definitions. Please remove ":${style.styleref.$refText}"`,
         {
           node: style,
-          property: "style",
+          property: "styleref",
         },
       );
     }
-    if (style.name == style.style?.$refText) {
+    if (
+      style.id !== undefined &&
+      style.id.length > 0 &&
+      style.id == style.styleref?.$refText
+    ) {
       accept(
         "error",
-        `Style '${style.name}' cannot refer to itself. Please remove ":${style.style.$refText}"`,
+        `Style '${style.id}' cannot refer to itself. Please remove ":${style.styleref.$refText}"`,
         {
           node: style,
-          property: "style",
+          property: "styleref",
         },
       );
     }
@@ -464,7 +490,7 @@ function find_styles(
     style_dict.push({
       level,
       containerID:
-        `${seq}::` + (isModel(container) === true ? "" : container.name),
+        `${seq}::` + (isModel(container) === true ? "" : container.id),
       style,
     });
   }
@@ -490,7 +516,7 @@ function check_styles_defined_before_elements(
     if (isElement(childNode)) {
       elementCount++;
       console.debug(
-        `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Element node #${elementCount} of type '${childNode.$type}' ${childNode.name === undefined ? "" : ` with name '${childNode.name}'`}`,
+        `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Element node #${elementCount} of type '${childNode.$type}' ${childNode.id === undefined ? "" : ` with name '${childNode.id}'`}`,
       );
       if (isGraph(childNode)) {
         // recurse
@@ -505,7 +531,7 @@ function check_styles_defined_before_elements(
     } else if (isStyle(childNode)) {
       styleCount++;
       console.debug(
-        `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Style node #${styleCount} with name '${childNode.name}'`,
+        `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Style node #${styleCount} with name '${childNode.id}'`,
       );
 
       if (elementCount > 0) {
