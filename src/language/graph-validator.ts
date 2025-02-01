@@ -224,16 +224,6 @@ export class GraphValidator {
     }
   };
   checkStyleSubstyles = (style: Style, accept: ValidationAcceptor) => {
-    if (style.styleref !== undefined && style.styleref.$refText.length > 0) {
-      accept(
-        "info",
-        `Referring to another style is not yet implemented for style definitions. Please remove ":${style.styleref.$refText}"`,
-        {
-          node: style,
-          property: "styleref",
-        },
-      );
-    }
     if (
       style.id !== undefined &&
       style.id.length > 0 &&

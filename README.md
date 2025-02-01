@@ -48,36 +48,38 @@ The [grammar](src/language/graph.langium) allows to describe graphs as follows:
 style decision {
     BorderColor: blue;
     BorderWidth: 2pt;
-    FillColor: "rgb(240,120,24)";
-    LabelColor: "black";
+    FillColor: rgb(240,120,24);
+    LabelColor: black;
     Shape: "diamond";
 }
-style yes {
-    LabelColor: "green";
-    LabelText: "no";
-    LineColor: "green";
+style yn { LineWidth: 10pt }
+style:yn yesno { // Style 'inherits' from style 'yn'
     LineOpacity: .75;
-    LineWidth: 2pt;
+    LineWidth: 1.5pt;
 }
-style no {
+style:yesno no {
     LabelColor: #ff0000;
+    LabelText: "no";
+    LineColor: red;
+}
+style:yesno yes {
+    LabelColor: green;
     LabelText: "yes";
-    LineColor: "red";
-    LineOpacity: .75;
-    LineWidth: 2pt;
+    LineColor: green;
 }
 
 graph g1 "Main graph title" {
     style decision { // Override style in this scope:
-        FillColor: "darkorange";
-        BorderColor: "red";
+        FillColor: darkorange;
+        BorderColor: red;
     }
+    style yes {TextColor: lime; LineColor: lime}
     node:decision n1 "a node in a graph"
     node n2 [bracketed node label]
     node n3 /* Empty node */
 
     // Links don't have to have a name (identifier) defined:
-    link:yes n1 to n2,g2n1 /* separate identifiers with commas to specify multiple sources / destinations */
+    link:yes n1,n2 ==> g2n1,g2n2
     link:no n1 to n3
 
     graph g2 "Graph g2 in graph g1" {
@@ -87,6 +89,10 @@ graph g1 "Main graph title" {
         link (l1g2) g2n1 -- g2n2 "edge label in g2"
     }
 }
+
+node n_1 "A node at top (model) level"
+node n_2 "Another node at top (model) level"
+link:yes n_1 --> n_2
 ```
 
 The CLI allows checking a graph for errors, and transformation of the graph into different formats
@@ -122,6 +128,7 @@ Supported features:
 - A label defined in a style is applied to `Link` if no link label has been specified
 - Scoping of `Graph`, `Node` and named `Link` nodes
 - Cascading `Style` computation, including `reset` option
+- Inheritance of styles (one style can extend another style)
 - VS Code plugin (see below) with syntax highlighting and validation checks
 
 > [!WARNING]
