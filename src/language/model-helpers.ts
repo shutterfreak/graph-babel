@@ -19,7 +19,6 @@ import {
   StringLabel,
   StyleDefinition,
 } from "./generated/ast.js";
-import { inspect } from "util";
 
 export const NAMED_COLORS_AND_HEX_DEFINITIONS = {
   aliceblue: "#f0f8ff",
@@ -350,8 +349,8 @@ export function Label_get_label(label: Label | undefined): string {
  * The styles adhere to CSS logic: top-down inheritance, and selective overruling of style items at lower levels.
  * Style items at a given nesting level inherit style definitions from previous levels.
  * A 'Reset' token allows selective resetting of parts or all style elements defined in parent styles.
- * @param element The element that may have to be styled
- * @returns The array of unique style items applicable to the element, or undefined if element not defined or style not provided
+ * @param {Element} element - The element that may have to be styled
+ * @returns {StyleDefinition[] | undefined} The array of unique style items applicable to the element, or undefined if element not defined or style not provided
  */
 export function Element_get_style_items(
   element: Element,
@@ -360,156 +359,171 @@ export function Element_get_style_items(
     // The element has no style assigned
     return undefined;
   }
-  // The element has a style
-  const filtered_style_definitions: StyleDefinition[] = [];
 
-  // Collect the element's (and linked style's)  ancestry (bottom-up):
+  // Collect the element's (and linked style's) ancestry (bottom-up):
   const ancestry: AstNode[] = Element_get_ancestry(element);
 
-  // DEBUG START
+  // Traverse the style tree and get the style definition stack
+  const style_definition_stack = generate_style_definition_stack(
+    element.styleref.$refText,
+    ancestry,
+  );
 
-  const style_definition_stack: StyleDefinition[][] = [];
-
-  /**
-   * Traverse the model hierarchy bottom-up to retrieve all style definitions relating to the Element
-   * (including styles that inherit from other styles).
-   * The basic algorithm is to first traverse the model hierarchy from the container containing the Element
-   * upwards to the Model, and then to apply all matching StyleDefinitions[] lists in scope of the Element
-   * in reverse order of the stack. This allows correct cascading 'overruling' of style.
-   * While traversing the model hierarchy starting from the Element, relating StyleDefinition[] lists for
-   * styles applying to the Element will be stored in stack.
-   * The resulting StyleDefintion[] array will be generating by traversing this stack in reverse order.
-   * When a style in scope refers to another style, then the relating StyleDefinition[] lists from that
-   * related style will also be added to the stack (by means of recursion).
-   * @param style_name the style identifier
-   * @param ancestry the Element's (or related Style's) container's ancestry
-   * @param level ancestry level (only used for debugging)
-   */
-  function traverse_ancestry_for_style(
-    style_name: string,
-    ancestry: AstNode[],
-    level: number,
-  ): void {
-    console.info(
-      chalk.yellow(
-        `DBG::traverse_ancestry_for_style(level: ${level}) - Traversing ancestry for style '${style_name}'`,
+  // Flatten the style definition stack
+  const flattened_style_items = flatten_style_definition_stack(
+    style_definition_stack,
+  );
+  let i = 1;
+  for (const item of flattened_style_items) {
+    console.debug(
+      chalk.blueBright(
+        `DBG: Element_get_style_items() - Flattened: #${i} - type: '${item.$type}', topic: '${item.topic}', definition: '${item.$cstNode?.text}'`,
       ),
     );
+    i++;
+  }
 
-    for (const ancestor of ancestry) {
-      if (isModel(ancestor) || isGraph(ancestor)) {
-        // Useless check (required for linter)
-        for (const s of ancestor.styles) {
-          if (s.id === style_name) {
-            // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
-            console.info(
-              chalk.yellowBright(
-                `DBG::Element_get_style_items(level: ${level}) - Found style '${s.id}'`,
-              ),
-              chalk.redBright(
-                `${s.styleref === undefined ? "" : ` REFERRING TO style '${s.styleref.$refText}'`}\n`,
-              ),
+  // Process the ancestry top-down to get the filtered style definitions
+  const filtered_style_definitions = generate_filtered_style_definition(
+    ancestry,
+    element.styleref.$refText,
+    flattened_style_items,
+  );
+
+  // Debug statements:
+  i = 1;
+  for (const item of filtered_style_definitions) {
+    console.log(
+      chalk.bgWhite.blueBright(
+        `DBG: Element_get_style_items() - Filtered: #${i} - type: '${item.$type}', topic: '${item.topic}', definition: '${item.$cstNode?.text}'`,
+      ),
+    );
+    i++;
+  }
+
+  return filtered_style_definitions;
+}
+
+/**
+ * Traverses the ancestry of AST nodes to find style definitions that match the given style name.
+ *
+ * @param style_name - The name of the style to search for.
+ * @param ancestry - An array of AST nodes representing the ancestry to traverse.
+ * @returns An array of arrays of style definitions that match the given style name.
+ */
+function generate_style_definition_stack(
+  style_name: string,
+  ancestry: AstNode[],
+  level: number = 0,
+  stack: StyleDefinition[][] = [],
+): StyleDefinition[][] {
+  const style_definition_stack = stack;
+  console.info(
+    chalk.yellowBright(
+      `DBG::traverse_ancestry_for_style(style '${style_name}', level: ${level}) - START`,
+    ),
+  );
+
+  for (const ancestor of ancestry) {
+    if (isModel(ancestor) || isGraph(ancestor)) {
+      // Useless check (required for linter)
+      for (const s of ancestor.styles) {
+        if (s.id === style_name) {
+          // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
+          console.info(
+            chalk.yellowBright(
+              `DBG::Element_get_style_items(style '${style_name}', level: ${level}) - Found style '${s.id}'`,
+            ),
+            chalk.redBright(
+              `${s.styleref === undefined ? "" : ` REFERRING TO style '${s.styleref.$refText}'`}\n`,
+            ),
+          );
+          console.info(chalk.yellow(s.definition.$cstNode?.text));
+
+          // Add the style definition to the stack:
+          style_definition_stack.push(s.definition.items);
+          if (s.styleref !== undefined) {
+            generate_style_definition_stack(
+              s.styleref.$refText,
+              ancestry,
+              level + 1,
+              style_definition_stack,
             );
-            console.info(chalk.yellow(s.definition.$cstNode?.text));
-
-            // Add the style definition to the stack:
-            style_definition_stack.push(s.definition.items);
-            if (s.styleref !== undefined) {
-              traverse_ancestry_for_style(s.styleref.$refText, ancestry, level);
-            }
           }
         }
       }
-      // Next level:
-      level += 1;
     }
-    console.info(
-      chalk.yellow(
-        `DBG::traverse_ancestry_for_style(level: ${level}) - Traversing ancestry for style '${style_name}' - inspect:`,
-        inspect(style_definition_stack),
-      ),
-    );
   }
 
-  // Traverse the style tree
-  console.log(
-    `traverse_ancestry_for_style(${element.styleref.$refText}) - START`,
-  );
-  traverse_ancestry_for_style(element.styleref.$refText, ancestry, 0);
-  console.log(
-    `traverse_ancestry_for_style(${element.styleref.$refText}) - END`,
-  );
+  return style_definition_stack;
+}
 
-  // Reverse the stack and flatten the Style Definitions:
-  console.info(
-    chalk.greenBright(
-      `DBG::Element_get_style_items(type: ${element.$type}) - BEFORE flattening:`,
-    ),
-  );
-  console.info(chalk.green(inspect(style_definition_stack)));
-  const flattened_style_items = style_definition_stack.reverse().flat(1);
-  console.info(
-    chalk.greenBright(
-      `DBG::Element_get_style_items(type: ${element.$type}) - AFTER flattening:`,
-    ),
-  );
-  console.info(chalk.green(inspect(flattened_style_items)));
-  for (const item of flattened_style_items) {
-    console.debug(
-      chalk.blueBright(`DBG: Element_get_style_items() ${item.$cstNode?.text}`),
-    );
-  }
+/**
+ * Flattens a stack of style definitions by reversing the order of the stack
+ * and then flattening it by one level.
+ *
+ * @param style_definition_stack - A stack of style definitions, where each
+ * element is an array of `StyleDefinition`.
+ * @returns A flattened array of `StyleDefinition` from the reversed stack which can
+ * subsequently be processed linearly to compute the resulting style definition.
+ */
+function flatten_style_definition_stack(
+  style_definition_stack: StyleDefinition[][],
+): StyleDefinition[] {
+  return style_definition_stack.reverse().flat(1);
+}
 
-  // DEBUG END
+function generate_filtered_style_definition(
+  ancestry: AstNode[],
+  style_ref_text: string,
+  flattened_style_items: StyleDefinition[],
+): StyleDefinition[] {
+  const filtered_style_definitions: StyleDefinition[] = [];
 
-  // Process the ancestry top-down:
+  const topicIndexMap = new Map<string, number>();
+
+  /*
   for (const ancestor of ancestry.reverse()) {
     // Search for style definitions with the proper style identifier:
     if (isModel(ancestor) || isGraph(ancestor)) {
       // Useless check (required for linter)
       for (const s of ancestor.styles) {
-        if (s.id === element.styleref.$refText) {
+        if (s.id === style_ref_text) {
           // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
-
           for (const d of s.definition.items) {
-            // First check reset topic:
-            // if (d.topic === "Reset") {
-            if (isResetStyleDefinition(d)) {
-              // Check which topics must be reset
-              if (["All", "*"].includes(d.value)) {
-                // Reset entire style definition:
-                filtered_style_definitions.length = 0;
-              } else {
-                console.error(
-                  chalk.redBright(
-                    `ERROR: NOT YET IMPLEMENTED: reset style argument '${d.value}'`,
-                  ),
-                );
-              }
-            } else {
-              // Retrieve the index of the style definition with the same topic (returns -1 if no match)
-              const index = filtered_style_definitions.findIndex(
-                (it) => it.topic === d.topic,
-              );
-              if (index < 0) {
-                // No match: add to array
-                filtered_style_definitions.push(d);
-              } else {
-                // Match: replace existing style defintion with new one
-                filtered_style_definitions.splice(index, 1, d);
-              }
-            }
+          */
+  for (const d of flattened_style_items) {
+    // First check reset topic:
+    if (isResetStyleDefinition(d)) {
+      // Check which topics must be reset
+      if (["All", "*"].includes(d.value)) {
+        // Reset entire style definition:
+        filtered_style_definitions.length = 0;
+        topicIndexMap.clear();
+      } else {
+        console.error(
+          chalk.redBright(
+            `ERROR: NOT YET IMPLEMENTED: reset style argument '${d.value}'`,
+          ),
+        );
+      }
+    } else {
+      // Retrieve the index of the style definition with the same topic (returns -1 if no match)
+      const index = topicIndexMap.get(d.topic);
+      if (index === undefined) {
+        // No match: add to array
+        filtered_style_definitions.push(d);
+        topicIndexMap.set(d.topic, filtered_style_definitions.length - 1);
+      } else {
+        // Match: replace existing style defintion with new one
+        filtered_style_definitions[index] = d;
+      }
+    }
+    /*
           }
         }
       }
-    }
-  }
-
-  // Debug statements:
-  for (const d of filtered_style_definitions) {
-    console.log(
-      chalk.bgWhite.blueBright(`Filtered: ${d.topic}: "${d.$cstNode?.text}";`),
-    );
+    }*/
   }
 
   return filtered_style_definitions;
