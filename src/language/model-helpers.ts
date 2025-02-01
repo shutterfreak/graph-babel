@@ -172,12 +172,14 @@ export const NAMED_COLORS_AND_HEX_DEFINITIONS = {
   yellowgreen: "#9acd32",
 }; // Already sorted alphabetically
 
-export const NAMED_COLORS = Object.keys(NAMED_COLORS_AND_HEX_DEFINITIONS);
+export const NAMED_COLORS: string[] = Object.keys(
+  NAMED_COLORS_AND_HEX_DEFINITIONS,
+);
 
 /** Named shapes originate from MermaidJS:
  * url: https://mermaid.js.org/syntax/flowchart.html
  */
-export const NAMED_SHAPES = [
+export const NAMED_SHAPES: string[] = [
   "notch_rect",
   "card",
   "notched_rectangle", // Card - Represents a card
@@ -313,7 +315,7 @@ export const NAMED_SHAPES = [
   "text", // Text Block - Text block
 ].sort();
 
-export const LENGTH_UNITS = [
+export const LENGTH_UNITS: string[] = [
   "mm",
   "cm",
   "pc",
@@ -322,6 +324,69 @@ export const LENGTH_UNITS = [
   "ex",
   "rem",
   "rex",
+].sort();
+
+/**
+ * Topics for ColorStyleDefintion:
+ */
+export const COLOR_STYLE_TOPICS: string[] = [
+  "BorderColor",
+  "LabelColor",
+  "LineColor",
+  "FillColor",
+];
+
+/**
+ * Topics for OpacityStyleDefinition:
+ */
+export const OPACITY_STYLE_TOPICS: string[] = [
+  "BorderAlpha",
+  "BorderOpacity",
+  "LabelAlpha",
+  "LabelOpacity",
+  "LineAlpha",
+  "LineOpacity",
+  "FillAlpha",
+  "FillOpacity",
+];
+
+/**
+ * Topics for LabelStyleDefinition:
+ */
+export const LABEL_STYLE_TOPICS: string[] = [
+  "LabelText",
+  "SrcLabelText",
+  "DstLabelText",
+];
+
+/**
+ * Topics for BorderStyleDefinition:
+ */
+export const LINE_STYLE_TOPICS: string[] = ["BorderStyle", "LineStyle"];
+
+/**
+ * Topics for LineWidthDefinition:
+ */
+export const LINE_WIDTH_TOPICS: string[] = ["BorderWidth", "LineWidth"];
+
+/**
+ * Topics for ShapeStyleDefinition:
+ */
+export const SHAPE_STYLE_TOPICS: string[] = ["Shape"];
+
+/**
+ * Topics for ResetStyleDefinition:
+ */
+export const RESET_STYLE_TOPIC: string[] = ["Reset"];
+
+export const STYLE_TOPICS: string[] = [
+  ...COLOR_STYLE_TOPICS,
+  ...OPACITY_STYLE_TOPICS,
+  ...LABEL_STYLE_TOPICS,
+  ...LINE_STYLE_TOPICS,
+  ...LINE_WIDTH_TOPICS,
+  ...SHAPE_STYLE_TOPICS,
+  ...RESET_STYLE_TOPIC,
 ].sort();
 
 /**

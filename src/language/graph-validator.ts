@@ -21,12 +21,14 @@ import {
   TextColorDefinition,
   ShapeStyleDefinition,
   isNode,
+  StyleDefinition,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
 import {
   LENGTH_UNITS,
   NAMED_COLORS,
   NAMED_SHAPES,
+  STYLE_TOPICS,
   StyleDefinition_toString,
 } from "./model-helpers.js";
 import chalk from "chalk";
@@ -40,6 +42,7 @@ export function registerValidationChecks(services: GraphServices) {
   const checks: ValidationChecks<GraphAstType> = {
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
     Style: [validator.checkStyleNames, validator.checkStyleSubstyles],
+    StyleDefinition: [validator.checkStyleDefinitionTopics],
     HexColorDefinition: [validator.checkHexColorDefinitions],
     RgbColorDefinition: [validator.checkRgbColorDefinitions],
     TextColorDefinition: [validator.checkTextColorDefinitions],
@@ -202,6 +205,22 @@ export class GraphValidator {
       accept("error", "A style must have a nonempty name.", { node: style });
     }
   };
+  checkStyleDefinitionTopics = (
+    shape_definition: StyleDefinition,
+    accept: ValidationAcceptor,
+  ) => {
+    const topic = shape_definition.topic;
+    if (topic.length == 0) {
+      accept("error", `Style topic missing.`, {
+        node: shape_definition,
+      });
+    } else if (!STYLE_TOPICS.includes(topic)) {
+      accept("error", `The style topic '${topic}' is not recognized.`, {
+        node: shape_definition,
+        property: "topic",
+      });
+    }
+  };
   /**
    * Verify that the shape names provided are valid (exhaustive list defined in NAMED_SHAPES)
    * @param shape_definition
@@ -212,7 +231,11 @@ export class GraphValidator {
     accept: ValidationAcceptor,
   ) => {
     const value = shape_definition.value.toLowerCase();
-    if (!NAMED_SHAPES.includes(value)) {
+    if (value.length == 0) {
+      accept("error", `Shape name missing.`, {
+        node: shape_definition,
+      });
+    } else if (!NAMED_SHAPES.includes(value)) {
       accept(
         "error",
         `The shape '${shape_definition.value}' is not recognized.`,
