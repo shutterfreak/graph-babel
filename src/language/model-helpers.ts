@@ -172,9 +172,10 @@ export const NAMED_COLORS_AND_HEX_DEFINITIONS = {
   yellowgreen: "#9acd32",
 }; // Already sorted alphabetically
 
-export const NAMED_COLORS: string[] = Object.keys(
-  NAMED_COLORS_AND_HEX_DEFINITIONS,
-);
+export const NAMED_COLORS: string[] = [
+  "transparent",
+  ...Object.keys(NAMED_COLORS_AND_HEX_DEFINITIONS),
+].sort();
 
 /** Named shapes originate from MermaidJS:
  * url: https://mermaid.js.org/syntax/flowchart.html
