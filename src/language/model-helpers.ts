@@ -19,6 +19,7 @@ import {
   StringLabel,
   StyleDefinition,
 } from "./generated/ast.js";
+import { inspect } from "util";
 
 export const NAMED_COLORS_AND_HEX_DEFINITIONS = {
   aliceblue: "#f0f8ff",
@@ -366,11 +367,35 @@ export function Element_get_style_items(
   const ancestry: AstNode[] = Element_get_ancestry(element);
 
   // DEBUG START
+
+  const style_definition_stack: StyleDefinition[][] = [];
+
+  /**
+   * Traverse the model hierarchy bottom-up to retrieve all style definitions relating to the Element
+   * (including styles that inherit from other styles).
+   * The basic algorithm is to first traverse the model hierarchy from the container containing the Element
+   * upwards to the Model, and then to apply all matching StyleDefinitions[] lists in scope of the Element
+   * in reverse order of the stack. This allows correct cascading 'overruling' of style.
+   * While traversing the model hierarchy starting from the Element, relating StyleDefinition[] lists for
+   * styles applying to the Element will be stored in stack.
+   * The resulting StyleDefintion[] array will be generating by traversing this stack in reverse order.
+   * When a style in scope refers to another style, then the relating StyleDefinition[] lists from that
+   * related style will also be added to the stack (by means of recursion).
+   * @param style_name the style identifier
+   * @param ancestry the Element's (or related Style's) container's ancestry
+   * @param level ancestry level (only used for debugging)
+   */
   function traverse_ancestry_for_style(
     style_name: string,
     ancestry: AstNode[],
     level: number,
   ): void {
+    console.info(
+      chalk.yellow(
+        `DBG::traverse_ancestry_for_style(level: ${level}) - Traversing ancestry for style '${style_name}'`,
+      ),
+    );
+
     for (const ancestor of ancestry) {
       if (isModel(ancestor) || isGraph(ancestor)) {
         // Useless check (required for linter)
@@ -386,6 +411,9 @@ export function Element_get_style_items(
               ),
             );
             console.info(chalk.yellow(s.definition.$cstNode?.text));
+
+            // Add the style definition to the stack:
+            style_definition_stack.push(s.definition.items);
             if (s.styleref !== undefined) {
               traverse_ancestry_for_style(s.styleref.$refText, ancestry, level);
             }
@@ -395,10 +423,42 @@ export function Element_get_style_items(
       // Next level:
       level += 1;
     }
+    console.info(
+      chalk.yellow(
+        `DBG::traverse_ancestry_for_style(level: ${level}) - Traversing ancestry for style '${style_name}' - inspect:`,
+        inspect(style_definition_stack),
+      ),
+    );
   }
 
   // Traverse the style tree
+  console.log(
+    `traverse_ancestry_for_style(${element.styleref.$refText}) - START`,
+  );
   traverse_ancestry_for_style(element.styleref.$refText, ancestry, 0);
+  console.log(
+    `traverse_ancestry_for_style(${element.styleref.$refText}) - END`,
+  );
+
+  // Reverse the stack and flatten the Style Definitions:
+  console.info(
+    chalk.greenBright(
+      `DBG::Element_get_style_items(type: ${element.$type}) - BEFORE flattening:`,
+    ),
+  );
+  console.info(chalk.green(inspect(style_definition_stack)));
+  const flattened_style_items = style_definition_stack.reverse().flat(1);
+  console.info(
+    chalk.greenBright(
+      `DBG::Element_get_style_items(type: ${element.$type}) - AFTER flattening:`,
+    ),
+  );
+  console.info(chalk.green(inspect(flattened_style_items)));
+  for (const item of flattened_style_items) {
+    console.debug(
+      chalk.blueBright(`DBG: Element_get_style_items() ${item.$cstNode?.text}`),
+    );
+  }
 
   // DEBUG END
 
