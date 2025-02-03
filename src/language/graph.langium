@@ -33,14 +33,18 @@ Link:
         ')'
     )?
     src+=[Element:ID] ( ',' src+=[Element:ID] )*
-    kind=LINK_TYPE
+    LinkType
     dst+=[Element:ID] ( ',' dst+=[Element:ID] )*
     label=Label?
 ;
 
+fragment LinkType:
+    relation=('to' | 'with') |
+    link=LINK_TYPE
+;
+
 terminal LINK_TYPE:
-    'to' | 'with' |
-    /[<xo]?(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)[>xo]?/
+    /([xo]|[<][|>]?)?(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)([xo]|[|<]?[>])?/
 ;
 
 fragment StyleID:

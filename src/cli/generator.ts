@@ -87,8 +87,11 @@ export function generate_cleaned_graph(
       for (s of childNode.dst) {
         dst_links.push(s.$refText);
       }
-
-      debug_log_message = `${preamble} ${src_links.join(",")} ${childNode.kind} ${dst_links.join(",")} "${Label_get_label(childNode.label)}"`;
+      const relation =
+        childNode.relation === undefined ? "" : childNode.relation;
+      const line: string = childNode.link === undefined ? "" : childNode.link;
+      const link = relation.length > 0 ? relation : line;
+      debug_log_message = `${preamble} ${src_links.join(",")} ${link} ${dst_links.join(",")} "${Label_get_label(childNode.label)}"`;
     } else if (isStyle(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
       debug_log_message = `${preamble} with name '${childNode.id}' (no direct access to StyleBlock)`;
@@ -195,8 +198,23 @@ export function generate_cleaned_graph(
     for (s of link.dst) {
       dst_links.push(s.$refText);
     }
+    const relation = link.relation === undefined ? "" : link.relation;
+    const link_style = link.link === undefined ? "" : link.link;
+    /*
+    const src_head: string = link.src_head === undefined ? "" : link.src_head;
+    const dst_head: string = link.dst_head === undefined ? "" : link.dst_head;
+    const line: string = link.line === undefined ? "" : link.line;
+    */
+    let link_definition = "";
+    if (relation.length > 0) {
+      link_definition = relation;
+    } else if (link_style.length > 0) {
+      link_definition = link_style;
+    } else {
+      console.error("Error: this can't happen.");
+    }
 
-    return `${INDENTATION.repeat(level)}link${link.styleref ? `:${link.styleref.$refText}` : ""} ${link.id != null ? `(${link.id}) ` : ""}${src_links.join(",")} ${link.kind} ${dst_links.join(",")}${label !== "" ? ` "${label}"` : ""}`;
+    return `${INDENTATION.repeat(level)}link${link.styleref ? `:${link.styleref.$refText}` : ""} ${link.id != null ? `(${link.id}) ` : ""}${src_links.join(",")} ${link_definition} ${dst_links.join(",")}${label !== "" ? ` "${label}"` : ""}`;
   }
 
   function render_Style(style: Style, level: number): string {

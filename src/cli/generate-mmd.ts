@@ -4,6 +4,7 @@ import {
   Graph,
   isGraph,
   Element,
+  GraphTerminals,
   Node,
   Link,
   isNode,
@@ -28,6 +29,7 @@ import {
   StyleDefinitions_get_color_value,
   StyleDefinitions_get_opacity_value,
   StyleDefinitions_get_line_width_value,
+  NAMED_SHAPES,
 } from "../language/model-helpers.js";
 import { inspect } from "util";
 import { Reference } from "langium";
@@ -127,6 +129,7 @@ function render_node_contents(
 
   return lines;
 }
+
 function render_element(
   element: Element,
   nesting_level: number,
@@ -195,6 +198,10 @@ function render_link(
   const style_definitions: StyleDefinition[] | undefined =
     Element_get_style_items(link);
 
+  // Rendering warnings and errors:
+  const comments: string[] = [];
+  let comment = "";
+
   let label: string | undefined = Label_get_label(link.label);
   if (label.length == 0 && link.styleref !== undefined) {
     // Try obtaining the label definition from the link Style
@@ -246,7 +253,7 @@ function render_link(
     link_opacity,
   ].filter((s) => s !== undefined); // TODO
 
-  // Render link type --- AST: LINK_TYPE = /([<xo]?)(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)([>xo])?/
+  // Render the link
   // MermaidJS: A -->|label| B
   let edge: string | undefined = undefined;
   if (label === undefined || label.length == 0) {
@@ -255,41 +262,95 @@ function render_link(
     // Escape '|' characters in the edge label:
     label = `|${label.replaceAll("|", "\|")}|`;
   }
-  if (link.kind == "to") {
-    edge = "-->";
-  } else if (link.kind == "with") {
-    edge = "---";
-  } else {
-    const match = /([<xo]?)(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)([>xo])?/.exec(
-      link.kind,
-    );
-    if (match) {
-      const src: string = match[1];
-      let line: string = match[2];
-      const dst: string = match[3];
 
-      if (line.length > 0) {
-        if (src == "" && dst == "") {
-          // ensure line length is 3 characters:
-          if (line.length < 3) {
-            // Only if identical characters - duplicate 1st characer:
-            line = line + line.charAt(0);
+  // A link either has property 'relation' defined ('to' | 'with'), or 'link' (obeying GraphTerminals.LINK_TYPE)
+  if (link.relation !== undefined && link.relation.length > 0) {
+    // 'relation' defined:
+    switch (link.relation) {
+      case "to":
+        edge = "-->";
+        break;
+      case "with":
+        edge = "---";
+        break;
+      default: // Error - shouldn't happen
+        break;
+    }
+  } else {
+    // 'link' defined:
+    if (link.link !== undefined && link.link.length > 0) {
+      const match = GraphTerminals.LINK_TYPE.exec(link.link);
+      if (match) {
+        let src_head = match[1] ?? "";
+        let line = match[2] ?? "";
+        let dst_head = match[3] ?? "";
+
+        // Arrowhead at source:
+        if (src_head.length > 0) {
+          switch (src_head) {
+            case "<":
+            case "o":
+            case "x":
+              break;
+            default:
+              comment = `Warning: source arrowhead '${src_head}' is not available in a MermaidJS graph. Will render as '<'. Source: '${link.$cstNode?.text}'`;
+              comments.push(comment);
+              console.warn(chalk.red(comment));
+              src_head = "<";
           }
         }
-        edge = src + line + dst;
+
+        // Arrowhead at destination:
+        if (dst_head.length > 0) {
+          switch (dst_head) {
+            case ">":
+            case "o":
+            case "x":
+              break;
+            default:
+              comment = `Warning: destination arrowhead '${dst_head}' is not available in a MermaidJS graph. Will render as '>'. Source: '${link.$cstNode?.text}'`;
+              comments.push(comment);
+              console.warn(chalk.red(comment));
+              dst_head = ">";
+          }
+        }
+
+        // Line style:
+        if (line.length > 0) {
+          if (/(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)/.exec(line) === null) {
+            comment = `Warning: line style '${line}' is not available in a MermaidJS graph. Will render as '...'. Source: '${link.$cstNode?.text}'`;
+            console.warn(chalk.red(comment));
+            edge = "...";
+          }
+
+          if (src_head.length == 0 && dst_head.length == 0) {
+            // ensure line length is 3 characters:
+            if (line.length < 3) {
+              // Only if identical characters - duplicate the 1st characer:
+              line = line + line.charAt(0);
+            }
+          }
+        }
+
+        // Generate edge:
+        edge = src_head + line + dst_head;
+      } else {
+        // No match
+        comment = `Error: invalid line style: '${link.$cstNode?.text}'. Will render as '...'. Source: '${link.$cstNode?.text}'`;
+        comments.push(comment);
+        console.error(chalk.red(comment));
+        edge = "...";
       }
     } else {
-      console.warn(
-        chalk.red(
-          `Warning: link style '${link.kind}' is not (yet) implemented. Will render as '...`,
-        ),
-      );
+      comment = `Error: line style missing: '${link.$cstNode?.text}'. Will render as '...'. Source: '${link.$cstNode?.text}'`;
+      comments.push(comment);
+      console.error(chalk.red(comment));
       edge = "...";
     }
   }
 
-  const src_links: string[] = [];
   let s: Reference<Element> | undefined = undefined;
+  const src_links: string[] = [];
   for (s of link.src) {
     src_links.push(s.$refText);
   }
@@ -322,6 +383,12 @@ function render_link(
 
   //TODO: assign styling to ALL links (not only the first one)
   return (
+    (comments.length > 0
+      ? INDENTATION.repeat(nesting_level) +
+        "%% " +
+        comments.join("\n" + INDENTATION.repeat(nesting_level) + "%% ") +
+        "\n"
+      : "") +
     INDENTATION.repeat(nesting_level) +
     `${src_links.join(" & ")} ${edge}${label} ${dst_links.join(" & ")}\n`
   );
@@ -412,7 +479,7 @@ function render_style(style: Style, nesting_level: number): string {
 
   let result =
     INDENTATION.repeat(nesting_level) +
-    `%% ${style.definition.$cstNode?.text.replaceAll(/[\r\n\s]+/g, " ")}`;
+    `%% style ${style.id} ${style.definition.$cstNode?.text.replaceAll(/[\r\n\s]+/g, " ")}`;
   if (style_items.length > 0) {
     result +=
       "\n" +
@@ -432,30 +499,15 @@ function shape_to_mmd_shape(shape: string | undefined): string | undefined {
   if (shape === undefined) {
     return undefined;
   }
-  switch (shape) {
-    case "roundrect":
-    case "rect-rounded":
-    case "rounded-rect":
-      return "rounded";
-    case "diamond":
-    case "circle":
-    case "trap-b":
-    case "trap-t":
-    case "cylinder":
-    case "rect":
-    case "hourglass":
-    case "collate":
-      return shape;
-    // TODO
-    default:
-      console.warn(
-        chalk.red(
-          `shape_to_mmd_shape(${shape}) - not yet implemented (will use 'rect')`,
-        ),
-      );
-      return "rect";
+  if (NAMED_SHAPES.includes(shape)) {
+    return shape;
   }
-  return shape;
+  console.warn(
+    chalk.red(
+      `shape_to_mmd_shape(${shape}) - unknown shape - not yet implemented (will use 'rect').`,
+    ),
+  );
+  return "rect";
 }
 
 /**
