@@ -10,6 +10,7 @@ import { NodeFileSystem } from "langium/node";
 import * as url from "node:url";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { generate_graphml_graph } from "./generate-graphml.js";
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 
 const packagePath = path.resolve(__dirname, "..", "..", "package.json");
@@ -61,6 +62,20 @@ export const generateMermaidGraphAction = async (
   );
 };
 
+export const generateGraphMLAction = async (
+  fileName: string,
+  opts: GenerateOptions,
+): Promise<void> => {
+  const services = createGraphServices(NodeFileSystem).Graph;
+  const model = await extractAstNode<Model>(fileName, services);
+  const generatedFilePath = generate_graphml_graph(model, fileName, opts);
+  console.log(
+    chalk.green(
+      `GraphML Graph code generated successfully: ${generatedFilePath}`,
+    ),
+  );
+};
+
 export interface GenerateOptions {
   destination?: string;
 }
@@ -106,6 +121,17 @@ export default function (): void {
     .option("-d, --destination <dir>", "destination directory of generating")
     .description("generate a MermaidJS graph (.mmd)")
     .action(generateMermaidGraphAction);
+
+  // Action generate:graphml
+  program
+    .command("generate:graphml")
+    .argument(
+      "<file>",
+      `source file (possible file extensions: ${fileExtensions})`,
+    )
+    .option("-d, --destination <dir>", "destination directory of generating")
+    .description("generate a graphML graph (.graphml)")
+    .action(generateGraphMLAction);
 
   program.parse(process.argv);
 }
