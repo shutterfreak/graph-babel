@@ -1,8 +1,20 @@
+# Microsoft Visual Studio Code:
 .vscode/*
 !.vscode/extensions.json
 !.vscode/launch.json
 !.vscode/tasks.json
+
+# Dependency directories:
 node_modules/
+
+# Compiled JS:
 out/
+
+# Generated grammar and AST:
 src/language/generated/
+
+# Generated syntax highlighting:
 syntaxes/
+
+# TypeScript cache:
+*.tsbuildinfo
