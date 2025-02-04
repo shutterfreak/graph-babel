@@ -3,6 +3,7 @@ import { AstNode } from "langium";
 // import { inspect } from "util";
 import {
   ColorDefinition,
+  ColorStyleDefinition,
   Element,
   isColorDefinition,
   isColorStyleDefinition,
@@ -15,12 +16,13 @@ import {
   isResetStyleDefinition,
   isRgbColorDefinition,
   isShapeStyleDefinition,
+  isTextColorDefinition,
   Label,
   StringLabel,
   StyleDefinition,
 } from "./generated/ast.js";
 
-export const NAMED_COLORS_AND_HEX_DEFINITIONS = {
+export const NAMED_COLORS_AND_HEX_DEFINITIONS: { [key: string]: string } = {
   aliceblue: "#f0f8ff",
   antiquewhite: "#faebd7",
   aqua: "#00ffff",
@@ -172,6 +174,10 @@ export const NAMED_COLORS_AND_HEX_DEFINITIONS = {
   yellowgreen: "#9acd32",
 }; // Already sorted alphabetically
 
+export function color_name_to_hex(color_name: string): string | undefined {
+  return NAMED_COLORS_AND_HEX_DEFINITIONS[color_name] ?? undefined;
+}
+
 export const NAMED_COLORS: string[] = [
   "transparent",
   ...Object.keys(NAMED_COLORS_AND_HEX_DEFINITIONS),
@@ -304,7 +310,6 @@ export const NAMED_SHAPES: string[] = [
   "crossed_circle",
   "summary", // Summary - Summary
   "tag_doc",
-  "tag_doc",
   "tagged_document", // Tagged Document - Tagged document
   "tag_rect",
   "tag_proc",
@@ -421,8 +426,18 @@ export function Label_get_label(label: Label | undefined): string {
 export function Element_get_style_items(
   element: Element,
 ): StyleDefinition[] | undefined {
+  console.info(
+    chalk.gray(
+      `Element_get_style_items(type = ${element.$type}) - [${element.$cstNode?.text.replaceAll("\n", "\\n")}]`,
+    ),
+  );
   if (element.styleref === undefined) {
     // The element has no style assigned
+    console.info(
+      chalk.gray(
+        `Element_get_style_items(type = ${element.$type}) - NO STYLE REFERENCE FOUND`,
+      ),
+    );
     return undefined;
   }
 
@@ -439,6 +454,12 @@ export function Element_get_style_items(
   const flattened_style_items = flatten_style_definition_stack(
     style_definition_stack,
   );
+  console.info(
+    chalk.gray(
+      `Element_get_style_items(type = ${element.$type}) - FOUND ${flattened_style_items.length} UNFILTERED STYLE ITEMS`,
+    ),
+  );
+
   let i = 1;
   for (const item of flattened_style_items) {
     console.debug(
@@ -466,6 +487,11 @@ export function Element_get_style_items(
     );
     i++;
   }
+  console.info(
+    chalk.gray(
+      `Element_get_style_items(type = ${element.$type}) - FOUND ${filtered_style_definitions.length} FILTERED STYLE ITEMS`,
+    ),
+  );
 
   return filtered_style_definitions;
 }
@@ -640,7 +666,7 @@ export function StyleDefinitions_get_label(
 }
 
 /**
- * Get the olor value of a ColorStyleItem from a style definition that matches any token in matching_tokens
+ * Get the color value of a ColorStyleItem from a style definition that matches any token in matching_tokens
  * @param items the StyleItem array to explore
  * @param matching_tokens the array of tokens to check (BorderColor, FillColor, LabelColor, LineColor)
  * @returns the last matching StyleItem
@@ -648,13 +674,35 @@ export function StyleDefinitions_get_label(
 export function StyleDefinitions_get_color_value(
   items: StyleDefinition[] | undefined,
   matching_tokens: string[],
-): StyleDefinition | undefined {
+): ColorStyleDefinition | undefined {
   if (items === undefined) {
     return undefined;
   }
   return items
     .filter((def) => isColorStyleDefinition(def))
     .findLast((def) => matching_tokens.includes(def.topic)); //?.value;
+}
+
+/**
+ * Get the color value as hex color code
+ * @param items the StyleItem array to explore
+ * @param matching_tokens the array of tokens to check (BorderWidth, LineWidth)
+ * @returns the color as hex color code (or undefined)
+ */
+export function StyleDefinitions_get_color_value_as_hex(
+  items: StyleDefinition[] | undefined,
+  matching_tokens: string[],
+) {
+  if (items === undefined) {
+    return undefined;
+  }
+  const color_item: ColorStyleDefinition | undefined =
+    StyleDefinitions_get_color_value(items, matching_tokens);
+  let color_value: string | undefined = undefined;
+  if (color_item !== undefined) {
+    color_value = ColorDefinition_to_hex_color(color_item.value);
+  }
+  return color_value;
 }
 
 /**
@@ -702,6 +750,36 @@ export function ColorDefinition_toString(d: ColorDefinition) {
       return color.hex_color;
     }
     return color.color_name;
+  }
+  return undefined;
+}
+
+function color_component_to_hex(c: number) {
+  const hex = c.toString(16);
+  return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgb_to_hex(r: number, g: number, b: number) {
+  return (
+    "#" +
+    color_component_to_hex(r) +
+    color_component_to_hex(g) +
+    color_component_to_hex(b)
+  );
+}
+
+export function ColorDefinition_to_hex_color(d: ColorDefinition) {
+  if (isColorDefinition(d)) {
+    const color = d.color;
+    if (isRgbColorDefinition(color)) {
+      return rgb_to_hex(color.red, color.green, color.blue);
+      // `rgb(${color.red},${color.green},${color.blue})`;
+    } else if (isHexColorDefinition(color)) {
+      return color.hex_color;
+    } else if (isTextColorDefinition(color)) {
+      // Named color
+      return color_name_to_hex(color.color_name);
+    }
   }
   return undefined;
 }
