@@ -33,8 +33,10 @@ Link:
         ')'
     )?
     src+=[Element:ID] ( ',' src+=[Element:ID] )*
+    (':' src_arrowhead=ID)?
     LinkType
     dst+=[Element:ID] ( ',' dst+=[Element:ID] )*
+    (':' dst_arrowhead=ID)?
     label=Label?
 ;
 

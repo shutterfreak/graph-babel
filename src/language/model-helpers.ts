@@ -395,6 +395,21 @@ export const STYLE_TOPICS: string[] = [
   ...RESET_STYLE_TOPIC,
 ].sort();
 
+export const ARROWHEADS: string[] = [
+  "none",
+  "standard",
+  "default",
+  "plain",
+  "diamond",
+  "white_diamond",
+  "delta",
+  "white_delta",
+  "circle",
+  "white_circle",
+  "transparent_circle",
+  "cross",
+].sort();
+
 /**
  * Retrieve the label string from a Label node
  * @param label the Label item to fetch the label text from

@@ -22,9 +22,12 @@ import {
   ShapeStyleDefinition,
   isNode,
   StyleDefinition,
+  Link,
+  GraphTerminals,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
 import {
+  ARROWHEADS,
   LENGTH_UNITS,
   NAMED_COLORS,
   NAMED_SHAPES,
@@ -41,6 +44,7 @@ export function registerValidationChecks(services: GraphServices) {
   const validator = services.validation.GraphValidator;
   const checks: ValidationChecks<GraphAstType> = {
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
+    Link: [validator.checkLinkStyles],
     Style: [validator.checkStyleNames, validator.checkStyleSubstyles],
     StyleDefinition: [validator.checkStyleDefinitionTopics],
     HexColorDefinition: [validator.checkHexColorDefinitions],
@@ -134,6 +138,69 @@ export class GraphValidator {
    * @param model
    * @param accept
    */
+  checkLinkStyles = (link: Link, accept: ValidationAcceptor): void => {
+    // Source arrowhead:
+    if (link.src_arrowhead !== undefined) {
+      if (link.src_arrowhead.length === 0) {
+        accept(
+          "error",
+          "Expecting a source arrowhead style definition after the colon - it cannot be empty.",
+          { node: link, property: "src_arrowhead" },
+        );
+      } else if (!ARROWHEADS.includes(link.src_arrowhead)) {
+        accept(
+          "error",
+          `Unknown source arrowhead style definition: '${link.src_arrowhead}'`,
+          { node: link, property: "src_arrowhead" },
+        );
+      }
+    }
+    // Destination arrowhead:
+    if (link.dst_arrowhead !== undefined) {
+      if (link.dst_arrowhead.length === 0) {
+        accept(
+          "error",
+          "Expecting a destination arrowhead style definition after the colon - it cannot be empty.",
+          { node: link, property: "dst_arrowhead" },
+        );
+      } else if (!ARROWHEADS.includes(link.dst_arrowhead)) {
+        accept(
+          "error",
+          `Unknown destination arrowhead style definition: '${link.dst_arrowhead}'`,
+          { node: link, property: "dst_arrowhead" },
+        );
+      }
+    }
+    // Link style (already captured by grammar) - ensure there are no arrowhead redefinitions in link style:
+    if (link.link !== undefined) {
+      const match = GraphTerminals.LINK_TYPE.exec(link.link);
+      if (match) {
+        const src_head: string = match[1] ?? "";
+        // const line = match[2] ?? ""; -- already checked in the grammar
+        const dst_head: string = match[3] ?? "";
+
+        if (link.src_arrowhead !== undefined && src_head.length > 0) {
+          accept(
+            "error",
+            `Redefinition of source arrowhead style definition: ':${link.src_arrowhead}' and '${src_head}'`,
+            { node: link, property: "link" },
+          );
+        }
+        if (link.dst_arrowhead !== undefined && dst_head.length > 0) {
+          accept(
+            "error",
+            `Redefinition of destination arrowhead style definition: ':${link.dst_arrowhead}' and '${dst_head}'`,
+            { node: link, property: "link" },
+          );
+        }
+      } else {
+        accept("error", `Invalid link style definition: ':${link.link}'`, {
+          node: link,
+          property: "link",
+        });
+      }
+    }
+  };
   checkStyles = (model: Model, accept: ValidationAcceptor): void => {
     console.info(chalk.cyanBright("checkStyles(model)"));
 
