@@ -186,7 +186,7 @@ export const NAMED_COLORS: string[] = [
 /** Named shapes originate from MermaidJS:
  * url: https://mermaid.js.org/syntax/flowchart.html
  */
-export const NAMED_SHAPES: string[] = [
+const _NAMED_SHAPES: string[] = [
   "notch_rect",
   "card",
   "notched_rectangle", // Card - Represents a card
@@ -230,7 +230,6 @@ export const NAMED_SHAPES: string[] = [
   "div_proc",
   "divided_process",
   "divided_rectangle", // Divided Process - Divided process shape
-  "doc",
   "doc",
   "document", // Document - Represents a document
   "rounded",
@@ -320,6 +319,7 @@ export const NAMED_SHAPES: string[] = [
   "terminal", // Terminal Point - Terminal point
   "text", // Text Block - Text block
 ].sort();
+export const NAMED_SHAPES = [...new Set(_NAMED_SHAPES)]; // Remove potential duplicates
 
 export const LENGTH_UNITS: string[] = [
   "mm",

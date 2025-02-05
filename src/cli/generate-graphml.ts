@@ -3,6 +3,7 @@ import {
   Node,
   Link,
   Element,
+  GraphTerminals,
   Model,
   Style,
   isStyleDefinition,
@@ -45,17 +46,30 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
     case "card":
     case "notched_rectangle": // Card - Represents a card
       return { type: "GenericNode", shape: "com.yworks.flowchart.card" };
+
     case "cyl":
     case "cylinder":
     case "database":
     case "db": // Database - Database storage
       return { type: "GenericNode", shape: "com.yworks.flowchart.dataBase" };
+    case "lin_cyl":
+    case "disk":
+    case "lined_cylinder": // Disk Storage - Disk storage
+      console.warn(
+        chalk.yellowBright(
+          `Warning: shape '${named_shape}' will be mapped to yWorks GraphML GenericNode: com.yworks.flowchart.dataBase`,
+        ),
+      );
+      return { type: "GenericNode", shape: "com.yworks.flowchart.dataBase" };
+
     case "diam":
     case "diamond":
       return { type: "ShapeNode", shape: "diamond" };
+
     case "decision":
     case "question": // Decision - Decision-making step
       return { type: "GenericNode", shape: "com.yworks.flowchart.decision" };
+
     case "delay":
     case "half_rounded_rectangle": // Delay - Represents a delay
       return { type: "GenericNode", shape: "com.yworks.flowchart.delay" };
@@ -70,12 +84,129 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
         shape: "com.yworks.flowchart.manualOperation",
       };
 
+    case "trap_b":
+    case "priority":
+    case "trapezoid":
+    case "trapezoid_bottom": // Priority Action - Priority action
+      return { type: "ShapeNode", shape: "trapezoid" };
+
     case "rect":
     case "rectangle": // Process - Standard process shape
       return { type: "ShapeNode", shape: "rectangle" };
     case "proc":
     case "process":
       return { type: "GenericNode", shape: "com.yworks.flowchart.process" };
+
+    case "rounded":
+    case "event": // Event - Represents an event
+      return { type: "ShapeNode", shape: "diamond" };
+
+    case "doc":
+    case "document": // Document - Represents a document
+      return { type: "GenericNode", shape: "com.yworks.flowchart.document" };
+
+    case "brace_l":
+    case "brace":
+    case "comment": // Comment - Adds a comment
+      return { type: "GenericNode", shape: "com.yworks.flowchart.annotation" };
+    case "brace_r": // Comment Right - Adds a comment
+    case "braces": // Comment with braces on both sides - Adds a comment
+      console.warn(
+        chalk.yellowBright(
+          `Warning: shape '${named_shape}' will be mapped to yWorks GraphML GenericNode: com.yworks.flowchart.annotation`,
+        ),
+      );
+      return { type: "GenericNode", shape: "com.yworks.flowchart.annotation" };
+
+    case "lean_r":
+    case "in_out":
+    case "lean_right": // Data Input/Output - Represents input or output
+      return { type: "ShapeNode", shape: "parallelogram" };
+    case "lean_l":
+    case "lean_left":
+    case "out_in": // Data Input/Output - Represents output or input
+      return { type: "ShapeNode", shape: "parallelogram2" };
+
+    case "curv_trap":
+    case "curved_trapezoid":
+    case "display": // Display - Represents a display
+      return { type: "GenericNode", shape: "com.yworks.flowchart.display" };
+
+    case "flag":
+    case "paper_tape": // Paper Tape - Paper tape
+      return { type: "GenericNode", shape: "com.yworks.flowchart.paperType" };
+
+    case "hex":
+    case "hexagon":
+      return { type: "ShapeNode", shape: "hexagon" };
+    case "prepare": // Prepare Conditional - Preparation or condition step
+      return { type: "GenericNode", shape: "com.yworks.flowchart.preparation" };
+
+    case "h_cyl":
+    case "das":
+    case "horizontal_cylinder": // Direct Access Storage - Direct access storage
+      return { type: "GenericNode", shape: "com.yworks.flowchart.directData" };
+
+    case "tri":
+    case "extract":
+    case "triangle": // Extract - Extraction process
+      return { type: "ShapeNode", shape: "triangle" };
+
+    case "flip_tri":
+    case "flipped_triangle":
+    case "manual_file": // Manual File - Manual file operation
+      return { type: "ShapeNode", shape: "triangle2" };
+
+    case "win_pane":
+    case "internal_storage":
+    case "window_pane": // Internal Storage - Internal storage
+      return {
+        type: "GenericNode",
+        shape: "com.yworks.flowchart.internalStorage",
+      };
+
+    case "sl_rect":
+    case "manual_input":
+    case "sloped_rectangle": // Manual Input - Manual input step
+      return { type: "GenericNode", shape: "com.yworks.flowchart.manualInput" };
+
+    case "stadium":
+    case "pill":
+    case "terminal": // Terminal Point - Terminal point
+      return { type: "GenericNode", shape: "com.yworks.flowchart.terminator" };
+
+    case "fr_rect":
+    case "framed_rectangle":
+    case "subproc":
+    case "subprocess":
+    case "subroutine": // Subprocess - Subprocess
+      return {
+        type: "GenericNode",
+        shape: "com.yworks.flowchart.predefinedProcess",
+      };
+
+    case "circle":
+    case "circ": // Start - Starting point
+    case "sm_circ":
+    case "small_circle":
+    case "start": // Start - Small starting point
+      return { type: "GenericNode", shape: "com.yworks.flowchart.start2" };
+
+    case "odd": // Odd - Odd shape
+      return {
+        type: "GenericNode",
+        shape: "com.yworks.flowchart.networkMessage",
+      };
+
+    case "notch_pent":
+    case "loop_limit":
+    case "notched_pentagon": // Loop Limit - Loop limit step
+      return { type: "GenericNode", shape: "com.yworks.flowchart.loopLimit" };
+
+    case "bow_rect":
+    case "bow_tie_rectangle":
+    case "stored_data": // Stored Data - Stored data
+      return { type: "GenericNode", shape: "com.yworks.flowchart.storedData" };
 
     default:
       console.warn(
@@ -92,43 +223,12 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
   "bolt",
   "com_link",
   "lightning_bolt", // Com Link - Communication link
-  "brace",
-  "brace_l",
-  "comment", // Comment - Adds a comment
-  "brace_r", // Comment Right - Adds a comment
-  "braces", // Comment with braces on both sides - Adds a comment
-  "lean_r",
-  "in_out",
-  "lean_right", // Data Input/Output - Represents input or output
-  "lean_l",
-  "lean_left",
-  "out_in", // Data Input/Output - Represents output or input
-  "h_cyl",
-  "das",
-  "horizontal_cylinder", // Direct Access Storage - Direct access storage
-  "lin_cyl",
-  "disk",
-  "lined_cylinder", // Disk Storage - Disk storage
-  "curv_trap",
-  "curved_trapezoid",
-  "display", // Display - Represents a display
   "div_rect",
   "div_proc",
   "divided_process",
   "divided_rectangle", // Divided Process - Divided process shape
-  "doc",
-  "doc",
-  "document", // Document - Represents a document
-  "rounded",
-  "event", // Event - Represents an event
-  "tri",
-  "extract",
-  "triangle", // Extract - Extraction process
   "fork",
   "join", // Fork/Join - Fork or join in process flow
-  "win_pane",
-  "internal_storage",
-  "window_pane", // Internal Storage - Internal storage
   "f_circ",
   "filled_circle",
   "junction", // Junction - Junction point
@@ -139,15 +239,6 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
   "lined_process",
   "lined_rectangle",
   "shaded_process", // Lined/Shaded Process - Lined process shape
-  "notch_pent",
-  "loop_limit",
-  "notched_pentagon", // Loop Limit - Loop limit step
-  "flip_tri",
-  "flipped_triangle",
-  "manual_file", // Manual File - Manual file operation
-  "sl_rect",
-  "manual_input",
-  "sloped_rectangle", // Manual Input - Manual input step
   "docs",
   "documents",
   "st_doc",
@@ -156,34 +247,11 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
   "processes",
   "procs",
   "stacked_rectangle", // Multi-Process - Multiple processes
-  "odd", // Odd - Odd shape
-  "flag",
-  "paper_tape", // Paper Tape - Paper tape
-  "hex",
-  "hexagon",
-  "prepare", // Prepare Conditional - Preparation or condition step
-  "trap_b",
-  "priority",
-  "trapezoid",
-  "trapezoid_bottom", // Priority Action - Priority action
-  "circle",
-  "circ", // Start - Starting point
-  "sm_circ",
-  "small_circle",
-  "start", // Start - Small starting point
   "dbl_circ",
   "double_circle", // Stop - Represents a stop point
   "fr_circ",
   "framed_circle",
   "stop", // Stop - Stop point
-  "bow_rect",
-  "bow_tie_rectangle",
-  "stored_data", // Stored Data - Stored data
-  "fr_rect",
-  "framed_rectangle",
-  "subproc",
-  "subprocess",
-  "subroutine", // Subprocess - Subprocess
   "cross_circ",
   "crossed_circle",
   "summary", // Summary - Summary
@@ -193,12 +261,10 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
   "tag_proc",
   "tagged_process",
   "tagged_rectangle", // Tagged Process - Tagged process
-  "stadium",
-  "pill",
-  "terminal", // Terminal Point - Terminal point
   "text", // Text Block - Text block
   */
 }
+
 export function generate_graphml_graph(
   model: Model,
   filePath: string,
@@ -461,6 +527,136 @@ export function generate_graphml_graph(
       );
     }
 
+    // LINK STYLE AND ARROW HEADS - START
+    const comments: string[] = [];
+    let comment = "";
+    const GRAPHML_ARROWHEADS = {
+      none: "none", // No arrow head
+      standard: "standard", // Standard arrow head
+      delta: "delta", // Triangular arrow head, filled
+      white_delta: "white_delta", // Same, filled in white
+      diamond: "diamond", // Diamond arrow head, filled
+      white_diamond: "white_diamond", // Same, filled in white
+      circle: "circle", // Circle, filled
+      transparent_circle: "transparent_circle", // Circle, not filled
+      plain: "plain", // Plain (straight) arrow
+      cross: "cross", // Cross
+      // TODO: add other arrow heads
+    };
+
+    const GRAPHML_LINE_STYLES = {
+      line: "line",
+      dotted: "dotted",
+      dashed: "dashed",
+      dashed_dotted: "dashed_dotted",
+    };
+
+    let arrowhead_src: string = GRAPHML_ARROWHEADS.none;
+    let arrowhead_dst: string = GRAPHML_ARROWHEADS.none;
+    let edge_style: string | undefined = undefined;
+    if (link.relation !== undefined && link.relation.length > 0) {
+      // 'relation' defined:
+      edge_style = GRAPHML_LINE_STYLES.line;
+      switch (link.relation) {
+        case "to":
+          arrowhead_dst = GRAPHML_ARROWHEADS.standard;
+          break;
+        case "with":
+          break;
+        default: // Error - shouldn't happen
+          break;
+      }
+    } else {
+      // 'link' defined:
+      if (link.link !== undefined && link.link.length > 0) {
+        const match = GraphTerminals.LINK_TYPE.exec(link.link);
+        if (match) {
+          const src_head = match[1] ?? "";
+          const line = match[2] ?? "";
+          let dst_head = match[3] ?? "";
+
+          // Arrowhead at source:
+          if (src_head.length > 0) {
+            switch (src_head) {
+              case "<":
+                arrowhead_src = GRAPHML_ARROWHEADS.standard;
+                break;
+              case "o":
+                arrowhead_src = GRAPHML_ARROWHEADS.transparent_circle;
+                break;
+              case "x":
+                arrowhead_src = GRAPHML_ARROWHEADS.cross;
+                break;
+              case "<>":
+                arrowhead_src = GRAPHML_ARROWHEADS.white_diamond;
+                break;
+              case "<|":
+                arrowhead_src = GRAPHML_ARROWHEADS.white_delta;
+                break;
+
+              default:
+                comment = `Warning: source arrowhead '${src_head}' is not (yet) available in a yEd GraphML graph. Will render as 'standard'. Source: '${link.$cstNode?.text}'`;
+                comments.push(comment);
+                console.warn(chalk.red(comment));
+                arrowhead_src = GRAPHML_ARROWHEADS.standard;
+            }
+          }
+
+          // Arrowhead at destination:
+          if (dst_head.length > 0) {
+            switch (dst_head) {
+              case ">":
+                arrowhead_dst = GRAPHML_ARROWHEADS.standard;
+                break;
+
+              case "o":
+                arrowhead_dst = GRAPHML_ARROWHEADS.transparent_circle;
+                break;
+
+              case "x":
+                arrowhead_dst = GRAPHML_ARROWHEADS.cross;
+                break;
+
+              case "<>":
+                arrowhead_dst = GRAPHML_ARROWHEADS.white_diamond;
+                break;
+              case "|>":
+                arrowhead_dst = GRAPHML_ARROWHEADS.white_delta;
+                break;
+              default:
+                comment = `Warning: destination arrowhead '${dst_head}' is not (yet) available in a yEd GraphML graph. Will render as 'standard'. Source: '${link.$cstNode?.text}'`;
+                comments.push(comment);
+                console.warn(chalk.red(comment));
+                dst_head = ">";
+            }
+          }
+
+          // Line style:
+          if (line.length > 0) {
+            if (/(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)/.exec(line) === null) {
+              comment = `Warning: line style '${line}' is not (yet) available in a yEd GraphML graph. Will render as 'dotted'. Source: '${link.$cstNode?.text}'`;
+              console.warn(chalk.red(comment));
+              edge_style = GRAPHML_LINE_STYLES.dotted;
+            }
+          }
+
+          // Generate edge:
+        } else {
+          // No match
+          comment = `Error: invalid line style: '${link.$cstNode?.text}'. Will render as 'dotted'. Source: '${link.$cstNode?.text}'`;
+          comments.push(comment);
+          console.error(chalk.red(comment));
+          edge_style = GRAPHML_LINE_STYLES.dotted;
+        }
+      } else {
+        comment = `Error: line style missing: '${link.$cstNode?.text}'. Will render as 'dotted'. Source: '${link.$cstNode?.text}'`;
+        comments.push(comment);
+        console.error(chalk.red(comment));
+        edge_style = GRAPHML_LINE_STYLES.dotted;
+      }
+    }
+    // LINK STYLE AND ARROW HEADS - END
+
     const line_color_value = StyleDefinitions_get_color_value_as_hex(
       style_items,
       ["LineColor"],
@@ -479,8 +675,8 @@ export function generate_graphml_graph(
   <data key="d9"/>
   <data key="d10">
     <y:PolyLineEdge>
-      <y:LineStyle${line_color_value === undefined ? "" : ` color="${line_color_value}"`} type="line" width="1.0"/>
-      <y:Arrows source="none" target="standard"/>
+      <y:LineStyle${line_color_value === undefined ? "" : ` color="${line_color_value}"`} type="${edge_style}" width="1.0"/>
+      <y:Arrows source="${arrowhead_src}" target="${arrowhead_dst}"/>
       <y:EdgeLabel fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" ${label_color_value === undefined ? 'hasLineColor="false"' : `textColor="${label_color_value}"`} xml:space="preserve">${label}</y:EdgeLabel>
     </y:PolyLineEdge>
   </data>
