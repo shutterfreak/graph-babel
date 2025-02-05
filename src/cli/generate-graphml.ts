@@ -99,7 +99,7 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
 
     case "rounded":
     case "event": // Event - Represents an event
-      return { type: "ShapeNode", shape: "diamond" };
+      return { type: "ShapeNode", shape: "roundrectangle" };
 
     case "doc":
     case "document": // Document - Represents a document
