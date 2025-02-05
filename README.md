@@ -77,6 +77,8 @@ graph g1 "Main graph title" {
     node:decision n1 "a node in a graph"
     node n2 [bracketed node label]
     node n3 /* Empty node */
+    link n1 <|-- n2 // Shorthand for delta arrowhead
+    link n2 <>-- n3 // Shorthand notation for diamond arrowhead
 
     // Links don't have to have a name (identifier) defined:
     link:yes n1,n2 ==> g2n1,g2n2
@@ -86,7 +88,7 @@ graph g1 "Main graph title" {
         node g2n1 "graph 2 node 1"
         node g2n2 "graph 2 node 2"
         // A named link has the identifier between round brackets:
-        link (l1g2) g2n1 -- g2n2 "edge label in g2"
+        link (l1g2) g2n1:diamond -- g2n2:circle "edge label in g2" // Source and destination arrowheads specified by name
     }
 }
 
@@ -112,7 +114,7 @@ node bin/cli generate:clean input_file.graph
 
 ### Convert the graph to Mermaid Graph
 
-The followng command will generate file containing a Mermaid graph:
+The followng command will generate a file containing a Mermaid graph:
 
 ```sh
 node bin/cli generate:mermaid input_file.graph
@@ -122,10 +124,27 @@ node bin/cli generate:mermaid input_file.graph
 > More refined [rendering options for the `elk` layout engine](https://mermaid.js.org/intro/syntax-reference.html)
 > might be added later.
 
+### Convert the graph to yEd graphml format
+
+The followng command will generate a file containing a yEd graphml graph:
+
+```sh
+node bin/cli generate:mermaid input_file.graph
+```
+
+> [!NOTE]
+> The generation of yEd graphml format is still incomplete.
+>
+> Styling still needs to be refined.
+>
+> Nesting of graphs in graphs is only supported with a depth of 1. For this reason, yEd-specific group nodes must be used.
+> This is not yet fully implemented.
+
 Supported features:
 
 - A shape defined in a style is applied to `Node`
 - A label defined in a style is applied to `Link` if no link label has been specified
+- A `Link` can specify source and target arrowheads by name or by a shorthand notation
 - Scoping of `Graph`, `Node` and named `Link` nodes
 - Cascading `Style` computation, including `reset` option
 - Inheritance of styles (one style can extend another style)
