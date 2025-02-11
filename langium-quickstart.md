@@ -38,4 +38,4 @@ This folder contains all necessary files for your language extension.
 
 ## To Go Further
 
-Documentation about the Langium framework is available at https://langium.org
+Documentation about the Langium framework is available at <https://langium.org>
