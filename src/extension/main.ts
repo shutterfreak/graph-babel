@@ -2,27 +2,38 @@ import type {
   LanguageClientOptions,
   ServerOptions,
 } from "vscode-languageclient/node.js";
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import * as path from "node:path";
 import { LanguageClient, TransportKind } from "vscode-languageclient/node.js";
 
-let client: LanguageClient;
+let client: LanguageClient | undefined;
 
 // This function is called when the extension is activated.
-export function activate(context: vscode.ExtensionContext): void {
-  client = startLanguageClient(context);
+export async function activate(
+  context: vscode.ExtensionContext,
+): Promise<void> {
+  console.log("Registered languages:", vscode.languages.getLanguages());
+
+  try {
+    client = await startLanguageClient(context); // Wait for the client to fully start
+
+    console.log("Extension activated successfully and client started.");
+  } catch (error) {
+    console.error("Error during extension activation:", error);
+  }
 }
 
 // This function is called when the extension is deactivated.
 export function deactivate(): Thenable<void> | undefined {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (client !== undefined) {
     return client.stop();
   }
   return undefined;
 }
 
-function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
+async function startLanguageClient(
+  context: vscode.ExtensionContext,
+): Promise<LanguageClient> {
   const serverModule = context.asAbsolutePath(
     path.join("out", "language", "main.cjs"),
   );
@@ -60,9 +71,10 @@ function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
     clientOptions,
   );
 
-  // Start the client. This will also launch the server
-  client.start().catch((exception) => {
-    console.error(exception);
+  // Wait for the client to start before proceeding
+  await client.start().catch((exception) => {
+    console.error("Failed to start the language client:", exception);
   });
+
   return client;
 }
