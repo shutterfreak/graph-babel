@@ -89,7 +89,7 @@ export class GraphValidator {
         accept(
           "error",
           `${element.$type} must have a nonempty id [${element.$cstNode?.text}]`,
-          { node: element },
+          { node: element, property: "id", code: "empty_id" },
         );
       }
       if (element.id !== undefined) {
@@ -104,6 +104,7 @@ export class GraphValidator {
           accept("error", `Duplicate name '${element.id}'`, {
             node: element,
             property: "id",
+            code: "duplicate_id",
           });
         } else {
           identifiers.add(element.id);
@@ -145,13 +146,21 @@ export class GraphValidator {
         accept(
           "error",
           "Expecting a source arrowhead style definition after the colon - it cannot be empty.",
-          { node: link, property: "src_arrowhead" },
+          {
+            node: link,
+            property: "src_arrowhead",
+            code: "src_arrowhead_empty",
+          },
         );
       } else if (!ARROWHEADS.includes(link.src_arrowhead)) {
         accept(
           "error",
           `Unknown source arrowhead style definition: '${link.src_arrowhead}'`,
-          { node: link, property: "src_arrowhead" },
+          {
+            node: link,
+            property: "src_arrowhead",
+            code: "src_arrowhead_invalid",
+          },
         );
       }
     }
@@ -161,13 +170,21 @@ export class GraphValidator {
         accept(
           "error",
           "Expecting a destination arrowhead style definition after the colon - it cannot be empty.",
-          { node: link, property: "dst_arrowhead" },
+          {
+            node: link,
+            property: "dst_arrowhead",
+            code: "dst_arrowhead_empty",
+          },
         );
       } else if (!ARROWHEADS.includes(link.dst_arrowhead)) {
         accept(
           "error",
           `Unknown destination arrowhead style definition: '${link.dst_arrowhead}'`,
-          { node: link, property: "dst_arrowhead" },
+          {
+            node: link,
+            property: "dst_arrowhead",
+            code: "dst_arrowhead_invalid",
+          },
         );
       }
     }
@@ -183,20 +200,29 @@ export class GraphValidator {
           accept(
             "error",
             `Redefinition of source arrowhead style definition: ':${link.src_arrowhead}' and '${src_head}'`,
-            { node: link, property: "link" },
+            {
+              node: link,
+              property: "link",
+              code: "src_arrowhead_duplicate_definition",
+            },
           );
         }
         if (link.dst_arrowhead !== undefined && dst_head.length > 0) {
           accept(
             "error",
             `Redefinition of destination arrowhead style definition: ':${link.dst_arrowhead}' and '${dst_head}'`,
-            { node: link, property: "link" },
+            {
+              node: link,
+              property: "link",
+              code: "dst_arrowhead_duplicate_definition",
+            },
           );
         }
       } else {
         accept("error", `Invalid link style definition: ':${link.link}'`, {
           node: link,
           property: "link",
+          code: "link_style_invalid",
         });
       }
     }
@@ -255,6 +281,7 @@ export class GraphValidator {
               {
                 node: duplicate_style_definition,
                 property: "id",
+                code: "style_multiple_definitions",
               },
             );
           }
@@ -269,7 +296,11 @@ export class GraphValidator {
           `ERROR: checkStyleNames() - style has no id: [${style.$cstNode?.text}]`,
         ),
       );
-      accept("error", "A style must have a nonempty name.", { node: style });
+      accept("error", "A style must have a nonempty name.", {
+        node: style,
+        property: "id",
+        code: "empty_id",
+      });
     }
   };
   checkStyleDefinitionTopics = (
@@ -280,11 +311,14 @@ export class GraphValidator {
     if (topic.length == 0) {
       accept("error", `Style topic missing.`, {
         node: shape_definition,
+        property: "topic",
+        code: "empty_topic",
       });
     } else if (!STYLE_TOPICS.includes(topic)) {
       accept("error", `The style topic '${topic}' is not recognized.`, {
         node: shape_definition,
         property: "topic",
+        code: "unknown_topic",
       });
     }
   };
@@ -301,6 +335,8 @@ export class GraphValidator {
     if (value.length == 0) {
       accept("error", `Shape name missing.`, {
         node: shape_definition,
+        property: "value",
+        code: "shape_name_missing",
       });
     } else if (!NAMED_SHAPES.includes(value)) {
       accept(
@@ -309,6 +345,7 @@ export class GraphValidator {
         {
           node: shape_definition,
           property: "value",
+          code: "shape_name_unknown",
         },
       );
     }
@@ -325,6 +362,7 @@ export class GraphValidator {
         {
           node: style,
           property: "styleref",
+          code: "style_self_reference",
         },
       );
     }
@@ -346,6 +384,7 @@ export class GraphValidator {
         {
           node: color_definition,
           property: "color_name",
+          code: "color_name_unknown",
         },
       );
     }
@@ -377,6 +416,7 @@ export class GraphValidator {
         {
           node: hex_color_definition,
           property: "hex_color",
+          code: "hex_color_invalid",
         },
       );
     }
@@ -398,6 +438,7 @@ export class GraphValidator {
       accept("error", `RGB color value for red is not an integer: '${red}'`, {
         node: rgb_color_definition,
         property: "red",
+        code: "rgb_channel_value_invalid",
       });
     } else {
       if (red < 0 || red > 255) {
@@ -407,6 +448,7 @@ export class GraphValidator {
           {
             node: rgb_color_definition,
             property: "red",
+            code: "rgb_channel_out_of_range",
           },
         );
       }
@@ -421,6 +463,7 @@ export class GraphValidator {
         {
           node: rgb_color_definition,
           property: "green",
+          code: "rgb_channel_value_invalid",
         },
       );
     } else {
@@ -442,6 +485,7 @@ export class GraphValidator {
       accept("error", `RGB color value for blue is not an integer: '${blue}'`, {
         node: rgb_color_definition,
         property: "blue",
+        code: "rgb_channel_value_invalid",
       });
     } else {
       if (blue < 0 || blue > 255) {
@@ -451,6 +495,7 @@ export class GraphValidator {
           {
             node: rgb_color_definition,
             property: "blue",
+            code: "rgb_channel_out_of_range",
           },
         );
       }
@@ -482,7 +527,11 @@ export class GraphValidator {
           accept(
             "error",
             `Link width has invalid numeric value: '${line_style_item.value}'.`,
-            { node: line_style_item, property: "value" },
+            {
+              node: line_style_item,
+              property: "value",
+              code: "link_width_invalid",
+            },
           );
         }
         if (unit.length > 0 && !LENGTH_UNITS.includes(unit)) {
@@ -492,7 +541,11 @@ export class GraphValidator {
           accept(
             "error",
             `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
-            { node: line_style_item, property: "value" },
+            {
+              node: line_style_item,
+              property: "value",
+              code: "link_width_unit_unknown",
+            },
           );
         }
       }
@@ -520,7 +573,11 @@ export class GraphValidator {
           accept(
             "error",
             `Link opacity value out of range (0% - 100%): found '${opacity}%'`,
-            { node: opacity_style_item, property: "value" },
+            {
+              node: opacity_style_item,
+              property: "value",
+              code: "opacity_value_out_of_range",
+            },
           );
         }
       } else {
@@ -530,7 +587,11 @@ export class GraphValidator {
         accept(
           "error",
           `Expecting integer percentage value: found '${opacity}%'`,
-          { node: opacity_style_item, property: "value" },
+          {
+            node: opacity_style_item,
+            property: "value",
+            code: "opacity_value_invalid",
+          },
         );
       }
     } else {
@@ -543,7 +604,11 @@ export class GraphValidator {
         accept(
           "error",
           `Link opacity value out of range (0...1): found '${opacity}'`,
-          { node: opacity_style_item, property: "value" },
+          {
+            node: opacity_style_item,
+            property: "value",
+            code: "opacity_out_of_range",
+          },
         );
       }
     }
@@ -625,6 +690,7 @@ function check_styles_defined_before_elements(
           "Style definitions must appear before any graph elements.",
           {
             node: childNode,
+            code: "style_after_element",
           },
         );
       }
