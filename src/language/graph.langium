@@ -146,7 +146,7 @@ WidthDefinition:
     width=WidthValue
 ;
 WidthValue:
-    value=NUMBER unit=WIDTH_UNIT
+    value=NUMBER unit=ID? // WIDTH_UNIT
 ;
 terminal WIDTH_UNIT:
     'mm' |

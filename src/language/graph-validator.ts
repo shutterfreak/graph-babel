@@ -1,3 +1,4 @@
+import chalk from "chalk";
 import {
   AstNode,
   AstUtils,
@@ -5,25 +6,25 @@ import {
   type ValidationChecks,
 } from "langium";
 import {
-  GraphAstType,
   Element,
-  Model,
-  isModel,
-  Style,
   Graph,
+  GraphAstType,
+  GraphTerminals,
+  HexColorDefinition,
   isElement,
   isGraph,
+  isModel,
+  isNode,
   isStyle,
-  HexColorDefinition,
-  LineStyleDefinition,
+  Link,
+  Model,
   OpacityStyleDefinition,
   RgbColorDefinition,
-  TextColorDefinition,
   ShapeStyleDefinition,
-  isNode,
+  Style,
   StyleDefinition,
-  Link,
-  GraphTerminals,
+  TextColorDefinition,
+  WidthValue,
 } from "./generated/ast.js";
 import type { GraphServices } from "./graph-module.js";
 import {
@@ -34,7 +35,6 @@ import {
   STYLE_TOPICS,
   StyleDefinition_toString,
 } from "./model-helpers.js";
-import chalk from "chalk";
 
 /**
  * Register custom validation checks.
@@ -50,7 +50,7 @@ export function registerValidationChecks(services: GraphServices) {
     HexColorDefinition: [validator.checkHexColorDefinitions],
     RgbColorDefinition: [validator.checkRgbColorDefinitions],
     TextColorDefinition: [validator.checkTextColorDefinitions],
-    LineStyleDefinition: [validator.checkLineWidthDefinitions],
+    WidthValue: [validator.checkWidthDefinitions],
     OpacityStyleDefinition: [validator.checkOpacityStyleDefinition],
     ShapeStyleDefinition: [validator.checkShapeStyleDefinitions],
   };
@@ -79,7 +79,8 @@ export const IssueCodes = {
   HexColorInvalid: "hex-color-invalid",
   RgbChannelValueInvalid: "rgb-channel-value-invalid",
   RgbChannelValueOutOfRange: "rgb-channel-value-out-of-range",
-  LinkWidthInvalid: "link-width-invalid",
+  LinkWidthHasNoUnit: "link-width-no-unit",
+  LinkWidthValueInvalid: "link-width-value-invalid",
   LinkWidthUnitUnknown: "link-width-unit-unknown",
   OpacityValueOutOfRange: "opacity-value-out-of-range",
   OpacityValueInvalid: "opacity-value-invalid",
@@ -532,51 +533,54 @@ export class GraphValidator {
   };
   /**
    * Check that the line style definitions are valid (number + valid unit)
-   * @param line_style_item
+   * @param width_definition
    * @param accept
    */
-  checkLineWidthDefinitions = (
-    line_style_item: LineStyleDefinition,
+  checkWidthDefinitions = (
+    width_value: WidthValue,
     accept: ValidationAcceptor,
   ): void => {
-    if (["BorderWidth", "LineWidth"].includes(line_style_item.topic)) {
-      // Check the line style definition
-      const match = /^(\d+|\.\d+|\d*\.\d+)( *([a-z]{2,3}))?$/.exec(
-        line_style_item.value,
+    if (width_value.value < 0) {
+      console.error(
+        chalk.red(`Width has invalid numeric value: '${width_value.value}'.`),
       );
-      if (match) {
-        const value = match[1];
-        const unit = match[3];
-        if (value.length == 0) {
-          console.error(
-            chalk.red(
-              `Link width has invalid numeric value: '${line_style_item.value}'.`,
-            ),
-          );
-          accept(
-            "error",
-            `Link width has invalid numeric value: '${line_style_item.value}'.`,
-            {
-              node: line_style_item,
-              property: "value",
-              code: IssueCodes.LinkWidthInvalid,
-            },
-          );
-        }
-        if (unit.length > 0 && !LENGTH_UNITS.includes(unit)) {
-          console.error(
-            `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
-          );
-          accept(
-            "error",
-            `Link width has invalid unit: '${line_style_item.value}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
-            {
-              node: line_style_item,
-              property: "value",
-              code: IssueCodes.LinkWidthUnitUnknown,
-            },
-          );
-        }
+      accept(
+        "error",
+        `Width has invalid numeric value: '${width_value.value}'.`,
+        {
+          node: width_value,
+          property: "value",
+          code: IssueCodes.LinkWidthValueInvalid,
+        },
+      );
+    }
+    if (!("unit" in width_value) || width_value.unit?.length == 0) {
+      accept(
+        "warning",
+        `Width has no unit. The default unit will be used in conversions. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
+        {
+          node: width_value,
+          property: "unit",
+          code: IssueCodes.LinkWidthHasNoUnit,
+        },
+      );
+    } else {
+      if (
+        (width_value.unit?.length ?? 0) > 0 &&
+        !LENGTH_UNITS.includes(width_value.unit ?? "")
+      ) {
+        console.error(
+          `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
+        );
+        accept(
+          "error",
+          `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
+          {
+            node: width_value,
+            property: "unit",
+            code: IssueCodes.LinkWidthUnitUnknown,
+          },
+        );
       }
     }
   };

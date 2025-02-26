@@ -3,6 +3,7 @@ import { CodeActionParams } from "vscode-languageserver-protocol";
 import { Command, CodeAction } from "vscode-languageserver-types";
 import {
   AstUtils,
+  CstNode,
   LangiumDocument,
   LeafCstNode,
   LeafCstNodeImpl,
@@ -10,9 +11,10 @@ import {
 } from "langium";
 import { CodeActionProvider } from "langium/lsp";
 import { inspect } from "util";
-import { isElement, isStyle } from "../language/generated/ast.js";
+import { isElement, isStyle, isWidthValue } from "../language/generated/ast.js";
 import { IssueCodes } from "../language/graph-validator.js";
 import { findLeafNodeAtOffset } from "../language/cst-util.js";
+import { LENGTH_UNITS } from "../language/model-helpers.js";
 
 export class GraphCodeActionProvider implements CodeActionProvider {
   getCodeActions(
@@ -20,22 +22,26 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     params: CodeActionParams,
   ): MaybePromise<(Command | CodeAction)[]> {
     const result: CodeAction[] = [];
+
     if ("context" in params) {
       for (const diagnostic of params.context.diagnostics) {
-        const codeAction = this.createCodeAction(diagnostic, document);
-        if (codeAction) {
-          result.push(codeAction);
+        const codeActions = this.createCodeAction(diagnostic, document);
+
+        if (Array.isArray(codeActions)) {
+          result.push(...codeActions); // Handle multiple actions
+        } else if (codeActions) {
+          result.push(codeActions); // Handle single action
         }
       }
     }
+
     return result;
   }
 
   private createCodeAction(
     diagnostic: Diagnostic,
-
     document: LangiumDocument,
-  ): CodeAction | undefined {
+  ): CodeAction | CodeAction[] | undefined {
     switch (
       diagnostic.code // code as defined in 'graph-validator.ts' for each validation check
     ) {
@@ -44,6 +50,8 @@ export class GraphCodeActionProvider implements CodeActionProvider {
         return this.generateNewId(diagnostic, document);
       case IssueCodes.StyleSelfReference:
         return this.removeStyleSelfReference(diagnostic, document);
+      case IssueCodes.LinkWidthUnitUnknown:
+        return this.fixIncorrectWidthUnit(diagnostic, document); // Now supports multiple actions
       /*
       case "name_lowercase":
         return this.makeUpperCase(diagnostic, document);
@@ -214,6 +222,106 @@ export class GraphCodeActionProvider implements CodeActionProvider {
         },
       },
     };
+  }
+
+  private fixIncorrectWidthUnit(
+    diagnostic: Diagnostic,
+    document: LangiumDocument,
+  ): CodeAction[] {
+    const offset = document.textDocument.offsetAt(diagnostic.range.start);
+    const rootNode = document.parseResult.value;
+    const rootCst = rootNode.$cstNode;
+
+    if (!rootCst) {
+      console.error("fixIncorrectWidthUnit() - rootCst undefined!");
+      return [];
+    }
+
+    // Find the CST node at the given offset
+    const cstNode = findLeafNodeAtOffset(rootCst, offset);
+    if (!cstNode) {
+      console.error("fixIncorrectWidthUnit() - cstNode undefined!");
+      return [];
+    }
+
+    // Get the corresponding AST node
+    const astNode = cstNode.astNode;
+
+    // Ensure the AST node is a WidthValue instance
+    if (!isWidthValue(astNode)) {
+      console.error(
+        "fixIncorrectWidthUnit() - Not a valid WidthValue instance!",
+      );
+      return [];
+    }
+
+    const { value, unit } = astNode;
+    let units = LENGTH_UNITS;
+
+    if (unit !== undefined) {
+      if (LENGTH_UNITS.includes(unit)) {
+        console.info("fixIncorrectWidthUnit() - Unit is known");
+        return [];
+      } else if (LENGTH_UNITS.includes(unit.toLowerCase())) {
+        units = [unit.toLowerCase()];
+      }
+    } else {
+      console.info("fixIncorrectWidthUnit() - No unit found (dimensionless)!");
+    }
+
+    // Find the CST node representing the unit
+    let unitNode: LeafCstNode | undefined;
+    let valueNode: CstNode | undefined;
+    let foundValue = false;
+
+    for (const child of cstNode.container?.content ?? []) {
+      if (!foundValue && child.text === value.toString()) {
+        valueNode = child;
+        foundValue = true;
+      } else if (foundValue && child instanceof LeafCstNodeImpl) {
+        unitNode = child;
+        break;
+      }
+    }
+
+    // Determine range to replace (unitNode if it exists, otherwise insert after valueNode)
+    const startOffset = unitNode
+      ? unitNode.offset
+      : valueNode
+        ? valueNode.offset + valueNode.length
+        : cstNode.offset + value.toString().length;
+    const endOffset = unitNode
+      ? unitNode.offset + unitNode.length
+      : startOffset;
+
+    const range = {
+      start: document.textDocument.positionAt(startOffset),
+      end: document.textDocument.positionAt(endOffset),
+    };
+
+    console.info(
+      `fixIncorrectWidthUnit() - Replacement range: [${startOffset}, ${endOffset}]`,
+    );
+
+    // Generate multiple CodeActions, each suggesting a valid unit
+    return units.map((validUnit) => ({
+      title:
+        unit === undefined
+          ? `Set unit to '${validUnit}'`
+          : `Replace '${unit}' with '${validUnit}'`,
+      kind: CodeActionKind.QuickFix,
+      diagnostics: [diagnostic],
+      edit: {
+        changes: {
+          [document.textDocument.uri]: [
+            {
+              range,
+              newText: validUnit, // Correctly replaces or inserts the new unit
+            },
+          ],
+        },
+      },
+    }));
   }
 
   /*
