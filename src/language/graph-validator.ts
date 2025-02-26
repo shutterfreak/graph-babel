@@ -560,7 +560,7 @@ export class GraphValidator {
         `Width has no unit. The default unit will be used in conversions. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
         {
           node: width_value,
-          property: "unit",
+          property: undefined, // there is no "unit"
           code: IssueCodes.LinkWidthHasNoUnit,
         },
       );

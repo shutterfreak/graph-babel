@@ -174,12 +174,13 @@ And now hit 'F5' in VS Code.
 
 The following code actions have been implemented:
 
-| vscode diagnostic code |         code text         | description                           | code action and explanation                                                             |
-| :--------------------: | :-----------------------: | ------------------------------------- | --------------------------------------------------------------------------------------- |
-|       IdMissing        |       "id-missing"        | Object has a missing `ìd` property    | `generateNewId()` - generate a (new) unique `id`                                        |
-|      IdDuplicate       |      "id-duplicate"       | Object has a duplicate `ìd` property  | `generateNewId()` - generate a (new) unique `id`                                        |
-|   StyleSelfReference   |  "style-self-reference"   | `Style` references itself             | `removeStyleSelfReference` - remove ': styleref' from self-referencing style definition |
-|  LinkWidthUnitUnknown  | "link-width-unit-unknown" | `WidthValue` as an unknown width unit | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
+| vscode diagnostic code |         code text         | description                            | code action and explanation                                                             |
+| :--------------------: | :-----------------------: | -------------------------------------- | --------------------------------------------------------------------------------------- |
+|       IdMissing        |       "id-missing"        | Object has a missing `ìd` property     | `generateNewId()` - generate a (new) unique `id`                                        |
+|      IdDuplicate       |      "id-duplicate"       | Object has a duplicate `ìd` property   | `generateNewId()` - generate a (new) unique `id`                                        |
+|   StyleSelfReference   |  "style-self-reference"   | `Style` references itself              | `removeStyleSelfReference` - remove ': styleref' from self-referencing style definition |
+|  LinkWidthUnitUnknown  | "link-width-unit-unknown" | `WidthValue` has an unknown width unit | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
+|   LinkWidthHasNoUnit   |   "link-width-no-unit"    | `WidthValue` has no width unit         | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
 
 ## Contributing
 

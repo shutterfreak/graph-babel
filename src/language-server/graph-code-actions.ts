@@ -51,6 +51,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
       case IssueCodes.StyleSelfReference:
         return this.removeStyleSelfReference(diagnostic, document);
       case IssueCodes.LinkWidthUnitUnknown:
+      case IssueCodes.LinkWidthHasNoUnit:
         return this.fixIncorrectWidthUnit(diagnostic, document); // Now supports multiple actions
       /*
       case "name_lowercase":
@@ -301,6 +302,10 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
     console.info(
       `fixIncorrectWidthUnit() - Replacement range: [${startOffset}, ${endOffset}]`,
+    );
+
+    console.info(
+      `fixIncorrectWidthUnit() - Returning ${units.length} code actions.`,
     );
 
     // Generate multiple CodeActions, each suggesting a valid unit
