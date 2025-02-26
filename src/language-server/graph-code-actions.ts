@@ -1,7 +1,13 @@
 import { CodeActionKind, Diagnostic } from "vscode-languageserver";
 import { CodeActionParams } from "vscode-languageserver-protocol";
 import { Command, CodeAction } from "vscode-languageserver-types";
-import { AstUtils, LangiumDocument, MaybePromise } from "langium";
+import {
+  AstUtils,
+  LangiumDocument,
+  LeafCstNode,
+  LeafCstNodeImpl,
+  MaybePromise,
+} from "langium";
 import { CodeActionProvider } from "langium/lsp";
 import { inspect } from "util";
 import { isElement, isStyle } from "../language/generated/ast.js";
@@ -36,6 +42,8 @@ export class GraphCodeActionProvider implements CodeActionProvider {
       case IssueCodes.IdDuplicate:
       case IssueCodes.IdMissing:
         return this.generateNewId(diagnostic, document);
+      case IssueCodes.StyleSelfReference:
+        return this.removeStyleSelfReference(diagnostic, document);
       /*
       case "name_lowercase":
         return this.makeUpperCase(diagnostic, document);
@@ -128,6 +136,79 @@ export class GraphCodeActionProvider implements CodeActionProvider {
             {
               range: diagnostic.range,
               newText: newId,
+            },
+          ],
+        },
+      },
+    };
+  }
+
+  private removeStyleSelfReference(
+    diagnostic: Diagnostic,
+    document: LangiumDocument,
+  ): CodeAction {
+    const offset = document.textDocument.offsetAt(diagnostic.range.start);
+    const rootNode = document.parseResult.value;
+    const rootCst = rootNode.$cstNode;
+
+    if (!rootCst) {
+      console.error("removeStyleSelfReference() - rootCst undefined!");
+      return undefined!;
+    }
+
+    // Find the CST node at the given offset
+    const cstNode = findLeafNodeAtOffset(rootCst, offset); // as LeafCstNode;
+    if (!cstNode) {
+      console.error("removeStyleSelfReference() - cstNode undefined!");
+      return undefined!;
+    }
+
+    // Get the corresponding AST node
+    const astNode = cstNode.astNode;
+
+    // Ensure the AST node is a Style instance and has a styleRef
+    if (!isStyle(astNode) || !astNode.styleref) {
+      console.error("removeStyleSelfReference() - Not a valid Style instance!");
+      return undefined!;
+    }
+
+    // Find the colon (:) in the CST node's parent's children
+    const parentCst = cstNode.container;
+    if (!parentCst) {
+      console.error("removeStyleSelfReference() - Parent CST node undefined!");
+      return undefined!;
+    }
+
+    let colonNode: LeafCstNode | undefined;
+    for (const child of parentCst.content) {
+      if (child instanceof LeafCstNodeImpl && child.text === ":") {
+        colonNode = child;
+        break;
+      }
+    }
+
+    if (!colonNode) {
+      console.error("removeStyleSelfReference() - Colon token not found!");
+      return undefined!;
+    }
+
+    // Define the range from the colon (`:`) to the end of `styleRef`
+    const range = {
+      start: document.textDocument.positionAt(colonNode.offset),
+      end: document.textDocument.positionAt(cstNode.offset + cstNode.length),
+    };
+
+    return {
+      title: "Remove self-reference",
+      kind: CodeActionKind.QuickFix,
+      diagnostics: [diagnostic],
+      isPreferred: true,
+      edit: {
+        changes: {
+          [document.textDocument.uri]: [
+            {
+              range,
+              newText: "", // Remove everything in the range
             },
           ],
         },
