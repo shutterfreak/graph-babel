@@ -12,7 +12,10 @@ let client: LanguageClient | undefined;
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
-  console.log("Registered languages:", vscode.languages.getLanguages());
+  console.log(
+    "Registered languages:",
+    (await vscode.languages.getLanguages()).join(", "),
+  );
 
   try {
     client = await startLanguageClient(context); // Wait for the client to fully start

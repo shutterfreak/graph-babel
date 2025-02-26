@@ -57,6 +57,34 @@ export function registerValidationChecks(services: GraphServices) {
   registry.register(checks, validator);
 }
 
+// The issue codes can help to select code actions for issues encountered while validating the document
+export const IssueCodes = {
+  IdMissing: "id-missing",
+  IdDuplicate: "id-duplicate",
+  SrcArrowheadEmpty: "src-arrowhead-empty",
+  SrcArrowheadInvalid: "src-arrowhead-empty",
+  DstArrowheadEmpty: "dst-arrowhead-empty",
+  DstArrowheadInvalid: "dst-arrowhead-empty",
+  SrcArrowheadRedefined: "src-arrowhead-redefined",
+  DstArrowheadRedefined: "dst-arrowhead-redefined",
+  LinkStyleInvalid: "link-style-invalid",
+  StyleAfterElement: "style-after-element",
+  StyleMultipleDefinitions: "style-multiple-definitions",
+  StyleDefinitionEmptyTopic: "style-definition-empty-topic",
+  StyleDefinitionUnknownTopic: "style-definition-missing-topic",
+  ShapeNameMissing: "shape-name-missing",
+  ShapeNameUnknown: "shape-name-unknown",
+  StyleSelfReference: "style-self-reference",
+  ColorNameUnknown: "color-name-unknown",
+  HexColorInvalid: "hex-color-invalid",
+  RgbChannelValueInvalid: "rgb-channel-value-invalid",
+  RgbChannelValueOutOfRange: "rgb-channel-value-out-of-range",
+  LinkWidthInvalid: "link-width-invalid",
+  LinkWidthUnitUnknown: "link-width-unit-unknown",
+  OpacityValueOutOfRange: "opacity-value-out-of-range",
+  OpacityValueInvalid: "opacity-value-invalid",
+};
+
 /**
  * Implementation of custom validations.
  */
@@ -89,7 +117,7 @@ export class GraphValidator {
         accept(
           "error",
           `${element.$type} must have a nonempty id [${element.$cstNode?.text}]`,
-          { node: element, property: "id", code: "empty_id" },
+          { node: element, property: "id", code: IssueCodes.IdMissing },
         );
       }
       if (element.id !== undefined) {
@@ -104,7 +132,7 @@ export class GraphValidator {
           accept("error", `Duplicate name '${element.id}'`, {
             node: element,
             property: "id",
-            code: "duplicate_id",
+            code: IssueCodes.IdDuplicate,
           });
         } else {
           identifiers.add(element.id);
@@ -149,7 +177,7 @@ export class GraphValidator {
           {
             node: link,
             property: "src_arrowhead",
-            code: "src_arrowhead_empty",
+            code: IssueCodes.SrcArrowheadEmpty,
           },
         );
       } else if (!ARROWHEADS.includes(link.src_arrowhead)) {
@@ -159,7 +187,7 @@ export class GraphValidator {
           {
             node: link,
             property: "src_arrowhead",
-            code: "src_arrowhead_invalid",
+            code: IssueCodes.SrcArrowheadInvalid,
           },
         );
       }
@@ -173,7 +201,7 @@ export class GraphValidator {
           {
             node: link,
             property: "dst_arrowhead",
-            code: "dst_arrowhead_empty",
+            code: IssueCodes.DstArrowheadEmpty,
           },
         );
       } else if (!ARROWHEADS.includes(link.dst_arrowhead)) {
@@ -183,7 +211,7 @@ export class GraphValidator {
           {
             node: link,
             property: "dst_arrowhead",
-            code: "dst_arrowhead_invalid",
+            code: IssueCodes.DstArrowheadInvalid,
           },
         );
       }
@@ -203,7 +231,7 @@ export class GraphValidator {
             {
               node: link,
               property: "link",
-              code: "src_arrowhead_duplicate_definition",
+              code: IssueCodes.SrcArrowheadRedefined,
             },
           );
         }
@@ -214,7 +242,7 @@ export class GraphValidator {
             {
               node: link,
               property: "link",
-              code: "dst_arrowhead_duplicate_definition",
+              code: IssueCodes.DstArrowheadRedefined,
             },
           );
         }
@@ -222,7 +250,7 @@ export class GraphValidator {
         accept("error", `Invalid link style definition: ':${link.link}'`, {
           node: link,
           property: "link",
-          code: "link_style_invalid",
+          code: IssueCodes.LinkStyleInvalid,
         });
       }
     }
@@ -281,7 +309,7 @@ export class GraphValidator {
               {
                 node: duplicate_style_definition,
                 property: "id",
-                code: "style_multiple_definitions",
+                code: IssueCodes.StyleMultipleDefinitions,
               },
             );
           }
@@ -299,7 +327,7 @@ export class GraphValidator {
       accept("error", "A style must have a nonempty name.", {
         node: style,
         property: "id",
-        code: "empty_id",
+        code: IssueCodes.IdMissing,
       });
     }
   };
@@ -312,13 +340,13 @@ export class GraphValidator {
       accept("error", `Style topic missing.`, {
         node: shape_definition,
         property: "topic",
-        code: "empty_topic",
+        code: IssueCodes.StyleDefinitionEmptyTopic,
       });
     } else if (!STYLE_TOPICS.includes(topic)) {
       accept("error", `The style topic '${topic}' is not recognized.`, {
         node: shape_definition,
         property: "topic",
-        code: "unknown_topic",
+        code: IssueCodes.StyleDefinitionUnknownTopic,
       });
     }
   };
@@ -336,7 +364,7 @@ export class GraphValidator {
       accept("error", `Shape name missing.`, {
         node: shape_definition,
         property: "value",
-        code: "shape_name_missing",
+        code: IssueCodes.ShapeNameMissing,
       });
     } else if (!NAMED_SHAPES.includes(value)) {
       accept(
@@ -345,7 +373,7 @@ export class GraphValidator {
         {
           node: shape_definition,
           property: "value",
-          code: "shape_name_unknown",
+          code: IssueCodes.ShapeNameUnknown,
         },
       );
     }
@@ -362,7 +390,7 @@ export class GraphValidator {
         {
           node: style,
           property: "styleref",
-          code: "style_self_reference",
+          code: IssueCodes.StyleSelfReference,
         },
       );
     }
@@ -384,7 +412,7 @@ export class GraphValidator {
         {
           node: color_definition,
           property: "color_name",
-          code: "color_name_unknown",
+          code: IssueCodes.ColorNameUnknown,
         },
       );
     }
@@ -416,7 +444,7 @@ export class GraphValidator {
         {
           node: hex_color_definition,
           property: "hex_color",
-          code: "hex_color_invalid",
+          code: IssueCodes.HexColorInvalid,
         },
       );
     }
@@ -438,7 +466,7 @@ export class GraphValidator {
       accept("error", `RGB color value for red is not an integer: '${red}'`, {
         node: rgb_color_definition,
         property: "red",
-        code: "rgb_channel_value_invalid",
+        code: IssueCodes.RgbChannelValueInvalid,
       });
     } else {
       if (red < 0 || red > 255) {
@@ -448,7 +476,7 @@ export class GraphValidator {
           {
             node: rgb_color_definition,
             property: "red",
-            code: "rgb_channel_out_of_range",
+            code: IssueCodes.RgbChannelValueOutOfRange,
           },
         );
       }
@@ -463,7 +491,7 @@ export class GraphValidator {
         {
           node: rgb_color_definition,
           property: "green",
-          code: "rgb_channel_value_invalid",
+          code: IssueCodes.RgbChannelValueInvalid,
         },
       );
     } else {
@@ -474,6 +502,7 @@ export class GraphValidator {
           {
             node: rgb_color_definition,
             property: "green",
+            code: IssueCodes.RgbChannelValueOutOfRange,
           },
         );
       }
@@ -485,7 +514,7 @@ export class GraphValidator {
       accept("error", `RGB color value for blue is not an integer: '${blue}'`, {
         node: rgb_color_definition,
         property: "blue",
-        code: "rgb_channel_value_invalid",
+        code: IssueCodes.RgbChannelValueInvalid,
       });
     } else {
       if (blue < 0 || blue > 255) {
@@ -495,7 +524,7 @@ export class GraphValidator {
           {
             node: rgb_color_definition,
             property: "blue",
-            code: "rgb_channel_out_of_range",
+            code: IssueCodes.RgbChannelValueOutOfRange,
           },
         );
       }
@@ -530,7 +559,7 @@ export class GraphValidator {
             {
               node: line_style_item,
               property: "value",
-              code: "link_width_invalid",
+              code: IssueCodes.LinkWidthInvalid,
             },
           );
         }
@@ -544,7 +573,7 @@ export class GraphValidator {
             {
               node: line_style_item,
               property: "value",
-              code: "link_width_unit_unknown",
+              code: IssueCodes.LinkWidthUnitUnknown,
             },
           );
         }
@@ -576,7 +605,7 @@ export class GraphValidator {
             {
               node: opacity_style_item,
               property: "value",
-              code: "opacity_value_out_of_range",
+              code: IssueCodes.OpacityValueOutOfRange,
             },
           );
         }
@@ -590,7 +619,7 @@ export class GraphValidator {
           {
             node: opacity_style_item,
             property: "value",
-            code: "opacity_value_invalid",
+            code: IssueCodes.OpacityValueInvalid,
           },
         );
       }
@@ -607,7 +636,7 @@ export class GraphValidator {
           {
             node: opacity_style_item,
             property: "value",
-            code: "opacity_out_of_range",
+            code: IssueCodes.OpacityValueOutOfRange,
           },
         );
       }
@@ -690,7 +719,7 @@ function check_styles_defined_before_elements(
           "Style definitions must appear before any graph elements.",
           {
             node: childNode,
-            code: "style_after_element",
+            code: IssueCodes.StyleAfterElement,
           },
         );
       }

@@ -30,6 +30,7 @@ import {
   Model,
 } from "./generated/ast.js";
 import chalk from "chalk";
+import { GraphCodeActionProvider } from "../language-server/graph-code-actions.js";
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -63,6 +64,9 @@ export const GraphModule: Module<
   },
   references: {
     ScopeComputation: (services) => new GraphScopeComputation(services),
+  },
+  lsp: {
+    CodeActionProvider: () => new GraphCodeActionProvider(),
   },
 };
 
