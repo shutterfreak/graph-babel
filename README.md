@@ -156,6 +156,8 @@ Supported features:
 
 ## Visual Studio Code integration
 
+### Initial setup
+
 For details, please read [langium-quickstart.md](langium-quickstart.md).
 
 Thanks to Langium, you can immediately try out the grammar when opening this project in VS Code.
@@ -167,6 +169,15 @@ npm run build
 ```
 
 And now hit 'F5' in VS Code.
+
+### Code actions
+
+The following code actions have been implemented:
+
+| vscode diagnostic code |   code text    | description                          | code action and explanation                      |
+| :--------------------: | :------------: | ------------------------------------ | ------------------------------------------------ |
+|       IdMissing        |  "id-missing"  | Object has a missing `ìd` property   | `generateNewId()` - generate a (new) unique `id` |
+|      IdDuplicate       | "id-duplicate" | Object has a duplicate `ìd` property | `generateNewId()` - generate a (new) unique `id` |
 
 ## Contributing
 
