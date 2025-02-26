@@ -18,3 +18,7 @@ syntaxes/
 
 # TypeScript cache:
 *.tsbuildinfo
+
+# Other file system files
+.DS_Store
+._.DS_Store
