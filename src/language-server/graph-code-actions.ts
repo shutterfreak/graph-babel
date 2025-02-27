@@ -13,7 +13,7 @@ import { CodeActionProvider } from "langium/lsp";
 import { inspect } from "util";
 import { isElement, isStyle, isWidthValue } from "../language/generated/ast.js";
 import { IssueCodes } from "../language/graph-validator.js";
-import { findLeafNodeAtOffset } from "../language/cst-util.js";
+import { CstUtils } from "langium";
 import { LENGTH_UNITS } from "../language/model-helpers.js";
 
 export class GraphCodeActionProvider implements CodeActionProvider {
@@ -21,6 +21,8 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     document: LangiumDocument,
     params: CodeActionParams,
   ): MaybePromise<(Command | CodeAction)[]> {
+    console.log("getCodeActions() called with params:", inspect(params));
+
     const result: CodeAction[] = [];
 
     if ("context" in params) {
@@ -34,6 +36,17 @@ export class GraphCodeActionProvider implements CodeActionProvider {
         }
       }
     }
+
+    // Handle manually triggered source actions (like rename ID)
+    if (
+      params.context.only &&
+      params.context.only.includes(CodeActionKind.Source)
+    ) {
+      console.log("getCodeActions() - Source actions requested!");
+      result.push(this.renameGraphElementId(document));
+    }
+
+    console.log("getCodeActions() - Returning code actions:", inspect(result));
 
     return result;
   }
@@ -64,6 +77,36 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
   // Define the code actions:
 
+  /*
+   * Code actions without triggering diagnostic code:
+   */
+
+  private renameGraphElementId(document: LangiumDocument): CodeAction {
+    console.log("renameGraphElementId() called!"); // Debugging output
+
+    return {
+      title: "Rename graph element ID",
+      kind: CodeActionKind.Source, // This makes it a source action, not a quick fix
+      edit: {
+        changes: {
+          [document.textDocument.uri]: [
+            {
+              range: {
+                start: { line: 0, character: 0 }, // Placeholder range, should be dynamic
+                end: { line: 0, character: 5 }, // Replace with the actual 'id' range
+              },
+              newText: "new-id", // Placeholder, should prompt for user input
+            },
+          ],
+        },
+      },
+    };
+  }
+
+  /*
+   * Code actions triggered by diagonstic code:
+   */
+
   /**
    * Generate a new, nonxisting id
    * @param diagnostic
@@ -86,7 +129,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     }
 
     // Find the cstNode at the zero-based offset in the document:
-    const cstNode = findLeafNodeAtOffset(rootCst, offset);
+    const cstNode = CstUtils.findLeafNodeAtOffset(rootCst, offset);
     if (!cstNode) {
       console.error("generateNewId() - cstNode undefined!");
       return undefined!;
@@ -166,7 +209,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     }
 
     // Find the CST node at the given offset
-    const cstNode = findLeafNodeAtOffset(rootCst, offset); // as LeafCstNode;
+    const cstNode = CstUtils.findLeafNodeAtOffset(rootCst, offset); // as LeafCstNode;
     if (!cstNode) {
       console.error("removeStyleSelfReference() - cstNode undefined!");
       return undefined!;
@@ -239,7 +282,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     }
 
     // Find the CST node at the given offset
-    const cstNode = findLeafNodeAtOffset(rootCst, offset);
+    const cstNode = CstUtils.findLeafNodeAtOffset(rootCst, offset);
     if (!cstNode) {
       console.error("fixIncorrectWidthUnit() - cstNode undefined!");
       return [];
@@ -328,39 +371,4 @@ export class GraphCodeActionProvider implements CodeActionProvider {
       },
     }));
   }
-
-  /*
-  
-  // EXAMPLE:
-
-  private makeUpperCase(
-    diagnostic: Diagnostic,
-    document: LangiumDocument,
-  ): CodeAction {
-    const range = {
-      start: diagnostic.range.start,
-      end: {
-        line: diagnostic.range.start.line,
-        character: diagnostic.range.start.character + 1,
-      },
-    };
-    return {
-      title: "First letter to upper case",
-      kind: CodeActionKind.QuickFix,
-      diagnostics: [diagnostic],
-      isPreferred: true,
-      edit: {
-        changes: {
-          [document.textDocument.uri]: [
-            {
-              range,
-              newText: document.textDocument.getText(range).toUpperCase(),
-            },
-          ],
-        },
-      },
-    };
-  }
-
-  */
 }
