@@ -98,7 +98,8 @@
         "extensions": [
           ".graph"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "renameProvider": true
       }
     ],
     "grammars": [

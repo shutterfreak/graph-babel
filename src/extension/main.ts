@@ -1,12 +1,31 @@
+import * as path from "node:path";
+import * as vscode from "vscode";
+import { workspace } from "vscode";
 import type {
   LanguageClientOptions,
   ServerOptions,
 } from "vscode-languageclient/node.js";
-import * as vscode from "vscode";
-import * as path from "node:path";
 import { LanguageClient, TransportKind } from "vscode-languageclient/node.js";
 
 let client: LanguageClient | undefined;
+
+/******* EXAMPLE REGISTRATION:
+import ∗ as vscode from 'vscode';
+export function activate(context:vscode.ExtensionContext){
+  this.context.subscriptions.push (
+    vscode.commands.registerCommand('example.hello',()=> {
+    vscode.window.showInformationMessage('Hello!') ;
+  }));
+  this.context.subscriptions.push (
+  vscode.commands.registerCommand('example.newFile ', async()=> {
+    const newDocument=await workspace.openTextDocument({
+      content:'\n\n\n\nHello',
+      language:'txt',
+    });
+    await window.showTextDocument(newDocument )
+  }));
+}
+*/
 
 // This function is called when the extension is activated.
 export async function activate(
@@ -64,6 +83,7 @@ async function startLanguageClient(
   // Options to control the language client
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "*", language: "graph" }],
+    synchronize: { fileEvents: workspace.createFileSystemWatcher("**/*") },
   };
 
   // Create the language client and start the client.

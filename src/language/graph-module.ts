@@ -31,6 +31,7 @@ import {
 } from "./generated/ast.js";
 import chalk from "chalk";
 import { GraphCodeActionProvider } from "../language-server/graph-code-actions.js";
+import { GraphRenameProvider } from "../language-server/graph-rename-provider.js";
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -67,6 +68,7 @@ export const GraphModule: Module<
   },
   lsp: {
     CodeActionProvider: () => new GraphCodeActionProvider(),
+    RenameProvider: (services) => new GraphRenameProvider(services), // Ensure correct type
   },
 };
 
