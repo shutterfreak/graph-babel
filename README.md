@@ -182,6 +182,10 @@ The following code actions have been implemented:
 |  LinkWidthUnitUnknown  | "link-width-unit-unknown" | `WidthValue` has an unknown width unit | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
 |   LinkWidthHasNoUnit   |   "link-width-no-unit"    | `WidthValue` has no width unit         | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
 
+### Rename provider
+
+The vscode Rename Symbol `<F2>` context menu can be used to rename a Node, Graph or Link. References are automatically renamed as well. The rename operation will not be applied if the new name is empty or already exists as name. Reserved keywords are also not permitted.
+
 ## Contributing
 
 We welcome contributions to the Graph Babel project.
