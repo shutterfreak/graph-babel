@@ -30,8 +30,8 @@ import {
   Model,
 } from "./generated/ast.js";
 import chalk from "chalk";
-import { GraphCodeActionProvider } from "../language-server/graph-code-actions.js";
-import { GraphRenameProvider } from "../language-server/graph-rename-provider.js";
+import { GraphCodeActionProvider } from "../lsp/graph-code-actions.js";
+import { GraphRenameProvider } from "../lsp/graph-rename-provider.js";
 
 /**
  * Declaration of custom services - add your own service classes here.
