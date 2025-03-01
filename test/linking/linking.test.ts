@@ -1,9 +1,10 @@
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
-import { EmptyFileSystem, type LangiumDocument } from "langium";
-import { expandToString as s } from "langium/generate";
-import { clearDocuments, parseHelper } from "langium/test";
-import { createGraphServices } from "../../src/language/graph-module.js";
-import { Model, isModel } from "../../src/language/generated/ast.js";
+import { EmptyFileSystem, type LangiumDocument } from 'langium';
+import { expandToString as s } from 'langium/generate';
+import { clearDocuments, parseHelper } from 'langium/test';
+import { afterEach, beforeAll, describe, expect, test } from 'vitest';
+
+import { Model, isModel } from '../../src/language/generated/ast.js';
+import { createGraphServices } from '../../src/language/graph-module.js';
 
 let services: ReturnType<typeof createGraphServices>;
 let parse: ReturnType<typeof parseHelper<Model>>;
@@ -21,8 +22,8 @@ afterEach(async () => {
   document && clearDocuments(services.shared, [document]);
 });
 
-describe("Linking tests", () => {
-  test("linking of greetings", async () => {
+describe('Linking tests', () => {
+  test('linking of greetings', async () => {
     document = await parse(`
             person Langium
             Hello Langium!
@@ -36,7 +37,7 @@ describe("Linking tests", () => {
       checkDocumentValid(document) ||
         document.parseResult.value.greetings
           .map((g) => g.person.ref?.name || g.person.error?.message)
-          .join("\n"),
+          .join('\n'),
     ).toBe(s`
             Langium
         `);
@@ -48,10 +49,9 @@ function checkDocumentValid(document: LangiumDocument): string | undefined {
     (document.parseResult.parserErrors.length &&
       s`
         Parser errors:
-          ${document.parseResult.parserErrors.map((e) => e.message).join("\n  ")}
+          ${document.parseResult.parserErrors.map((e) => e.message).join('\n  ')}
     `) ||
-    (document.parseResult.value === undefined &&
-      `ParseResult is 'undefined'.`) ||
+    (document.parseResult.value === undefined && `ParseResult is 'undefined'.`) ||
     (!isModel(document.parseResult.value) &&
       `Root AST object is a ${document.parseResult.value.$type}, expected a '${Model}'.`) ||
     undefined

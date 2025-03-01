@@ -1,9 +1,10 @@
-import { beforeAll, describe, expect, test } from "vitest";
-import { EmptyFileSystem, type LangiumDocument } from "langium";
-import { expandToString as s } from "langium/generate";
-import { parseHelper } from "langium/test";
-import { createGraphServices } from "../../src/language/graph-module.js";
-import { Model, isModel } from "../../src/language/generated/ast.js";
+import { EmptyFileSystem, type LangiumDocument } from 'langium';
+import { expandToString as s } from 'langium/generate';
+import { parseHelper } from 'langium/test';
+import { beforeAll, describe, expect, test } from 'vitest';
+
+import { Model, isModel } from '../../src/language/generated/ast.js';
+import { createGraphServices } from '../../src/language/graph-module.js';
 
 let services: ReturnType<typeof createGraphServices>;
 let parse: ReturnType<typeof parseHelper<Model>>;
@@ -17,8 +18,8 @@ beforeAll(async () => {
   // await services.shared.workspace.WorkspaceManager.initializeWorkspace([]);
 });
 
-describe("Parsing tests", () => {
-  test("parse simple model", async () => {
+describe('Parsing tests', () => {
+  test('parse simple model', async () => {
     document = await parse(`
             person Langium
             Hello Langium!
@@ -36,9 +37,9 @@ describe("Parsing tests", () => {
       checkDocumentValid(document) ||
         s`
                 Persons:
-                  ${document.parseResult.value?.persons?.map((p) => p.name)?.join("\n  ")}
+                  ${document.parseResult.value?.persons?.map((p) => p.name)?.join('\n  ')}
                 Greetings to:
-                  ${document.parseResult.value?.greetings?.map((g) => g.person.$refText)?.join("\n  ")}
+                  ${document.parseResult.value?.greetings?.map((g) => g.person.$refText)?.join('\n  ')}
             `,
     ).toBe(s`
             Persons:
@@ -54,10 +55,9 @@ function checkDocumentValid(document: LangiumDocument): string | undefined {
     (document.parseResult.parserErrors.length &&
       s`
         Parser errors:
-          ${document.parseResult.parserErrors.map((e) => e.message).join("\n  ")}
+          ${document.parseResult.parserErrors.map((e) => e.message).join('\n  ')}
     `) ||
-    (document.parseResult.value === undefined &&
-      `ParseResult is 'undefined'.`) ||
+    (document.parseResult.value === undefined && `ParseResult is 'undefined'.`) ||
     (!isModel(document.parseResult.value) &&
       `Root AST object is a ${document.parseResult.value.$type}, expected a '${Model}'.`) ||
     undefined
