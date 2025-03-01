@@ -1,26 +1,26 @@
+import chalk from 'chalk';
+import { AstUtils, Reference } from 'langium';
+import { expandToNode, joinToNode, toString } from 'langium/generate';
+// import * as fs from "node:fs";
+import * as path from 'node:path';
+import { inspect } from 'util';
+
 import {
-  Graph,
-  Node,
-  Link,
   Element,
+  Graph,
   GraphTerminals,
+  Link,
   Model,
+  Node,
   Style,
-  isStyleDefinition,
   isGraph,
-  isNode,
   isLink,
+  isNode,
   isStringLabel,
   isStyle,
   isStyleBlock,
-} from "../language/generated/ast.js";
-import { AstUtils, Reference } from "langium";
-import { expandToNode, joinToNode, toString } from "langium/generate";
-// import * as fs from "node:fs";
-import * as path from "node:path";
-import { inspect } from "util";
-import { extractDestinationAndName } from "./cli-util.js";
-import { GenerateOptions } from "./main.js";
+  isStyleDefinition,
+} from '../language/generated/ast.js';
 import {
   Element_get_style_items,
   Label_get_label,
@@ -28,8 +28,9 @@ import {
   StyleDefinitions_get_color_value_as_hex,
   StyleDefinitions_get_label,
   StyleDefinitions_get_shape,
-} from "../language/model-helpers.js";
-import chalk from "chalk";
+} from '../language/model-helpers.js';
+import { extractDestinationAndName } from './cli-util.js';
+import { GenerateOptions } from './main.js';
 
 type yworks_graphml_shape = {
   type: string;
@@ -39,174 +40,174 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
   named_shape: string | undefined,
 ): yworks_graphml_shape {
   if (named_shape === undefined || named_shape.length == 0) {
-    return { type: "ShapeNode", shape: "rectangle" };
+    return { type: 'ShapeNode', shape: 'rectangle' };
   }
   switch (named_shape) {
-    case "notch_rect":
-    case "card":
-    case "notched_rectangle": // Card - Represents a card
-      return { type: "GenericNode", shape: "com.yworks.flowchart.card" };
+    case 'notch_rect':
+    case 'card':
+    case 'notched_rectangle': // Card - Represents a card
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.card' };
 
-    case "cyl":
-    case "cylinder":
-    case "database":
-    case "db": // Database - Database storage
-      return { type: "GenericNode", shape: "com.yworks.flowchart.dataBase" };
-    case "lin_cyl":
-    case "disk":
-    case "lined_cylinder": // Disk Storage - Disk storage
+    case 'cyl':
+    case 'cylinder':
+    case 'database':
+    case 'db': // Database - Database storage
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.dataBase' };
+    case 'lin_cyl':
+    case 'disk':
+    case 'lined_cylinder': // Disk Storage - Disk storage
       console.warn(
         chalk.yellowBright(
           `Warning: shape '${named_shape}' will be mapped to yWorks GraphML GenericNode: com.yworks.flowchart.dataBase`,
         ),
       );
-      return { type: "GenericNode", shape: "com.yworks.flowchart.dataBase" };
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.dataBase' };
 
-    case "diam":
-    case "diamond":
-      return { type: "ShapeNode", shape: "diamond" };
+    case 'diam':
+    case 'diamond':
+      return { type: 'ShapeNode', shape: 'diamond' };
 
-    case "decision":
-    case "question": // Decision - Decision-making step
-      return { type: "GenericNode", shape: "com.yworks.flowchart.decision" };
+    case 'decision':
+    case 'question': // Decision - Decision-making step
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.decision' };
 
-    case "delay":
-    case "half_rounded_rectangle": // Delay - Represents a delay
-      return { type: "GenericNode", shape: "com.yworks.flowchart.delay" };
+    case 'delay':
+    case 'half_rounded_rectangle': // Delay - Represents a delay
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.delay' };
 
-    case "trap_t":
-    case "inv_trapezoid":
-    case "trapezoid_top": // Manual Operation - Represents a manual task
-      return { type: "ShapeNode", shape: "trapezoid2" };
-    case "manual":
+    case 'trap_t':
+    case 'inv_trapezoid':
+    case 'trapezoid_top': // Manual Operation - Represents a manual task
+      return { type: 'ShapeNode', shape: 'trapezoid2' };
+    case 'manual':
       return {
-        type: "GenericNode",
-        shape: "com.yworks.flowchart.manualOperation",
+        type: 'GenericNode',
+        shape: 'com.yworks.flowchart.manualOperation',
       };
 
-    case "trap_b":
-    case "priority":
-    case "trapezoid":
-    case "trapezoid_bottom": // Priority Action - Priority action
-      return { type: "ShapeNode", shape: "trapezoid" };
+    case 'trap_b':
+    case 'priority':
+    case 'trapezoid':
+    case 'trapezoid_bottom': // Priority Action - Priority action
+      return { type: 'ShapeNode', shape: 'trapezoid' };
 
-    case "rect":
-    case "rectangle": // Process - Standard process shape
-      return { type: "ShapeNode", shape: "rectangle" };
-    case "proc":
-    case "process":
-      return { type: "GenericNode", shape: "com.yworks.flowchart.process" };
+    case 'rect':
+    case 'rectangle': // Process - Standard process shape
+      return { type: 'ShapeNode', shape: 'rectangle' };
+    case 'proc':
+    case 'process':
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.process' };
 
-    case "rounded":
-    case "event": // Event - Represents an event
-      return { type: "ShapeNode", shape: "roundrectangle" };
+    case 'rounded':
+    case 'event': // Event - Represents an event
+      return { type: 'ShapeNode', shape: 'roundrectangle' };
 
-    case "doc":
-    case "document": // Document - Represents a document
-      return { type: "GenericNode", shape: "com.yworks.flowchart.document" };
+    case 'doc':
+    case 'document': // Document - Represents a document
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.document' };
 
-    case "brace_l":
-    case "brace":
-    case "comment": // Comment - Adds a comment
-      return { type: "GenericNode", shape: "com.yworks.flowchart.annotation" };
-    case "brace_r": // Comment Right - Adds a comment
-    case "braces": // Comment with braces on both sides - Adds a comment
+    case 'brace_l':
+    case 'brace':
+    case 'comment': // Comment - Adds a comment
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.annotation' };
+    case 'brace_r': // Comment Right - Adds a comment
+    case 'braces': // Comment with braces on both sides - Adds a comment
       console.warn(
         chalk.yellowBright(
           `Warning: shape '${named_shape}' will be mapped to yWorks GraphML GenericNode: com.yworks.flowchart.annotation`,
         ),
       );
-      return { type: "GenericNode", shape: "com.yworks.flowchart.annotation" };
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.annotation' };
 
-    case "lean_r":
-    case "in_out":
-    case "lean_right": // Data Input/Output - Represents input or output
-      return { type: "ShapeNode", shape: "parallelogram" };
-    case "lean_l":
-    case "lean_left":
-    case "out_in": // Data Input/Output - Represents output or input
-      return { type: "ShapeNode", shape: "parallelogram2" };
+    case 'lean_r':
+    case 'in_out':
+    case 'lean_right': // Data Input/Output - Represents input or output
+      return { type: 'ShapeNode', shape: 'parallelogram' };
+    case 'lean_l':
+    case 'lean_left':
+    case 'out_in': // Data Input/Output - Represents output or input
+      return { type: 'ShapeNode', shape: 'parallelogram2' };
 
-    case "curv_trap":
-    case "curved_trapezoid":
-    case "display": // Display - Represents a display
-      return { type: "GenericNode", shape: "com.yworks.flowchart.display" };
+    case 'curv_trap':
+    case 'curved_trapezoid':
+    case 'display': // Display - Represents a display
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.display' };
 
-    case "flag":
-    case "paper_tape": // Paper Tape - Paper tape
-      return { type: "GenericNode", shape: "com.yworks.flowchart.paperType" };
+    case 'flag':
+    case 'paper_tape': // Paper Tape - Paper tape
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.paperType' };
 
-    case "hex":
-    case "hexagon":
-      return { type: "ShapeNode", shape: "hexagon" };
-    case "prepare": // Prepare Conditional - Preparation or condition step
-      return { type: "GenericNode", shape: "com.yworks.flowchart.preparation" };
+    case 'hex':
+    case 'hexagon':
+      return { type: 'ShapeNode', shape: 'hexagon' };
+    case 'prepare': // Prepare Conditional - Preparation or condition step
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.preparation' };
 
-    case "h_cyl":
-    case "das":
-    case "horizontal_cylinder": // Direct Access Storage - Direct access storage
-      return { type: "GenericNode", shape: "com.yworks.flowchart.directData" };
+    case 'h_cyl':
+    case 'das':
+    case 'horizontal_cylinder': // Direct Access Storage - Direct access storage
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.directData' };
 
-    case "tri":
-    case "extract":
-    case "triangle": // Extract - Extraction process
-      return { type: "ShapeNode", shape: "triangle" };
+    case 'tri':
+    case 'extract':
+    case 'triangle': // Extract - Extraction process
+      return { type: 'ShapeNode', shape: 'triangle' };
 
-    case "flip_tri":
-    case "flipped_triangle":
-    case "manual_file": // Manual File - Manual file operation
-      return { type: "ShapeNode", shape: "triangle2" };
+    case 'flip_tri':
+    case 'flipped_triangle':
+    case 'manual_file': // Manual File - Manual file operation
+      return { type: 'ShapeNode', shape: 'triangle2' };
 
-    case "win_pane":
-    case "internal_storage":
-    case "window_pane": // Internal Storage - Internal storage
+    case 'win_pane':
+    case 'internal_storage':
+    case 'window_pane': // Internal Storage - Internal storage
       return {
-        type: "GenericNode",
-        shape: "com.yworks.flowchart.internalStorage",
+        type: 'GenericNode',
+        shape: 'com.yworks.flowchart.internalStorage',
       };
 
-    case "sl_rect":
-    case "manual_input":
-    case "sloped_rectangle": // Manual Input - Manual input step
-      return { type: "GenericNode", shape: "com.yworks.flowchart.manualInput" };
+    case 'sl_rect':
+    case 'manual_input':
+    case 'sloped_rectangle': // Manual Input - Manual input step
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.manualInput' };
 
-    case "stadium":
-    case "pill":
-    case "terminal": // Terminal Point - Terminal point
-      return { type: "GenericNode", shape: "com.yworks.flowchart.terminator" };
+    case 'stadium':
+    case 'pill':
+    case 'terminal': // Terminal Point - Terminal point
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.terminator' };
 
-    case "fr_rect":
-    case "framed_rectangle":
-    case "subproc":
-    case "subprocess":
-    case "subroutine": // Subprocess - Subprocess
+    case 'fr_rect':
+    case 'framed_rectangle':
+    case 'subproc':
+    case 'subprocess':
+    case 'subroutine': // Subprocess - Subprocess
       return {
-        type: "GenericNode",
-        shape: "com.yworks.flowchart.predefinedProcess",
+        type: 'GenericNode',
+        shape: 'com.yworks.flowchart.predefinedProcess',
       };
 
-    case "circle":
-    case "circ": // Start - Starting point
-    case "sm_circ":
-    case "small_circle":
-    case "start": // Start - Small starting point
-      return { type: "GenericNode", shape: "com.yworks.flowchart.start2" };
+    case 'circle':
+    case 'circ': // Start - Starting point
+    case 'sm_circ':
+    case 'small_circle':
+    case 'start': // Start - Small starting point
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.start2' };
 
-    case "odd": // Odd - Odd shape
+    case 'odd': // Odd - Odd shape
       return {
-        type: "GenericNode",
-        shape: "com.yworks.flowchart.networkMessage",
+        type: 'GenericNode',
+        shape: 'com.yworks.flowchart.networkMessage',
       };
 
-    case "notch_pent":
-    case "loop_limit":
-    case "notched_pentagon": // Loop Limit - Loop limit step
-      return { type: "GenericNode", shape: "com.yworks.flowchart.loopLimit" };
+    case 'notch_pent':
+    case 'loop_limit':
+    case 'notched_pentagon': // Loop Limit - Loop limit step
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.loopLimit' };
 
-    case "bow_rect":
-    case "bow_tie_rectangle":
-    case "stored_data": // Stored Data - Stored data
-      return { type: "GenericNode", shape: "com.yworks.flowchart.storedData" };
+    case 'bow_rect':
+    case 'bow_tie_rectangle':
+    case 'stored_data': // Stored Data - Stored data
+      return { type: 'GenericNode', shape: 'com.yworks.flowchart.storedData' };
 
     default:
       console.warn(
@@ -214,7 +215,7 @@ export function NAMED_SHAPES_to_yworks_graphml_shape(
           `Warning: shape '${named_shape}' not yet mapped to yWorks GraphML shape - assigning shape 'rectangle'`,
         ),
       );
-      return { type: "ShapeNode", shape: "rectangle" };
+      return { type: 'ShapeNode', shape: 'rectangle' };
   }
   /* TODO:
   "hourglass",
@@ -270,15 +271,13 @@ export function generate_graphml_graph(
   filePath: string,
   opts: GenerateOptions | undefined,
 ): string {
-  console.info(
-    chalk.magentaBright(`generate_graphml - [${model.$type}] -- START`),
-  );
+  console.info(chalk.magentaBright(`generate_graphml - [${model.$type}] -- START`));
 
   const data = extractDestinationAndName(filePath, opts?.destination);
   const generatedFilePath = `${path.join(data.destination, data.name)}-clean.graph`;
 
   for (const childNode of AstUtils.streamAllContents(model)) {
-    let debug_log_message = "";
+    let debug_log_message = '';
 
     // DEBUG - START
     const references = AstUtils.findLocalReferences(childNode);
@@ -291,11 +290,9 @@ export function generate_graphml_graph(
         chalk.green(
           `DBG : node of type '${childNode.$type}' - Found local reference ${i}: [${ref.$refText}] -> ` +
             (d === undefined
-              ? "<undefiined>"
+              ? '<undefiined>'
               : `type: '${d.type}', name: '${d.name}', path: '${d.path}'}`) +
-            (parent === undefined
-              ? ""
-              : ` within parent of type: '${parent.$type}'`),
+            (parent === undefined ? '' : ` within parent of type: '${parent.$type}'`),
         ),
         chalk.gray(inspect(ref.$nodeDescription)),
       );
@@ -306,13 +303,13 @@ export function generate_graphml_graph(
     if (isGraph(childNode)) {
       const element_count: number = childNode.elements.length;
       const style_count: number = childNode.styles.length;
-      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ""}'`;
+      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
       debug_log_message = `${preamble} and name '${childNode.id}' "${Label_get_label(childNode.label)}" -- ${element_count} element(s), ${style_count} style(s)`;
     } else if (isNode(childNode)) {
-      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ""}'`;
+      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
       debug_log_message = `${preamble} "${Label_get_label(childNode.label)}"`;
     } else if (isLink(childNode)) {
-      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ""}'`;
+      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
 
       const src_links: string[] = [];
       let s: Reference<Element> | undefined = undefined;
@@ -323,11 +320,10 @@ export function generate_graphml_graph(
       for (s of childNode.dst) {
         dst_links.push(s.$refText);
       }
-      const relation =
-        childNode.relation === undefined ? "" : childNode.relation;
-      const line: string = childNode.link === undefined ? "" : childNode.link;
+      const relation = childNode.relation === undefined ? '' : childNode.relation;
+      const line: string = childNode.link === undefined ? '' : childNode.link;
       const link = relation.length > 0 ? relation : line;
-      debug_log_message = `${preamble} ${src_links.join(",")} ${link} ${dst_links.join(",")} "${Label_get_label(childNode.label)}"`;
+      debug_log_message = `${preamble} ${src_links.join(',')} ${link} ${dst_links.join(',')} "${Label_get_label(childNode.label)}"`;
     } else if (isStyle(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
       debug_log_message = `${preamble} with name '${childNode.id}' (no direct access to StyleBlock)`;
@@ -341,19 +337,16 @@ export function generate_graphml_graph(
     } else {
       debug_log_message = ` --- generic '${childNode.$type}' (not yet processed)`;
     }
-    console.info(
-      chalk.magentaBright(`generate_cleaned_graph - [${childNode.$type}]`),
-    );
+    console.info(chalk.magentaBright(`generate_cleaned_graph - [${childNode.$type}]`));
     console.info(chalk.gray(debug_log_message));
     console.log(
       chalk.magenta(
-        `generate_cleaned_graph() - childNode.$cstNode?.text := '${childNode.$cstNode?.text ?? "<not defined>"}' -- END`,
+        `generate_cleaned_graph() - childNode.$cstNode?.text := '${childNode.$cstNode?.text ?? '<not defined>'}' -- END`,
       ),
     );
   }
 
-  const fileNode =
-    expandToNode`<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+  const fileNode = expandToNode`<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns"
   xmlns:java="http://www.yworks.com/xml/yfiles-common/1.0/java"
   xmlns:sys="http://www.yworks.com/xml/yfiles-common/markup/primitives/2.0"
@@ -403,11 +396,7 @@ export function generate_graphml_graph(
     console.log(
       chalk.magenta(
         `render_Graph(${graph.id}) - style := `,
-        inspect(
-          Element_get_style_items(graph)?.map((s) =>
-            StyleDefinition_toString([s]),
-          ),
-        ),
+        inspect(Element_get_style_items(graph)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
 
@@ -419,7 +408,7 @@ export function generate_graphml_graph(
       graph.elements
         // .filter((e) => !isLink(e))
         .map((element) => render_Element(element))
-        .join("\n") +
+        .join('\n') +
       `  <!-- Graph rendered as node -->
 </node>`
     );
@@ -430,7 +419,7 @@ export function generate_graphml_graph(
 
     let label: string | undefined = Label_get_label(node.label);
     if (label.length == 0) {
-      label = StyleDefinitions_get_label(style_items) ?? "";
+      label = StyleDefinitions_get_label(style_items) ?? '';
     }
 
     console.log(
@@ -440,41 +429,31 @@ export function generate_graphml_graph(
       ),
     );
 
-    console.log(
-      chalk.green("GraphMl:Node - Style items:\n", inspect(style_items)),
-    );
+    console.log(chalk.green('GraphMl:Node - Style items:\n', inspect(style_items)));
 
-    const fill_color_value = StyleDefinitions_get_color_value_as_hex(
-      style_items,
-      ["FillColor"],
-    );
-    const border_color_value = StyleDefinitions_get_color_value_as_hex(
-      style_items,
-      ["BorderColor"],
-    );
-    const label_color_value = StyleDefinitions_get_color_value_as_hex(
-      style_items,
-      ["LabelColor"],
-    );
+    const fill_color_value = StyleDefinitions_get_color_value_as_hex(style_items, ['FillColor']);
+    const border_color_value = StyleDefinitions_get_color_value_as_hex(style_items, [
+      'BorderColor',
+    ]);
+    const label_color_value = StyleDefinitions_get_color_value_as_hex(style_items, ['LabelColor']);
     const shape = StyleDefinitions_get_shape(style_items);
-    const graphml_shape: yworks_graphml_shape =
-      NAMED_SHAPES_to_yworks_graphml_shape(shape);
+    const graphml_shape: yworks_graphml_shape = NAMED_SHAPES_to_yworks_graphml_shape(shape);
 
     // return `<node id="${node.id}" /><!-- label: "${label}" -->`;
 
     return `<node id="${node.id}">
   <data key="d5"/>
   <data key="d6">
-    <y:${graphml_shape.type}${graphml_shape.type == "GenericNode" ? ` configuration="${graphml_shape.shape}"` : ""} >
+    <y:${graphml_shape.type}${graphml_shape.type == 'GenericNode' ? ` configuration="${graphml_shape.shape}"` : ''} >
       <y:Geometry height="30.0" width="30.0" x="0.0" y="0.0"/>${
         fill_color_value === undefined
-          ? ""
+          ? ''
           : `
       <y:Fill color="${fill_color_value}" transparent="false"/>`
       }
-      <y:BorderStyle${border_color_value === undefined ? "" : ` color="${border_color_value}"`} raised="false" type="line" width="1.0"/>
-      <y:NodeLabel fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false"${label_color_value === undefined ? "" : ` textColor="${label_color_value}"`} xml:space="preserve">${label}</y:NodeLabel>
-      ${graphml_shape.type == "ShapeNode" ? `<y:Shape type="${graphml_shape.shape}"/>` : ""}
+      <y:BorderStyle${border_color_value === undefined ? '' : ` color="${border_color_value}"`} raised="false" type="line" width="1.0"/>
+      <y:NodeLabel fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false"${label_color_value === undefined ? '' : ` textColor="${label_color_value}"`} xml:space="preserve">${label}</y:NodeLabel>
+      ${graphml_shape.type == 'ShapeNode' ? `<y:Shape type="${graphml_shape.shape}"/>` : ''}
     </y:${graphml_shape.type}>
   </data>
 </node>`;
@@ -485,17 +464,13 @@ export function generate_graphml_graph(
 
     let label: string | undefined = Label_get_label(link.label);
     if (label.length == 0) {
-      label = StyleDefinitions_get_label(style_items) ?? "";
+      label = StyleDefinitions_get_label(style_items) ?? '';
     }
 
     console.log(
       chalk.magenta(
-        `render_Link(${link.id ?? "<no name>"}) - style := `,
-        inspect(
-          Element_get_style_items(link)?.map((s) =>
-            StyleDefinition_toString([s]),
-          ),
-        ),
+        `render_Link(${link.id ?? '<no name>'}) - style := `,
+        inspect(Element_get_style_items(link)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
 
@@ -508,10 +483,10 @@ export function generate_graphml_graph(
     for (s of link.dst) {
       dst_links.push(s.$refText);
     }
-    const relation = link.relation === undefined ? "" : link.relation;
-    const link_style = link.link === undefined ? "" : link.link;
+    const relation = link.relation === undefined ? '' : link.relation;
+    const link_style = link.link === undefined ? '' : link.link;
 
-    let link_definition = "";
+    let link_definition = '';
     if (relation.length > 0) {
       link_definition = relation;
     } else if (link_style.length > 0) {
@@ -521,34 +496,32 @@ export function generate_graphml_graph(
     }
     if (link_definition.length > 0) {
       console.warn(
-        chalk.redBright(
-          `Warning: edge (link) styling not yet implemented. Found: '${link_style}'`,
-        ),
+        chalk.redBright(`Warning: edge (link) styling not yet implemented. Found: '${link_style}'`),
       );
     }
 
     // LINK STYLE AND ARROW HEADS - START
     const comments: string[] = [];
-    let comment = "";
+    let comment = '';
     const GRAPHML_ARROWHEADS = {
-      none: "none", // No arrow head
-      standard: "standard", // Standard arrow head
-      delta: "delta", // Triangular arrow head, filled
-      white_delta: "white_delta", // Same, filled in white
-      diamond: "diamond", // Diamond arrow head, filled
-      white_diamond: "white_diamond", // Same, filled in white
-      circle: "circle", // Circle, filled
-      transparent_circle: "transparent_circle", // Circle, not filled
-      plain: "plain", // Plain (straight) arrow
-      cross: "cross", // Cross
+      none: 'none', // No arrow head
+      standard: 'standard', // Standard arrow head
+      delta: 'delta', // Triangular arrow head, filled
+      white_delta: 'white_delta', // Same, filled in white
+      diamond: 'diamond', // Diamond arrow head, filled
+      white_diamond: 'white_diamond', // Same, filled in white
+      circle: 'circle', // Circle, filled
+      transparent_circle: 'transparent_circle', // Circle, not filled
+      plain: 'plain', // Plain (straight) arrow
+      cross: 'cross', // Cross
       // TODO: add other arrow heads
     };
 
     const GRAPHML_LINE_STYLES = {
-      line: "line",
-      dotted: "dotted",
-      dashed: "dashed",
-      dashed_dotted: "dashed_dotted",
+      line: 'line',
+      dotted: 'dotted',
+      dashed: 'dashed',
+      dashed_dotted: 'dashed_dotted',
     };
 
     let arrowhead_src: string = GRAPHML_ARROWHEADS.none;
@@ -558,10 +531,10 @@ export function generate_graphml_graph(
       // 'relation' defined:
       edge_style = GRAPHML_LINE_STYLES.line;
       switch (link.relation) {
-        case "to":
+        case 'to':
           arrowhead_dst = GRAPHML_ARROWHEADS.standard;
           break;
-        case "with":
+        case 'with':
           break;
         default: // Error - shouldn't happen
           break;
@@ -571,26 +544,26 @@ export function generate_graphml_graph(
       if (link.link !== undefined && link.link.length > 0) {
         const match = GraphTerminals.LINK_TYPE.exec(link.link);
         if (match) {
-          const src_head = match[1] ?? "";
-          const line = match[2] ?? "";
-          let dst_head = match[3] ?? "";
+          const src_head = match[1] ?? '';
+          const line = match[2] ?? '';
+          let dst_head = match[3] ?? '';
 
           // Arrowhead at source:
           if (src_head.length > 0) {
             switch (src_head) {
-              case "<":
+              case '<':
                 arrowhead_src = GRAPHML_ARROWHEADS.standard;
                 break;
-              case "o":
+              case 'o':
                 arrowhead_src = GRAPHML_ARROWHEADS.transparent_circle;
                 break;
-              case "x":
+              case 'x':
                 arrowhead_src = GRAPHML_ARROWHEADS.cross;
                 break;
-              case "<>":
+              case '<>':
                 arrowhead_src = GRAPHML_ARROWHEADS.white_diamond;
                 break;
-              case "<|":
+              case '<|':
                 arrowhead_src = GRAPHML_ARROWHEADS.white_delta;
                 break;
 
@@ -605,29 +578,29 @@ export function generate_graphml_graph(
           // Arrowhead at destination:
           if (dst_head.length > 0) {
             switch (dst_head) {
-              case ">":
+              case '>':
                 arrowhead_dst = GRAPHML_ARROWHEADS.standard;
                 break;
 
-              case "o":
+              case 'o':
                 arrowhead_dst = GRAPHML_ARROWHEADS.transparent_circle;
                 break;
 
-              case "x":
+              case 'x':
                 arrowhead_dst = GRAPHML_ARROWHEADS.cross;
                 break;
 
-              case "<>":
+              case '<>':
                 arrowhead_dst = GRAPHML_ARROWHEADS.white_diamond;
                 break;
-              case "|>":
+              case '|>':
                 arrowhead_dst = GRAPHML_ARROWHEADS.white_delta;
                 break;
               default:
                 comment = `Warning: destination arrowhead '${dst_head}' is not (yet) available in a yEd GraphML graph. Will render as 'standard'. Source: '${link.$cstNode?.text}'`;
                 comments.push(comment);
                 console.warn(chalk.red(comment));
-                dst_head = ">";
+                dst_head = '>';
             }
           }
 
@@ -657,25 +630,19 @@ export function generate_graphml_graph(
     }
     // LINK STYLE AND ARROW HEADS - END
 
-    const line_color_value = StyleDefinitions_get_color_value_as_hex(
-      style_items,
-      ["LineColor"],
-    );
-    const label_color_value = StyleDefinitions_get_color_value_as_hex(
-      style_items,
-      ["LabelColor"],
-    );
+    const line_color_value = StyleDefinitions_get_color_value_as_hex(style_items, ['LineColor']);
+    const label_color_value = StyleDefinitions_get_color_value_as_hex(style_items, ['LabelColor']);
 
     //return(`<!-- edge from ${src} to ${dst} removed ->`)
     const lines: string[] = [];
     for (const src of src_links) {
       for (const dst of dst_links) {
         lines.push(`
-<edge ${link.id == null ? "" : `id="${link.id}" `}source="${src}" target="${dst}">
+<edge ${link.id == null ? '' : `id="${link.id}" `}source="${src}" target="${dst}">
   <data key="d9"/>
   <data key="d10">
     <y:PolyLineEdge>
-      <y:LineStyle${line_color_value === undefined ? "" : ` color="${line_color_value}"`} type="${edge_style}" width="1.0"/>
+      <y:LineStyle${line_color_value === undefined ? '' : ` color="${line_color_value}"`} type="${edge_style}" width="1.0"/>
       <y:Arrows source="${arrowhead_src}" target="${arrowhead_dst}"/>
       <y:EdgeLabel fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" ${label_color_value === undefined ? 'hasLineColor="false"' : `textColor="${label_color_value}"`} xml:space="preserve">${label}</y:EdgeLabel>
     </y:PolyLineEdge>
@@ -684,7 +651,7 @@ export function generate_graphml_graph(
       }
     }
 
-    return lines.join("\n");
+    return lines.join('\n');
   }
 
   function render_Style(style: Style): string {
@@ -699,16 +666,16 @@ export function generate_graphml_graph(
         */
   console.log(
     chalk.yellow(
-      "\ngenerate_cleaned_graph() DEBUG - model::START\n",
+      '\ngenerate_cleaned_graph() DEBUG - model::START\n',
       inspect(model),
-      "\ngenerate_cleaned_graph() DEBUG - model::END\n",
+      '\ngenerate_cleaned_graph() DEBUG - model::END\n',
     ),
   );
   if (model.$document?.references) {
     for (const ref of model.$document.references) {
       console.log(
         chalk.greenBright.bgGray(
-          `Reference '${ref.$refText}' (type: ${ref.ref?.$type}) ${ref.ref?.$container ? ` - in container #${ref.ref.$container.$containerIndex} of type '${ref.ref.$container.$type}'` : ""}`,
+          `Reference '${ref.$refText}' (type: ${ref.ref?.$type}) ${ref.ref?.$container ? ` - in container #${ref.ref.$container.$containerIndex} of type '${ref.ref.$container.$type}'` : ''}`,
         ),
         // chalk.green(inspect(ref))
       );

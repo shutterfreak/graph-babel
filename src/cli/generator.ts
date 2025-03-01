@@ -1,48 +1,47 @@
+import chalk from 'chalk';
+import { AstUtils, Reference } from 'langium';
+import { expandToNode, joinToNode, toString } from 'langium/generate';
+// import * as fs from "node:fs";
+import * as path from 'node:path';
+import { inspect } from 'util';
+
 import {
-  Graph,
-  Node,
-  Link,
   Element,
+  Graph,
+  Link,
   Model,
+  Node,
   Style,
-  isStyleDefinition,
   isGraph,
-  isNode,
   isLink,
+  isNode,
   isStringLabel,
   isStyle,
   isStyleBlock,
-} from "../language/generated/ast.js";
-import { AstUtils, Reference } from "langium";
-import { expandToNode, joinToNode, toString } from "langium/generate";
-// import * as fs from "node:fs";
-import * as path from "node:path";
-import { inspect } from "util";
-import { extractDestinationAndName } from "./cli-util.js";
-import { GenerateOptions } from "./main.js";
+  isStyleDefinition,
+} from '../language/generated/ast.js';
 import {
   Element_get_style_items,
   Label_get_label,
   StyleDefinition_toString,
-} from "../language/model-helpers.js";
-import chalk from "chalk";
+} from '../language/model-helpers.js';
+import { extractDestinationAndName } from './cli-util.js';
+import { GenerateOptions } from './main.js';
 
 export function generate_cleaned_graph(
   model: Model,
   filePath: string,
   opts: GenerateOptions | undefined,
 ): string {
-  console.info(
-    chalk.magentaBright(`generate_cleaned_graph - [${model.$type}] -- START`),
-  );
+  console.info(chalk.magentaBright(`generate_cleaned_graph - [${model.$type}] -- START`));
 
   const data = extractDestinationAndName(filePath, opts?.destination);
   const generatedFilePath = `${path.join(data.destination, data.name)}-clean.graph`;
-  const INDENTATION = "  ";
+  const INDENTATION = '  ';
   const level = 0;
 
   for (const childNode of AstUtils.streamAllContents(model)) {
-    let debug_log_message = "";
+    let debug_log_message = '';
 
     // DEBUG - START
     const references = AstUtils.findLocalReferences(childNode);
@@ -55,11 +54,9 @@ export function generate_cleaned_graph(
         chalk.green(
           `DBG : node of type '${childNode.$type}' - Found local reference ${i}: [${ref.$refText}] -> ` +
             (d === undefined
-              ? "<undefiined>"
+              ? '<undefiined>'
               : `type: '${d.type}', name: '${d.name}', path: '${d.path}'}`) +
-            (parent === undefined
-              ? ""
-              : ` within parent of type: '${parent.$type}'`),
+            (parent === undefined ? '' : ` within parent of type: '${parent.$type}'`),
         ),
         chalk.gray(inspect(ref.$nodeDescription)),
       );
@@ -70,13 +67,13 @@ export function generate_cleaned_graph(
     if (isGraph(childNode)) {
       const element_count: number = childNode.elements.length;
       const style_count: number = childNode.styles.length;
-      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ""}'`;
+      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
       debug_log_message = `${preamble} and name '${childNode.id}' "${Label_get_label(childNode.label)}" -- ${element_count} element(s), ${style_count} style(s)`;
     } else if (isNode(childNode)) {
-      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ""}'`;
+      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
       debug_log_message = `${preamble} "${Label_get_label(childNode.label)}"`;
     } else if (isLink(childNode)) {
-      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ""}'`;
+      const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
 
       const src_links: string[] = [];
       let s: Reference<Element> | undefined = undefined;
@@ -87,11 +84,10 @@ export function generate_cleaned_graph(
       for (s of childNode.dst) {
         dst_links.push(s.$refText);
       }
-      const relation =
-        childNode.relation === undefined ? "" : childNode.relation;
-      const line: string = childNode.link === undefined ? "" : childNode.link;
+      const relation = childNode.relation === undefined ? '' : childNode.relation;
+      const line: string = childNode.link === undefined ? '' : childNode.link;
       const link = relation.length > 0 ? relation : line;
-      debug_log_message = `${preamble} ${src_links.join(",")} ${link} ${dst_links.join(",")} "${Label_get_label(childNode.label)}"`;
+      debug_log_message = `${preamble} ${src_links.join(',')} ${link} ${dst_links.join(',')} "${Label_get_label(childNode.label)}"`;
     } else if (isStyle(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
       debug_log_message = `${preamble} with name '${childNode.id}' (no direct access to StyleBlock)`;
@@ -105,13 +101,11 @@ export function generate_cleaned_graph(
     } else {
       debug_log_message = ` --- generic '${childNode.$type}' (not yet processed)`;
     }
-    console.info(
-      chalk.magentaBright(`generate_cleaned_graph - [${childNode.$type}]`),
-    );
+    console.info(chalk.magentaBright(`generate_cleaned_graph - [${childNode.$type}]`));
     console.info(chalk.gray(debug_log_message));
     console.log(
       chalk.magenta(
-        `generate_cleaned_graph() - childNode.$cstNode?.text := '${childNode.$cstNode?.text ?? "<not defined>"}' -- END`,
+        `generate_cleaned_graph() - childNode.$cstNode?.text := '${childNode.$cstNode?.text ?? '<not defined>'}' -- END`,
       ),
     );
   }
@@ -138,22 +132,16 @@ export function generate_cleaned_graph(
     console.log(
       chalk.magenta(
         `render_Graph(${graph.id}) - style := `,
-        inspect(
-          Element_get_style_items(graph)?.map((s) =>
-            StyleDefinition_toString([s]),
-          ),
-        ),
+        inspect(Element_get_style_items(graph)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
 
     return (
-      `${INDENTATION.repeat(level)}graph${graph.styleref ? `:${graph.styleref.$refText}` : ""} ${graph.id}${label !== "" ? ` "${label}"` : ""} {\n` +
-      graph.elements
-        .map((element) => render_Element(element, level + 1))
-        .join("\n") +
-      (graph.elements.length > 0 ? "\n" : "") +
-      graph.styles.map((style) => render_Style(style, level + 1)).join("\n") +
-      (graph.styles.length > 0 ? "\n" : "") +
+      `${INDENTATION.repeat(level)}graph${graph.styleref ? `:${graph.styleref.$refText}` : ''} ${graph.id}${label !== '' ? ` "${label}"` : ''} {\n` +
+      graph.elements.map((element) => render_Element(element, level + 1)).join('\n') +
+      (graph.elements.length > 0 ? '\n' : '') +
+      graph.styles.map((style) => render_Style(style, level + 1)).join('\n') +
+      (graph.styles.length > 0 ? '\n' : '') +
       `${INDENTATION.repeat(level)}}`
     );
   }
@@ -164,15 +152,11 @@ export function generate_cleaned_graph(
     console.log(
       chalk.magenta(
         `render_Node(${node.id}) - style := `,
-        inspect(
-          Element_get_style_items(node)?.map((s) =>
-            StyleDefinition_toString([s]),
-          ),
-        ),
+        inspect(Element_get_style_items(node)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
 
-    return `${INDENTATION.repeat(level)}node${node.styleref ? `:${node.styleref.$refText}` : ""} ${node.id}${label !== "" ? ` "${label}"` : ""}`;
+    return `${INDENTATION.repeat(level)}node${node.styleref ? `:${node.styleref.$refText}` : ''} ${node.id}${label !== '' ? ` "${label}"` : ''}`;
   }
 
   function render_Link(link: Link, level: number): string {
@@ -180,12 +164,8 @@ export function generate_cleaned_graph(
 
     console.log(
       chalk.magenta(
-        `render_Link(${link.id ?? "<no name>"}) - style := `,
-        inspect(
-          Element_get_style_items(link)?.map((s) =>
-            StyleDefinition_toString([s]),
-          ),
-        ),
+        `render_Link(${link.id ?? '<no name>'}) - style := `,
+        inspect(Element_get_style_items(link)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
 
@@ -198,14 +178,14 @@ export function generate_cleaned_graph(
     for (s of link.dst) {
       dst_links.push(s.$refText);
     }
-    const relation = link.relation === undefined ? "" : link.relation;
-    const link_style = link.link === undefined ? "" : link.link;
+    const relation = link.relation === undefined ? '' : link.relation;
+    const link_style = link.link === undefined ? '' : link.link;
     /*
     const src_head: string = link.src_head === undefined ? "" : link.src_head;
     const dst_head: string = link.dst_head === undefined ? "" : link.dst_head;
     const line: string = link.line === undefined ? "" : link.line;
     */
-    let link_definition = "";
+    let link_definition = '';
     if (relation.length > 0) {
       link_definition = relation;
     } else if (link_style.length > 0) {
@@ -214,16 +194,13 @@ export function generate_cleaned_graph(
       console.error("Error: this can't happen.");
     }
 
-    return `${INDENTATION.repeat(level)}link${link.styleref ? `:${link.styleref.$refText}` : ""} ${link.id != null ? `(${link.id}) ` : ""}${src_links.join(",")} ${link_definition} ${dst_links.join(",")}${label !== "" ? ` "${label}"` : ""}`;
+    return `${INDENTATION.repeat(level)}link${link.styleref ? `:${link.styleref.$refText}` : ''} ${link.id != null ? `(${link.id}) ` : ''}${src_links.join(',')} ${link_definition} ${dst_links.join(',')}${label !== '' ? ` "${label}"` : ''}`;
   }
 
   function render_Style(style: Style, level: number): string {
     return `${INDENTATION.repeat(level)}style ${style.id} {\n${style.definition.items
-      .map(
-        (it) =>
-          `${INDENTATION.repeat(level + 1)}${StyleDefinition_toString([it])}";`,
-      )
-      .join("\n")}\n${INDENTATION.repeat(level)}}`;
+      .map((it) => `${INDENTATION.repeat(level + 1)}${StyleDefinition_toString([it])}";`)
+      .join('\n')}\n${INDENTATION.repeat(level)}}`;
   }
 
   /*
@@ -234,16 +211,16 @@ export function generate_cleaned_graph(
   */
   console.log(
     chalk.yellow(
-      "\ngenerate_cleaned_graph() DEBUG - model::START\n",
+      '\ngenerate_cleaned_graph() DEBUG - model::START\n',
       inspect(model),
-      "\ngenerate_cleaned_graph() DEBUG - model::END\n",
+      '\ngenerate_cleaned_graph() DEBUG - model::END\n',
     ),
   );
   if (model.$document?.references) {
     for (const ref of model.$document.references) {
       console.log(
         chalk.greenBright.bgGray(
-          `Reference '${ref.$refText}' (type: ${ref.ref?.$type}) ${ref.ref?.$container ? ` - in container #${ref.ref.$container.$containerIndex} of type '${ref.ref.$container.$type}'` : ""}`,
+          `Reference '${ref.$refText}' (type: ${ref.ref?.$type}) ${ref.ref?.$container ? ` - in container #${ref.ref.$container.$containerIndex} of type '${ref.ref.$container.$type}'` : ''}`,
         ),
         // chalk.green(inspect(ref))
       );

@@ -1,21 +1,12 @@
-import chalk from "chalk";
-import {
-  AstNode,
-  AstUtils,
-  type ValidationAcceptor,
-  type ValidationChecks,
-} from "langium";
+import chalk from 'chalk';
+import { AstNode, AstUtils, type ValidationAcceptor, type ValidationChecks } from 'langium';
+
 import {
   Element,
   Graph,
   GraphAstType,
   GraphTerminals,
   HexColorDefinition,
-  isElement,
-  isGraph,
-  isModel,
-  isNode,
-  isStyle,
   Link,
   Model,
   OpacityStyleDefinition,
@@ -25,8 +16,13 @@ import {
   StyleDefinition,
   TextColorDefinition,
   WidthValue,
-} from "./generated/ast.js";
-import type { GraphServices } from "./graph-module.js";
+  isElement,
+  isGraph,
+  isModel,
+  isNode,
+  isStyle,
+} from './generated/ast.js';
+import type { GraphServices } from './graph-module.js';
 import {
   ARROWHEADS,
   LENGTH_UNITS,
@@ -34,7 +30,7 @@ import {
   NAMED_SHAPES,
   STYLE_TOPICS,
   StyleDefinition_toString,
-} from "./model-helpers.js";
+} from './model-helpers.js';
 
 /**
  * Register custom validation checks.
@@ -59,31 +55,31 @@ export function registerValidationChecks(services: GraphServices) {
 
 // The issue codes can help to select code actions for issues encountered while validating the document
 export const IssueCodes = {
-  IdMissing: "id-missing",
-  IdDuplicate: "id-duplicate",
-  SrcArrowheadEmpty: "src-arrowhead-empty",
-  SrcArrowheadInvalid: "src-arrowhead-empty",
-  DstArrowheadEmpty: "dst-arrowhead-empty",
-  DstArrowheadInvalid: "dst-arrowhead-empty",
-  SrcArrowheadRedefined: "src-arrowhead-redefined",
-  DstArrowheadRedefined: "dst-arrowhead-redefined",
-  LinkStyleInvalid: "link-style-invalid",
-  StyleAfterElement: "style-after-element",
-  StyleSelfReference: "style-self-reference",
-  StyleMultipleDefinitions: "style-multiple-definitions",
-  StyleDefinitionEmptyTopic: "style-definition-empty-topic",
-  StyleDefinitionUnknownTopic: "style-definition-missing-topic",
-  ShapeNameMissing: "shape-name-missing",
-  ShapeNameUnknown: "shape-name-unknown",
-  ColorNameUnknown: "color-name-unknown",
-  HexColorInvalid: "hex-color-invalid",
-  RgbChannelValueInvalid: "rgb-channel-value-invalid",
-  RgbChannelValueOutOfRange: "rgb-channel-value-out-of-range",
-  LinkWidthHasNoUnit: "link-width-no-unit",
-  LinkWidthValueInvalid: "link-width-value-invalid",
-  LinkWidthUnitUnknown: "link-width-unit-unknown",
-  OpacityValueOutOfRange: "opacity-value-out-of-range",
-  OpacityValueInvalid: "opacity-value-invalid",
+  IdMissing: 'id-missing',
+  IdDuplicate: 'id-duplicate',
+  SrcArrowheadEmpty: 'src-arrowhead-empty',
+  SrcArrowheadInvalid: 'src-arrowhead-empty',
+  DstArrowheadEmpty: 'dst-arrowhead-empty',
+  DstArrowheadInvalid: 'dst-arrowhead-empty',
+  SrcArrowheadRedefined: 'src-arrowhead-redefined',
+  DstArrowheadRedefined: 'dst-arrowhead-redefined',
+  LinkStyleInvalid: 'link-style-invalid',
+  StyleAfterElement: 'style-after-element',
+  StyleSelfReference: 'style-self-reference',
+  StyleMultipleDefinitions: 'style-multiple-definitions',
+  StyleDefinitionEmptyTopic: 'style-definition-empty-topic',
+  StyleDefinitionUnknownTopic: 'style-definition-missing-topic',
+  ShapeNameMissing: 'shape-name-missing',
+  ShapeNameUnknown: 'shape-name-unknown',
+  ColorNameUnknown: 'color-name-unknown',
+  HexColorInvalid: 'hex-color-invalid',
+  RgbChannelValueInvalid: 'rgb-channel-value-invalid',
+  RgbChannelValueOutOfRange: 'rgb-channel-value-out-of-range',
+  LinkWidthHasNoUnit: 'link-width-no-unit',
+  LinkWidthValueInvalid: 'link-width-value-invalid',
+  LinkWidthUnitUnknown: 'link-width-unit-unknown',
+  OpacityValueOutOfRange: 'opacity-value-out-of-range',
+  OpacityValueInvalid: 'opacity-value-invalid',
 };
 
 /**
@@ -95,15 +91,12 @@ export class GraphValidator {
    * @param model
    * @param accept
    */
-  checkUniqueElementNames = (
-    model: Model,
-    accept: ValidationAcceptor,
-  ): void => {
+  checkUniqueElementNames = (model: Model, accept: ValidationAcceptor): void => {
     // Create a set of identifiers while traversing the AST
     const identifiers = new Set<string>();
 
     function traverseElement(element: Element): void {
-      const preamble = `traverseElement(${element.$type} element (${element.id ?? "<no name>"}))`;
+      const preamble = `traverseElement(${element.$type} element (${element.id ?? '<no name>'}))`;
       console.log(chalk.white(`${preamble} - START`));
       if (
         (isNode(element) || isGraph(element)) &&
@@ -111,28 +104,24 @@ export class GraphValidator {
         (element.id === undefined || element.id.length == 0)
       ) {
         console.error(
-          chalk.redBright(
-            `${element.$type} must have a nonempty id [${element.$cstNode?.text}]`,
-          ),
+          chalk.redBright(`${element.$type} must have a nonempty id [${element.$cstNode?.text}]`),
         );
-        accept(
-          "error",
-          `${element.$type} must have a nonempty id [${element.$cstNode?.text}]`,
-          { node: element, property: "id", code: IssueCodes.IdMissing },
-        );
+        accept('error', `${element.$type} must have a nonempty id [${element.$cstNode?.text}]`, {
+          node: element,
+          property: 'id',
+          code: IssueCodes.IdMissing,
+        });
       }
       if (element.id !== undefined) {
         // The element has a name (note: links have an optional name)
         if (identifiers.has(element.id)) {
           // report an error if the identifier is not unique
           console.warn(
-            chalk.red(
-              `${preamble} - Duplicate name ${element.id} found for ${element.$type}.`,
-            ),
+            chalk.red(`${preamble} - Duplicate name ${element.id} found for ${element.$type}.`),
           );
-          accept("error", `Duplicate name '${element.id}'`, {
+          accept('error', `Duplicate name '${element.id}'`, {
             node: element,
-            property: "id",
+            property: 'id',
             code: IssueCodes.IdDuplicate,
           });
         } else {
@@ -140,7 +129,7 @@ export class GraphValidator {
         }
       }
 
-      if (element.$type === "Graph") {
+      if (element.$type === 'Graph') {
         // Recurse
         for (const e of element.elements) {
           traverseElement(e);
@@ -150,14 +139,14 @@ export class GraphValidator {
       console.log(chalk.white(`${preamble} - END`));
     }
 
-    console.log(chalk.whiteBright("checkUniqueElementNames() - START"));
+    console.log(chalk.whiteBright('checkUniqueElementNames() - START'));
 
     // Traverse the elements in the model:
     for (const element of model.elements) {
       traverseElement(element);
     }
 
-    console.log(chalk.whiteBright("checkUniqueElementNames() - END"));
+    console.log(chalk.whiteBright('checkUniqueElementNames() - END'));
   };
   /**
    * Check the Style nodes through the entire Model hierarchy:
@@ -173,91 +162,83 @@ export class GraphValidator {
     if (link.src_arrowhead !== undefined) {
       if (link.src_arrowhead.length === 0) {
         accept(
-          "error",
-          "Expecting a source arrowhead style definition after the colon - it cannot be empty.",
+          'error',
+          'Expecting a source arrowhead style definition after the colon - it cannot be empty.',
           {
             node: link,
-            property: "src_arrowhead",
+            property: 'src_arrowhead',
             code: IssueCodes.SrcArrowheadEmpty,
           },
         );
       } else if (!ARROWHEADS.includes(link.src_arrowhead)) {
-        accept(
-          "error",
-          `Unknown source arrowhead style definition: '${link.src_arrowhead}'`,
-          {
-            node: link,
-            property: "src_arrowhead",
-            code: IssueCodes.SrcArrowheadInvalid,
-          },
-        );
+        accept('error', `Unknown source arrowhead style definition: '${link.src_arrowhead}'`, {
+          node: link,
+          property: 'src_arrowhead',
+          code: IssueCodes.SrcArrowheadInvalid,
+        });
       }
     }
     // Destination arrowhead:
     if (link.dst_arrowhead !== undefined) {
       if (link.dst_arrowhead.length === 0) {
         accept(
-          "error",
-          "Expecting a destination arrowhead style definition after the colon - it cannot be empty.",
+          'error',
+          'Expecting a destination arrowhead style definition after the colon - it cannot be empty.',
           {
             node: link,
-            property: "dst_arrowhead",
+            property: 'dst_arrowhead',
             code: IssueCodes.DstArrowheadEmpty,
           },
         );
       } else if (!ARROWHEADS.includes(link.dst_arrowhead)) {
-        accept(
-          "error",
-          `Unknown destination arrowhead style definition: '${link.dst_arrowhead}'`,
-          {
-            node: link,
-            property: "dst_arrowhead",
-            code: IssueCodes.DstArrowheadInvalid,
-          },
-        );
+        accept('error', `Unknown destination arrowhead style definition: '${link.dst_arrowhead}'`, {
+          node: link,
+          property: 'dst_arrowhead',
+          code: IssueCodes.DstArrowheadInvalid,
+        });
       }
     }
     // Link style (already captured by grammar) - ensure there are no arrowhead redefinitions in link style:
     if (link.link !== undefined) {
       const match = GraphTerminals.LINK_TYPE.exec(link.link);
       if (match) {
-        const src_head: string = match[1] ?? "";
+        const src_head: string = match[1] ?? '';
         // const line = match[2] ?? ""; -- already checked in the grammar
-        const dst_head: string = match[3] ?? "";
+        const dst_head: string = match[3] ?? '';
 
         if (link.src_arrowhead !== undefined && src_head.length > 0) {
           accept(
-            "error",
+            'error',
             `Redefinition of source arrowhead style definition: ':${link.src_arrowhead}' and '${src_head}'`,
             {
               node: link,
-              property: "link",
+              property: 'link',
               code: IssueCodes.SrcArrowheadRedefined,
             },
           );
         }
         if (link.dst_arrowhead !== undefined && dst_head.length > 0) {
           accept(
-            "error",
+            'error',
             `Redefinition of destination arrowhead style definition: ':${link.dst_arrowhead}' and '${dst_head}'`,
             {
               node: link,
-              property: "link",
+              property: 'link',
               code: IssueCodes.DstArrowheadRedefined,
             },
           );
         }
       } else {
-        accept("error", `Invalid link style definition: ':${link.link}'`, {
+        accept('error', `Invalid link style definition: ':${link.link}'`, {
           node: link,
-          property: "link",
+          property: 'link',
           code: IssueCodes.LinkStyleInvalid,
         });
       }
     }
   };
   checkStyles = (model: Model, accept: ValidationAcceptor): void => {
-    console.info(chalk.cyanBright("checkStyles(model)"));
+    console.info(chalk.cyanBright('checkStyles(model)'));
 
     // Check that style definitions appear before Element definitions
     check_styles_defined_before_elements(model, accept);
@@ -296,20 +277,18 @@ export class GraphValidator {
       for (const style_name in d[container_id]) {
         if (d[container_id][style_name].length > 1) {
           // Multiple Style definitions with same name: issue warning
-          for (const duplicate_style_definition of d[container_id][
-            style_name
-          ]) {
+          for (const duplicate_style_definition of d[container_id][style_name]) {
             console.warn(
               chalk.red(
                 `Error: Multiple style definitions with name '${style_name}' at the same level should be merged. Found: ${StyleDefinition_toString(duplicate_style_definition.definition.items)}`,
               ),
             );
             accept(
-              "error",
+              'error',
               `Found multiple style definitions with the same name '${style_name}' at the same level.`,
               {
                 node: duplicate_style_definition,
-                property: "id",
+                property: 'id',
                 code: IssueCodes.StyleMultipleDefinitions,
               },
             );
@@ -321,32 +300,27 @@ export class GraphValidator {
   checkStyleNames = (style: Style, accept: ValidationAcceptor) => {
     if (style.id === undefined || style.id.length == 0) {
       console.error(
-        chalk.redBright(
-          `ERROR: checkStyleNames() - style has no id: [${style.$cstNode?.text}]`,
-        ),
+        chalk.redBright(`ERROR: checkStyleNames() - style has no id: [${style.$cstNode?.text}]`),
       );
-      accept("error", "A style must have a nonempty name.", {
+      accept('error', 'A style must have a nonempty name.', {
         node: style,
-        property: "id",
+        property: 'id',
         code: IssueCodes.IdMissing,
       });
     }
   };
-  checkStyleDefinitionTopics = (
-    shape_definition: StyleDefinition,
-    accept: ValidationAcceptor,
-  ) => {
+  checkStyleDefinitionTopics = (shape_definition: StyleDefinition, accept: ValidationAcceptor) => {
     const topic = shape_definition.topic;
     if (topic.length == 0) {
-      accept("error", `Style topic missing.`, {
+      accept('error', `Style topic missing.`, {
         node: shape_definition,
-        property: "topic",
+        property: 'topic',
         code: IssueCodes.StyleDefinitionEmptyTopic,
       });
     } else if (!STYLE_TOPICS.includes(topic)) {
-      accept("error", `The style topic '${topic}' is not recognized.`, {
+      accept('error', `The style topic '${topic}' is not recognized.`, {
         node: shape_definition,
-        property: "topic",
+        property: 'topic',
         code: IssueCodes.StyleDefinitionUnknownTopic,
       });
     }
@@ -362,35 +336,27 @@ export class GraphValidator {
   ) => {
     const value = shape_definition.value.toLowerCase();
     if (value.length == 0) {
-      accept("error", `Shape name missing.`, {
+      accept('error', `Shape name missing.`, {
         node: shape_definition,
-        property: "value",
+        property: 'value',
         code: IssueCodes.ShapeNameMissing,
       });
     } else if (!NAMED_SHAPES.includes(value)) {
-      accept(
-        "error",
-        `The shape '${shape_definition.value}' is not recognized.`,
-        {
-          node: shape_definition,
-          property: "value",
-          code: IssueCodes.ShapeNameUnknown,
-        },
-      );
+      accept('error', `The shape '${shape_definition.value}' is not recognized.`, {
+        node: shape_definition,
+        property: 'value',
+        code: IssueCodes.ShapeNameUnknown,
+      });
     }
   };
   checkStyleSubstyles = (style: Style, accept: ValidationAcceptor) => {
-    if (
-      style.id !== undefined &&
-      style.id.length > 0 &&
-      style.id == style.styleref?.$refText
-    ) {
+    if (style.id !== undefined && style.id.length > 0 && style.id == style.styleref?.$refText) {
       accept(
-        "error",
+        'error',
         `Style '${style.id}' cannot refer to itself. Please remove ":${style.styleref.$refText}"`,
         {
           node: style,
-          property: "styleref",
+          property: 'styleref',
           code: IssueCodes.StyleSelfReference,
         },
       );
@@ -408,11 +374,11 @@ export class GraphValidator {
     const value = color_definition.color_name.toLowerCase();
     if (!NAMED_COLORS.includes(value)) {
       accept(
-        "error",
+        'error',
         `The color '${color_definition.color_name}' is not defined. Please use a CSS named color.`,
         {
           node: color_definition,
-          property: "color_name",
+          property: 'color_name',
           code: IssueCodes.ColorNameUnknown,
         },
       );
@@ -440,11 +406,11 @@ export class GraphValidator {
         ),
       );
       accept(
-        "error",
+        'error',
         `Error: invalid hexadecimal color code '${hex_color_definition.hex_color}' (expecting '#' plus 3 or 6 hexadecimal digits, found ${code_length - 1}).`,
         {
           node: hex_color_definition,
-          property: "hex_color",
+          property: 'hex_color',
           code: IssueCodes.HexColorInvalid,
         },
       );
@@ -464,19 +430,19 @@ export class GraphValidator {
     // Check red:
     const red = rgb_color_definition.red;
     if (!Number.isInteger(red)) {
-      accept("error", `RGB color value for red is not an integer: '${red}'`, {
+      accept('error', `RGB color value for red is not an integer: '${red}'`, {
         node: rgb_color_definition,
-        property: "red",
+        property: 'red',
         code: IssueCodes.RgbChannelValueInvalid,
       });
     } else {
       if (red < 0 || red > 255) {
         accept(
-          "error",
+          'error',
           `RGB color value for red out of range: '${red}' (expecting an integer value (0 ≤ red ≤ 255)`,
           {
             node: rgb_color_definition,
-            property: "red",
+            property: 'red',
             code: IssueCodes.RgbChannelValueOutOfRange,
           },
         );
@@ -486,23 +452,19 @@ export class GraphValidator {
     // Check green:
     const green = rgb_color_definition.green;
     if (!Number.isInteger(green)) {
-      accept(
-        "error",
-        `RGB color value for green is not an integer: '${green}'`,
-        {
-          node: rgb_color_definition,
-          property: "green",
-          code: IssueCodes.RgbChannelValueInvalid,
-        },
-      );
+      accept('error', `RGB color value for green is not an integer: '${green}'`, {
+        node: rgb_color_definition,
+        property: 'green',
+        code: IssueCodes.RgbChannelValueInvalid,
+      });
     } else {
       if (green < 0 || green > 255) {
         accept(
-          "error",
+          'error',
           `RGB color value for green out of range: '${green}' (expecting an integer value (0 ≤ green ≤ 255)`,
           {
             node: rgb_color_definition,
-            property: "green",
+            property: 'green',
             code: IssueCodes.RgbChannelValueOutOfRange,
           },
         );
@@ -512,19 +474,19 @@ export class GraphValidator {
     // Check blue:
     const blue = rgb_color_definition.blue;
     if (!Number.isInteger(blue)) {
-      accept("error", `RGB color value for blue is not an integer: '${blue}'`, {
+      accept('error', `RGB color value for blue is not an integer: '${blue}'`, {
         node: rgb_color_definition,
-        property: "blue",
+        property: 'blue',
         code: IssueCodes.RgbChannelValueInvalid,
       });
     } else {
       if (blue < 0 || blue > 255) {
         accept(
-          "error",
+          'error',
           `RGB color value for blue out of range: '${blue}' (expecting an integer value (0 ≤ blue ≤ 255)`,
           {
             node: rgb_color_definition,
-            property: "blue",
+            property: 'blue',
             code: IssueCodes.RgbChannelValueOutOfRange,
           },
         );
@@ -536,28 +498,19 @@ export class GraphValidator {
    * @param width_definition
    * @param accept
    */
-  checkWidthDefinitions = (
-    width_value: WidthValue,
-    accept: ValidationAcceptor,
-  ): void => {
+  checkWidthDefinitions = (width_value: WidthValue, accept: ValidationAcceptor): void => {
     if (width_value.value < 0) {
-      console.error(
-        chalk.red(`Width has invalid numeric value: '${width_value.value}'.`),
-      );
-      accept(
-        "error",
-        `Width has invalid numeric value: '${width_value.value}'.`,
-        {
-          node: width_value,
-          property: "value",
-          code: IssueCodes.LinkWidthValueInvalid,
-        },
-      );
+      console.error(chalk.red(`Width has invalid numeric value: '${width_value.value}'.`));
+      accept('error', `Width has invalid numeric value: '${width_value.value}'.`, {
+        node: width_value,
+        property: 'value',
+        code: IssueCodes.LinkWidthValueInvalid,
+      });
     }
-    if (!("unit" in width_value) || width_value.unit?.length == 0) {
+    if (!('unit' in width_value) || width_value.unit?.length == 0) {
       accept(
-        "warning",
-        `Width has no unit. The default unit will be used in conversions. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
+        'warning',
+        `Width has no unit. The default unit will be used in conversions. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
         {
           node: width_value,
           property: undefined, // there is no "unit"
@@ -565,19 +518,16 @@ export class GraphValidator {
         },
       );
     } else {
-      if (
-        (width_value.unit?.length ?? 0) > 0 &&
-        !LENGTH_UNITS.includes(width_value.unit ?? "")
-      ) {
+      if ((width_value.unit?.length ?? 0) > 0 && !LENGTH_UNITS.includes(width_value.unit ?? '')) {
         console.error(
-          `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
+          `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
         );
         accept(
-          "error",
-          `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(", ")}.`,
+          'error',
+          `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
           {
             node: width_value,
-            property: "unit",
+            property: 'unit',
             code: IssueCodes.LinkWidthUnitUnknown,
           },
         );
@@ -600,49 +550,31 @@ export class GraphValidator {
       if (Number.isInteger(opacity)) {
         if (opacity < 0 || opacity > 100) {
           // Out of bounds
-          console.error(
-            `Link opacity value out of range (0% - 100%): found '${opacity}%'`,
-          );
-          accept(
-            "error",
-            `Link opacity value out of range (0% - 100%): found '${opacity}%'`,
-            {
-              node: opacity_style_item,
-              property: "value",
-              code: IssueCodes.OpacityValueOutOfRange,
-            },
-          );
+          console.error(`Link opacity value out of range (0% - 100%): found '${opacity}%'`);
+          accept('error', `Link opacity value out of range (0% - 100%): found '${opacity}%'`, {
+            node: opacity_style_item,
+            property: 'value',
+            code: IssueCodes.OpacityValueOutOfRange,
+          });
         }
       } else {
-        console.error(
-          `Expecting integer percentage value: found '${opacity}%'`,
-        );
-        accept(
-          "error",
-          `Expecting integer percentage value: found '${opacity}%'`,
-          {
-            node: opacity_style_item,
-            property: "value",
-            code: IssueCodes.OpacityValueInvalid,
-          },
-        );
+        console.error(`Expecting integer percentage value: found '${opacity}%'`);
+        accept('error', `Expecting integer percentage value: found '${opacity}%'`, {
+          node: opacity_style_item,
+          property: 'value',
+          code: IssueCodes.OpacityValueInvalid,
+        });
       }
     } else {
       // Opacity as float value (0--1)
       if (opacity < 0.0 || opacity > 1.0) {
         // Out of bounds (one)
-        console.error(
-          `Link opacity value out of range (0...1): found '${opacity}'`,
-        );
-        accept(
-          "error",
-          `Link opacity value out of range (0...1): found '${opacity}'`,
-          {
-            node: opacity_style_item,
-            property: "value",
-            code: IssueCodes.OpacityValueOutOfRange,
-          },
-        );
+        console.error(`Link opacity value out of range (0...1): found '${opacity}'`);
+        accept('error', `Link opacity value out of range (0...1): found '${opacity}'`, {
+          node: opacity_style_item,
+          property: 'value',
+          code: IssueCodes.OpacityValueOutOfRange,
+        });
       }
     }
   };
@@ -667,8 +599,7 @@ function find_styles(
     // Add the style:
     style_dict.push({
       level,
-      containerID:
-        `${seq}::` + (isModel(container) === true ? "" : container.id),
+      containerID: `${seq}::` + (isModel(container) === true ? '' : container.id),
       style,
     });
   }
@@ -684,9 +615,7 @@ function check_styles_defined_before_elements(
   accept: ValidationAcceptor,
   level = 0,
 ) {
-  console.debug(
-    `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) - START`,
-  );
+  console.debug(`${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) - START`);
   let elementCount = 0,
     styleCount = 0;
   for (const childNode of AstUtils.streamContents(node)) {
@@ -694,22 +623,22 @@ function check_styles_defined_before_elements(
     if (isElement(childNode)) {
       elementCount++;
       console.debug(
-        `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Element node #${elementCount} of type '${childNode.$type}' ${childNode.id === undefined ? "" : ` with name '${childNode.id}'`}`,
+        `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Element node #${elementCount} of type '${childNode.$type}' ${childNode.id === undefined ? '' : ` with name '${childNode.id}'`}`,
       );
       if (isGraph(childNode)) {
         // recurse
         console.debug(
-          `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) -- BEGIN recursion`,
+          `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) -- BEGIN recursion`,
         );
         check_styles_defined_before_elements(childNode, accept, level + 1);
         console.debug(
-          `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) -- END recursion`,
+          `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) -- END recursion`,
         );
       }
     } else if (isStyle(childNode)) {
       styleCount++;
       console.debug(
-        `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Style node #${styleCount} with name '${childNode.id}'`,
+        `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Style node #${styleCount} with name '${childNode.id}'`,
       );
 
       if (elementCount > 0) {
@@ -718,18 +647,14 @@ function check_styles_defined_before_elements(
             `Style definitions must appear before any graph elements. Found ${elementCount} graph element(s) so far.`,
           ),
         );
-        accept(
-          "error",
-          "Style definitions must appear before any graph elements.",
-          {
-            node: childNode,
-            code: IssueCodes.StyleAfterElement,
-          },
-        );
+        accept('error', 'Style definitions must appear before any graph elements.', {
+          node: childNode,
+          code: IssueCodes.StyleAfterElement,
+        });
       }
     }
   }
   console.debug(
-    `${"  ".repeat(level)}check_styles_defined_before_elements(${node.$type}) - END -  [elements: ${elementCount}, styles: ${styleCount}]`,
+    `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) - END -  [elements: ${elementCount}, styles: ${styleCount}]`,
   );
 }

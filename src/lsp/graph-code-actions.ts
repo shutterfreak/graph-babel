@@ -1,6 +1,3 @@
-import { CodeActionKind, Diagnostic } from "vscode-languageserver";
-import { CodeActionParams } from "vscode-languageserver-protocol";
-import { Command, CodeAction } from "vscode-languageserver-types";
 import {
   AstUtils,
   CstNode,
@@ -8,24 +5,28 @@ import {
   LeafCstNode,
   LeafCstNodeImpl,
   MaybePromise,
-} from "langium";
-import { CodeActionProvider } from "langium/lsp";
-import { inspect } from "util";
-import { isElement, isStyle, isWidthValue } from "../language/generated/ast.js";
-import { IssueCodes } from "../language/graph-validator.js";
-import { CstUtils } from "langium";
-import { LENGTH_UNITS } from "../language/model-helpers.js";
+} from 'langium';
+import { CstUtils } from 'langium';
+import { CodeActionProvider } from 'langium/lsp';
+import { inspect } from 'util';
+import { CodeActionKind, Diagnostic } from 'vscode-languageserver';
+import { CodeActionParams } from 'vscode-languageserver-protocol';
+import { CodeAction, Command } from 'vscode-languageserver-types';
+
+import { isElement, isStyle, isWidthValue } from '../language/generated/ast.js';
+import { IssueCodes } from '../language/graph-validator.js';
+import { LENGTH_UNITS } from '../language/model-helpers.js';
 
 export class GraphCodeActionProvider implements CodeActionProvider {
   getCodeActions(
     document: LangiumDocument,
     params: CodeActionParams,
   ): MaybePromise<(Command | CodeAction)[]> {
-    console.log("getCodeActions() called with params:", inspect(params));
+    console.log('getCodeActions() called with params:', inspect(params));
 
     const result: CodeAction[] = [];
 
-    if ("context" in params) {
+    if ('context' in params) {
       for (const diagnostic of params.context.diagnostics) {
         const codeActions = this.createCodeAction(diagnostic, document);
 
@@ -38,15 +39,12 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     }
 
     // Handle manually triggered source actions (like rename ID)
-    if (
-      params.context.only &&
-      params.context.only.includes(CodeActionKind.Source)
-    ) {
-      console.log("getCodeActions() - Source actions requested!");
+    if (params.context.only && params.context.only.includes(CodeActionKind.Source)) {
+      console.log('getCodeActions() - Source actions requested!');
       result.push(this.renameGraphElementId(document));
     }
 
-    console.log("getCodeActions() - Returning code actions:", inspect(result));
+    console.log('getCodeActions() - Returning code actions:', inspect(result));
 
     return result;
   }
@@ -82,10 +80,10 @@ export class GraphCodeActionProvider implements CodeActionProvider {
    */
 
   private renameGraphElementId(document: LangiumDocument): CodeAction {
-    console.log("renameGraphElementId() called!"); // Debugging output
+    console.log('renameGraphElementId() called!'); // Debugging output
 
     return {
-      title: "Rename graph element ID",
+      title: 'Rename graph element ID',
       kind: CodeActionKind.Source, // This makes it a source action, not a quick fix
       edit: {
         changes: {
@@ -95,7 +93,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
                 start: { line: 0, character: 0 }, // Placeholder range, should be dynamic
                 end: { line: 0, character: 5 }, // Replace with the actual 'id' range
               },
-              newText: "new-id", // Placeholder, should prompt for user input
+              newText: 'new-id', // Placeholder, should prompt for user input
             },
           ],
         },
@@ -113,10 +111,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
    * @param document
    * @returns
    */
-  private generateNewId(
-    diagnostic: Diagnostic,
-    document: LangiumDocument,
-  ): CodeAction {
+  private generateNewId(diagnostic: Diagnostic, document: LangiumDocument): CodeAction {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
     const rootNode = document.parseResult.value;
     const rootCst = rootNode.$cstNode;
@@ -124,21 +119,21 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     const existingIds = new Set<string>();
 
     if (!rootCst) {
-      console.error("generateNewId() - rootCst undefined!");
+      console.error('generateNewId() - rootCst undefined!');
       return undefined!;
     }
 
     // Find the cstNode at the zero-based offset in the document:
     const cstNode = CstUtils.findLeafNodeAtOffset(rootCst, offset);
     if (!cstNode) {
-      console.error("generateNewId() - cstNode undefined!");
+      console.error('generateNewId() - cstNode undefined!');
       return undefined!;
     }
 
     // Find the astNode of the cstNode:
     const astNode = cstNode.astNode;
     // Ensure that astNode is valid and has a type:
-    if (!("$type" in astNode) || typeof astNode.$type !== "string") {
+    if (!('$type' in astNode) || typeof astNode.$type !== 'string') {
       console.error(
         "generateNewId() - astNode has no '$type' property or '$type' property is not string!\ncstNode:\n",
         inspect(astNode),
@@ -148,18 +143,13 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
     // Collect all existing IDs in the AST
     for (const childNode of AstUtils.streamAllContents(rootNode)) {
-      if (
-        (isElement(childNode) || isStyle(childNode)) &&
-        childNode.id !== undefined
-      ) {
+      if ((isElement(childNode) || isStyle(childNode)) && childNode.id !== undefined) {
         existingIds.add(childNode.id);
       }
     }
 
     // Generate the new id from the lowercased first letter of the cstNode $type plus an int sequence number:
-    console.info(
-      `generateNewId() - cstNode.astNode.$type = '${cstNode.astNode.$type}`,
-    );
+    console.info(`generateNewId() - cstNode.astNode.$type = '${cstNode.astNode.$type}`);
     const baseId = cstNode.astNode.$type.charAt(0).toLowerCase();
 
     let counter = 1;
@@ -170,15 +160,11 @@ export class GraphCodeActionProvider implements CodeActionProvider {
       newId = baseId + counter;
     }
 
-    console.info(
-      "generateNewId() - found IDs: { ",
-      [...existingIds].join(", "),
-      "}",
-    );
-    console.info("diagnostics:\n", inspect(diagnostic));
+    console.info('generateNewId() - found IDs: { ', [...existingIds].join(', '), '}');
+    console.info('diagnostics:\n', inspect(diagnostic));
 
     return {
-      title: "Generate new id",
+      title: 'Generate new id',
       kind: CodeActionKind.QuickFix,
       diagnostics: [diagnostic],
       isPreferred: true,
@@ -195,23 +181,20 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     };
   }
 
-  private removeStyleSelfReference(
-    diagnostic: Diagnostic,
-    document: LangiumDocument,
-  ): CodeAction {
+  private removeStyleSelfReference(diagnostic: Diagnostic, document: LangiumDocument): CodeAction {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
     const rootNode = document.parseResult.value;
     const rootCst = rootNode.$cstNode;
 
     if (!rootCst) {
-      console.error("removeStyleSelfReference() - rootCst undefined!");
+      console.error('removeStyleSelfReference() - rootCst undefined!');
       return undefined!;
     }
 
     // Find the CST node at the given offset
     const cstNode = CstUtils.findLeafNodeAtOffset(rootCst, offset); // as LeafCstNode;
     if (!cstNode) {
-      console.error("removeStyleSelfReference() - cstNode undefined!");
+      console.error('removeStyleSelfReference() - cstNode undefined!');
       return undefined!;
     }
 
@@ -220,27 +203,27 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
     // Ensure the AST node is a Style instance and has a styleRef
     if (!isStyle(astNode) || !astNode.styleref) {
-      console.error("removeStyleSelfReference() - Not a valid Style instance!");
+      console.error('removeStyleSelfReference() - Not a valid Style instance!');
       return undefined!;
     }
 
     // Find the colon (:) in the CST node's parent's children
     const parentCst = cstNode.container;
     if (!parentCst) {
-      console.error("removeStyleSelfReference() - Parent CST node undefined!");
+      console.error('removeStyleSelfReference() - Parent CST node undefined!');
       return undefined!;
     }
 
     let colonNode: LeafCstNode | undefined;
     for (const child of parentCst.content) {
-      if (child instanceof LeafCstNodeImpl && child.text === ":") {
+      if (child instanceof LeafCstNodeImpl && child.text === ':') {
         colonNode = child;
         break;
       }
     }
 
     if (!colonNode) {
-      console.error("removeStyleSelfReference() - Colon token not found!");
+      console.error('removeStyleSelfReference() - Colon token not found!');
       return undefined!;
     }
 
@@ -251,7 +234,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     };
 
     return {
-      title: "Remove self-reference",
+      title: 'Remove self-reference',
       kind: CodeActionKind.QuickFix,
       diagnostics: [diagnostic],
       isPreferred: true,
@@ -260,7 +243,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
           [document.textDocument.uri]: [
             {
               range,
-              newText: "", // Remove everything in the range
+              newText: '', // Remove everything in the range
             },
           ],
         },
@@ -268,23 +251,20 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     };
   }
 
-  private fixIncorrectWidthUnit(
-    diagnostic: Diagnostic,
-    document: LangiumDocument,
-  ): CodeAction[] {
+  private fixIncorrectWidthUnit(diagnostic: Diagnostic, document: LangiumDocument): CodeAction[] {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
     const rootNode = document.parseResult.value;
     const rootCst = rootNode.$cstNode;
 
     if (!rootCst) {
-      console.error("fixIncorrectWidthUnit() - rootCst undefined!");
+      console.error('fixIncorrectWidthUnit() - rootCst undefined!');
       return [];
     }
 
     // Find the CST node at the given offset
     const cstNode = CstUtils.findLeafNodeAtOffset(rootCst, offset);
     if (!cstNode) {
-      console.error("fixIncorrectWidthUnit() - cstNode undefined!");
+      console.error('fixIncorrectWidthUnit() - cstNode undefined!');
       return [];
     }
 
@@ -293,9 +273,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
     // Ensure the AST node is a WidthValue instance
     if (!isWidthValue(astNode)) {
-      console.error(
-        "fixIncorrectWidthUnit() - Not a valid WidthValue instance!",
-      );
+      console.error('fixIncorrectWidthUnit() - Not a valid WidthValue instance!');
       return [];
     }
 
@@ -304,13 +282,13 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
     if (unit !== undefined) {
       if (LENGTH_UNITS.includes(unit)) {
-        console.info("fixIncorrectWidthUnit() - Unit is known");
+        console.info('fixIncorrectWidthUnit() - Unit is known');
         return [];
       } else if (LENGTH_UNITS.includes(unit.toLowerCase())) {
         units = [unit.toLowerCase()];
       }
     } else {
-      console.info("fixIncorrectWidthUnit() - No unit found (dimensionless)!");
+      console.info('fixIncorrectWidthUnit() - No unit found (dimensionless)!');
     }
 
     // Find the CST node representing the unit
@@ -334,29 +312,21 @@ export class GraphCodeActionProvider implements CodeActionProvider {
       : valueNode
         ? valueNode.offset + valueNode.length
         : cstNode.offset + value.toString().length;
-    const endOffset = unitNode
-      ? unitNode.offset + unitNode.length
-      : startOffset;
+    const endOffset = unitNode ? unitNode.offset + unitNode.length : startOffset;
 
     const range = {
       start: document.textDocument.positionAt(startOffset),
       end: document.textDocument.positionAt(endOffset),
     };
 
-    console.info(
-      `fixIncorrectWidthUnit() - Replacement range: [${startOffset}, ${endOffset}]`,
-    );
+    console.info(`fixIncorrectWidthUnit() - Replacement range: [${startOffset}, ${endOffset}]`);
 
-    console.info(
-      `fixIncorrectWidthUnit() - Returning ${units.length} code actions.`,
-    );
+    console.info(`fixIncorrectWidthUnit() - Returning ${units.length} code actions.`);
 
     // Generate multiple CodeActions, each suggesting a valid unit
     return units.map((validUnit) => ({
       title:
-        unit === undefined
-          ? `Set unit to '${validUnit}'`
-          : `Replace '${unit}' with '${validUnit}'`,
+        unit === undefined ? `Set unit to '${validUnit}'` : `Replace '${unit}' with '${validUnit}'`,
       kind: CodeActionKind.QuickFix,
       diagnostics: [diagnostic],
       edit: {

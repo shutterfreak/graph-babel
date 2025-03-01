@@ -1,8 +1,8 @@
-import type { AstNode, LangiumCoreServices, LangiumDocument } from "langium";
-import chalk from "chalk";
-import * as path from "node:path";
-import * as fs from "node:fs";
-import { URI } from "langium";
+import chalk from 'chalk';
+import type { AstNode, LangiumCoreServices, LangiumDocument } from 'langium';
+import { URI } from 'langium';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export async function extractDocument(
   fileName: string,
@@ -11,9 +11,7 @@ export async function extractDocument(
   const extensions = services.LanguageMetaData.fileExtensions;
   if (!extensions.includes(path.extname(fileName))) {
     console.error(
-      chalk.yellow(
-        `Please choose a file with one of these extensions: ${extensions.join(", ")}.`,
-      ),
+      chalk.yellow(`Please choose a file with one of these extensions: ${extensions.join(', ')}.`),
     );
     process.exit(1);
   }
@@ -23,19 +21,16 @@ export async function extractDocument(
     process.exit(1);
   }
 
-  const document =
-    await services.shared.workspace.LangiumDocuments.getOrCreateDocument(
-      URI.file(path.resolve(fileName)),
-    );
+  const document = await services.shared.workspace.LangiumDocuments.getOrCreateDocument(
+    URI.file(path.resolve(fileName)),
+  );
   await services.shared.workspace.DocumentBuilder.build([document], {
     validation: true,
   });
 
-  const validationErrors = (document.diagnostics ?? []).filter(
-    (e) => e.severity === 1,
-  );
+  const validationErrors = (document.diagnostics ?? []).filter((e) => e.severity === 1);
   if (validationErrors.length > 0) {
-    console.error(chalk.red("There are validation errors:"));
+    console.error(chalk.red('There are validation errors:'));
     for (const validationError of validationErrors) {
       console.error(
         chalk.red(
@@ -65,11 +60,9 @@ export function extractDestinationAndName(
   filePath: string,
   destination: string | undefined,
 ): FilePathData {
-  filePath = path
-    .basename(filePath, path.extname(filePath))
-    .replace(/[.-]/g, "");
+  filePath = path.basename(filePath, path.extname(filePath)).replace(/[.-]/g, '');
   return {
-    destination: destination ?? path.join(path.dirname(filePath), "generated"),
+    destination: destination ?? path.join(path.dirname(filePath), 'generated'),
     name: path.basename(filePath),
   };
 }

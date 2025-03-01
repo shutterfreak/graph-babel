@@ -1,12 +1,6 @@
-import {
-  AstUtils,
-  CstNode,
-  GrammarUtils,
-  type AstNode,
-  type LangiumDocument,
-} from "langium";
-import { DefaultRenameProvider, LangiumServices } from "langium/lsp";
-import { inspect } from "node:util";
+import { type AstNode, AstUtils, CstNode, GrammarUtils, type LangiumDocument } from 'langium';
+import { DefaultRenameProvider, LangiumServices } from 'langium/lsp';
+import { inspect } from 'node:util';
 import {
   CancellationToken,
   Position,
@@ -15,8 +9,9 @@ import {
   TextDocumentPositionParams,
   TextEdit,
   WorkspaceEdit,
-} from "vscode-languageserver";
-import { isElement } from "../language/generated/ast.js";
+} from 'vscode-languageserver';
+
+import { isElement } from '../language/generated/ast.js';
 
 export class GraphRenameProvider extends DefaultRenameProvider {
   constructor(services: LangiumServices) {
@@ -32,10 +27,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     cancelToken?: CancellationToken,
   ): Promise<Range | undefined> {
-    console.log(
-      "GraphRenameProvider.prepareRename() called, params.position : ",
-      params.position,
-    );
+    console.log('GraphRenameProvider.prepareRename() called, params.position : ', params.position);
     const node = this.findDeclarationNode(document, params.position);
     console.log(
       `GraphRenameProvider.prepareRename() found node of type '${node?.$type}' defined as:\n${node?.$cstNode?.text}\n\n\n`,
@@ -47,7 +39,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       return Promise.resolve(undefined);
     }
 
-    const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, "id");
+    const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'id');
     console.log(
       `GraphRenameProvider.prepareRename() found CST node with property "id": (${inspect(cstIdNode?.range)}) : [${cstIdNode?.text}]\n` +
         inspect(cstIdNode),
@@ -70,10 +62,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     cancelToken?: CancellationToken,
   ): Promise<WorkspaceEdit | undefined> {
     const node = this.findDeclarationNode(document, params.position);
-    console.log(
-      "GraphRenameProvider.rename() called, params : ",
-      inspect(params),
-    );
+    console.log('GraphRenameProvider.rename() called, params : ', inspect(params));
     console.log(
       `GraphRenameProvider.rename() found node of type '${node?.$type}' defined as:\n${node?.$cstNode?.text}\n\n\n`,
     );
@@ -82,9 +71,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       return undefined;
     }
     // Generate the required text edits for renaming the element
-    return Promise.resolve(
-      this.createRenameEdit(document, node, params.newName),
-    );
+    return Promise.resolve(this.createRenameEdit(document, node, params.newName));
   }
 
   /**
@@ -99,17 +86,12 @@ export class GraphRenameProvider extends DefaultRenameProvider {
 
     // Ensure CST node exists
     if (!rootNode.$cstNode) {
-      console.log(
-        "GraphRenameProvider.findDeclarationNode() - No root CST node.",
-      );
+      console.log('GraphRenameProvider.findDeclarationNode() - No root CST node.');
       return undefined;
     }
 
     // Find the AST node at the given cursor position
-    const declarationNode = this.findAstNodeAtPosition(
-      rootNode.$cstNode,
-      position,
-    );
+    const declarationNode = this.findAstNodeAtPosition(rootNode.$cstNode, position);
     console.log(
       `GraphRenameProvider.findDeclarationNode() - will return node of type '${declarationNode?.$type}' defined as:\n${declarationNode?.$cstNode?.text}\n\n\n`,
     );
@@ -117,10 +99,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     return declarationNode;
   }
 
-  protected findAstNodeAtPosition(
-    rootCstNode: CstNode,
-    position: Position,
-  ): AstNode | undefined {
+  protected findAstNodeAtPosition(rootCstNode: CstNode, position: Position): AstNode | undefined {
     let i = 0;
     const matches: AstNode[] = [];
 
@@ -141,16 +120,10 @@ export class GraphRenameProvider extends DefaultRenameProvider {
         continue;
       } else {
         // cursor line in cstNode range
-        if (
-          position.line === start.line &&
-          position.character < start.character
-        ) {
+        if (position.line === start.line && position.character < start.character) {
           // cstNode after cursor (char level) -- SKIP
           continue;
-        } else if (
-          position.line === end.line &&
-          position.character > end.character
-        ) {
+        } else if (position.line === end.line && position.character > end.character) {
           // cstNode before cursor (char level) -- SKIP
           continue;
         }
@@ -160,13 +133,10 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       console.log(`POTENTIAL MATCH: cursor position within cstNode range`);
 
       console.log(
-        `\nAST ${String("    " + i).slice(-4)} | ${astNode.$type} (${
-          astNode.$containerProperty ?? "<unknown container property>"
-        }) - cstNode <${
-          astNode.$cstNode.grammarSource?.$type ?? "undefined"
-        }: ${
-          astNode.$cstNode.grammarSource?.$containerProperty ??
-          "<container property not set>"
+        `\nAST ${String('    ' + i).slice(-4)} | ${astNode.$type} (${
+          astNode.$containerProperty ?? '<unknown container property>'
+        }) - cstNode <${astNode.$cstNode.grammarSource?.$type ?? 'undefined'}: ${
+          astNode.$cstNode.grammarSource?.$containerProperty ?? '<container property not set>'
         }> @ (line ${start.line}, char ${start.character}) to (line ${end.line}, char ${end.character}) -- length = ${astNode.$cstNode.length}`,
       );
       console.log(
@@ -174,9 +144,9 @@ export class GraphRenameProvider extends DefaultRenameProvider {
           .split(/\r?\n|\r|\n/g)
           .map(
             (line, index) =>
-              `  astNode.$cstNode.text: ${String("    " + (index + start.line + 1)).slice(-4)} | ${line}`,
+              `  astNode.$cstNode.text: ${String('    ' + (index + start.line + 1)).slice(-4)} | ${line}`,
           )
-          .join("\n"),
+          .join('\n'),
       );
 
       // We found a possible match of type Element (Graph, Node, Link) or Style
@@ -184,24 +154,22 @@ export class GraphRenameProvider extends DefaultRenameProvider {
 
       if (!isElement(astNode)) {
         // rename not applicable
-        console.log(" -- not in scope for renaming (skipped)");
+        console.log(' -- not in scope for renaming (skipped)');
         continue;
       }
     }
 
     // Now get the AST node with the "smallest match":
-    const m = matches.sort(
-      (a, b) => (a.$cstNode?.length ?? 0) - (b.$cstNode?.length ?? 0),
-    );
+    const m = matches.sort((a, b) => (a.$cstNode?.length ?? 0) - (b.$cstNode?.length ?? 0));
 
     console.log(
-      (m[0].$cstNode?.text ?? "<Error: CST Node is undefined>")
+      (m[0].$cstNode?.text ?? '<Error: CST Node is undefined>')
         .split(/\r?\n|\r|\n/g)
         .map(
           (line, index) =>
-            `  MATCH astNode.$cstNode.text: ${String("    " + (index + (m[0].$cstNode?.range.start.line ?? 0) + 1)).slice(-4)} | ${line}`,
+            `  MATCH astNode.$cstNode.text: ${String('    ' + (index + (m[0].$cstNode?.range.start.line ?? 0) + 1)).slice(-4)} | ${line}`,
         )
-        .join("\n"),
+        .join('\n'),
     );
 
     return m[0];
@@ -224,21 +192,19 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     }
 
     console.log(
-      `GraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'id' will be renamed from "${node.id ?? ""}" to "${newName}"`,
+      `GraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'id' will be renamed from "${node.id ?? ''}" to "${newName}"`,
     );
 
     // Collect all existing IDs in the document to avoid naming conflicts
     const existingIds = new Set<string>();
-    for (const childNode of AstUtils.streamAllContents(
-      document.parseResult.value,
-    )) {
+    for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
       if (isElement(childNode) && childNode.id != null) {
         existingIds.add(childNode.id);
       }
     }
 
     console.log(
-      `GraphRenameProvider.createRenameEdit() - existing 'id' values: [${[...existingIds].join(", ")}] -- should not contain "${newName}"`,
+      `GraphRenameProvider.createRenameEdit() - existing 'id' values: [${[...existingIds].join(', ')}] -- should not contain "${newName}"`,
     );
 
     // Validate the new name to prevent conflicts with existing identifiers or keywords
@@ -252,7 +218,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     const edits: TextEdit[] = [];
 
     // Rename the actual declaration
-    const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, "id");
+    const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'id');
     if (cstIdNode) {
       edits.push(TextEdit.replace(cstIdNode.range, newName));
     } else {
@@ -262,16 +228,14 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     // Find all references
     const refs = document.references;
 
-    console.log(
-      `GraphRenameProvider.createRenameEdit() - Found ${refs.length} references:`,
-    );
+    console.log(`GraphRenameProvider.createRenameEdit() - Found ${refs.length} references:`);
 
     for (const ref of refs) {
       console.log(
         `- Reference at ${inspect(ref.$refNode?.range)}: ${ref.$refText} ${
           ref.$refNode
             ? `Node type '${ref.$refNode.astNode.$type}', text: ${ref.$refNode.text}`
-            : "Unresolved reference"
+            : 'Unresolved reference'
         }`,
       );
     }
@@ -292,15 +256,13 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     }
 
     if (edits.length === 0) {
-      console.warn("No edits generated for rename.");
+      console.warn('No edits generated for rename.');
       return undefined;
     }
 
     const changes = { changes: { [document.uri.toString()]: edits } };
 
-    console.log(
-      `GraphRenameProvider.createRenameEdit() - will return:\n${inspect(changes)}\n`,
-    );
+    console.log(`GraphRenameProvider.createRenameEdit() - will return:\n${inspect(changes)}\n`);
 
     return changes;
   }
@@ -309,15 +271,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
    * Checks if a given name is a reserved keyword in the language to prevent invalid renaming.
    */
   protected isKeyword(name: string): boolean {
-    const keywords = new Set([
-      "element",
-      "graph",
-      "link",
-      "node",
-      "style",
-      "to",
-      "with",
-    ]);
+    const keywords = new Set(['element', 'graph', 'link', 'node', 'style', 'to', 'with']);
     return keywords.has(name);
   }
 }

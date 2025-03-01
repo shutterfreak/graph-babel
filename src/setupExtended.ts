@@ -1,50 +1,48 @@
-import {
-  MonacoEditorLanguageClientWrapper,
-  UserConfig,
-} from "monaco-editor-wrapper";
-import { configureWorker, defineUserServices } from "./setupCommon.js";
+import { MonacoEditorLanguageClientWrapper, UserConfig } from 'monaco-editor-wrapper';
+
+import { configureWorker, defineUserServices } from './setupCommon.js';
 
 export const setupConfigExtended = (): UserConfig => {
   const extensionFilesOrContents = new Map();
   extensionFilesOrContents.set(
-    "/language-configuration.json",
-    new URL("../language-configuration.json", import.meta.url),
+    '/language-configuration.json',
+    new URL('../language-configuration.json', import.meta.url),
   );
   extensionFilesOrContents.set(
-    "/graph-grammar.json",
-    new URL("../syntaxes/graph.tmLanguage.json", import.meta.url),
+    '/graph-grammar.json',
+    new URL('../syntaxes/graph.tmLanguage.json', import.meta.url),
   );
 
   return {
     wrapperConfig: {
       serviceConfig: defineUserServices(),
       editorAppConfig: {
-        $type: "extended",
-        languageId: "graph",
+        $type: 'extended',
+        languageId: 'graph',
         code: `// Graph is running in the web!`,
         useDiffEditor: false,
         extensions: [
           {
             config: {
-              name: "graph-web",
-              publisher: "generator-langium",
-              version: "1.0.0",
+              name: 'graph-web',
+              publisher: 'generator-langium',
+              version: '1.0.0',
               engines: {
-                vscode: "*",
+                vscode: '*',
               },
               contributes: {
                 languages: [
                   {
-                    id: "graph",
-                    extensions: [".graph"],
-                    configuration: "./language-configuration.json",
+                    id: 'graph',
+                    extensions: ['.graph'],
+                    configuration: './language-configuration.json',
                   },
                 ],
                 grammars: [
                   {
-                    language: "graph",
-                    scopeName: "source.graph",
-                    path: "./graph-grammar.json",
+                    language: 'graph',
+                    scopeName: 'source.graph',
+                    path: './graph-grammar.json',
                   },
                 ],
               },
@@ -54,8 +52,8 @@ export const setupConfigExtended = (): UserConfig => {
         ],
         userConfiguration: {
           json: JSON.stringify({
-            "workbench.colorTheme": "Default Dark Modern",
-            "editor.semanticHighlighting.enabled": true,
+            'workbench.colorTheme': 'Default Dark Modern',
+            'editor.semanticHighlighting.enabled': true,
           }),
         },
       },

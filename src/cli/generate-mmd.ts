@@ -1,47 +1,46 @@
-import { NodeFileSystem } from "langium/node";
+import chalk from 'chalk';
+import { Reference } from 'langium';
+import { NodeFileSystem } from 'langium/node';
+import path from 'path';
+import { inspect } from 'util';
+
 import {
-  Model,
-  Graph,
-  isGraph,
   Element,
+  Graph,
   GraphTerminals,
-  Node,
   Link,
-  isNode,
+  Model,
+  Node,
   Style,
   StyleDefinition,
   isColorStyleDefinition,
-  isRgbColorDefinition,
+  isGraph,
   isHexColorDefinition,
   isLineStyleDefinition,
+  isNode,
   isOpacityStyleDefinition,
-} from "../language/generated/ast.js";
-import { createGraphServices } from "../language/graph-module.js";
-import { extractDestinationAndName, extractDocument } from "./cli-util.js";
-import { GenerateOptions } from "./main.js";
-import chalk from "chalk";
-import path from "path";
+  isRgbColorDefinition,
+} from '../language/generated/ast.js';
+import { createGraphServices } from '../language/graph-module.js';
 import {
   Element_get_style_items,
   Label_get_label,
-  StyleDefinitions_get_shape,
-  StyleDefinitions_get_label,
-  StyleDefinitions_get_color_value,
-  StyleDefinitions_get_opacity_value,
-  StyleDefinitions_get_line_width_value,
   NAMED_SHAPES,
-} from "../language/model-helpers.js";
-import { inspect } from "util";
-import { Reference } from "langium";
+  StyleDefinitions_get_color_value,
+  StyleDefinitions_get_label,
+  StyleDefinitions_get_line_width_value,
+  StyleDefinitions_get_opacity_value,
+  StyleDefinitions_get_shape,
+} from '../language/model-helpers.js';
+import { extractDestinationAndName, extractDocument } from './cli-util.js';
+import { GenerateOptions } from './main.js';
 
 export async function generate_mermaid_graph(
   model: Model,
   filePath: string,
   opts: GenerateOptions | undefined,
 ): Promise<string> {
-  console.info(
-    chalk.magentaBright(`generate_mermaid_graph - [${model.$type}] -- START`),
-  );
+  console.info(chalk.magentaBright(`generate_mermaid_graph - [${model.$type}] -- START`));
 
   const data = extractDestinationAndName(filePath, opts?.destination);
   const generatedFilePath = `${path.join(data.destination, data.name)}.mmd`;
@@ -55,10 +54,7 @@ export async function generate_mermaid_graph(
   // extract the parse result details
   const parseResult = document.parseResult;
   // verify no lexer, parser, or general diagnostic errors show up
-  if (
-    parseResult.lexerErrors.length === 0 &&
-    parseResult.parserErrors.length === 0
-  ) {
+  if (parseResult.lexerErrors.length === 0 && parseResult.parserErrors.length === 0) {
     console.log(chalk.green(`Parsed and validated ${filePath} successfully!`));
     // console.log(document.parseResult.value);
   } else {
@@ -66,31 +62,25 @@ export async function generate_mermaid_graph(
   }
 
   console.log(chalk.whiteBright(_generateMMD(model, 0, filePath)));
-  console.log(
-    chalk.green(`Mermaid graph generated successfully to ${generatedFilePath}`),
-  );
+  console.log(chalk.green(`Mermaid graph generated successfully to ${generatedFilePath}`));
   return generatedFilePath;
 }
 
-const INDENTATION = "  ";
+const INDENTATION = '  ';
 
 /** A MermaidJS graph contains nodes, links, subgraphs and styling.
  */
-function _generateMMD(
-  model: Model | Graph,
-  level = 0,
-  filePath: string,
-): string {
+function _generateMMD(model: Model | Graph, level = 0, filePath: string): string {
   // We must keep track of links since they aren't identifiable in MermaidJS (they are numbered sequentially as they are defined)
   const link_style_dict: __mmd_link_style_dict = { count: 0, styled_links: {} };
   // Construct the mermaidJS document from a collection of text lines:
   const lines: string[] = [];
 
   lines.push(
-    "---",
+    '---',
     `  title: ${filePath}`,
-    "---",
-    "graph",
+    '---',
+    'graph',
     ...render_node_contents(model, level + 1, link_style_dict),
   );
 
@@ -99,16 +89,14 @@ function _generateMMD(
   // Render the link styling (if applicable):
   const link_style_list = Object.keys(link_style_dict.styled_links);
   if (link_style_list.length > 0) {
-    lines.push("\n%% Link styles:");
+    lines.push('\n%% Link styles:');
     for (const key of link_style_list) {
-      lines.push(
-        `linkStyle ${link_style_dict.styled_links[key].join(",")} ${key};`,
-      );
+      lines.push(`linkStyle ${link_style_dict.styled_links[key].join(',')} ${key};`);
     }
   }
-  lines.push("%% END");
+  lines.push('%% END');
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 function render_node_contents(
@@ -146,12 +134,11 @@ function render_element(
 }
 
 function render_node(node: Node, nesting_level: number): string {
-  const style_definitions: StyleDefinition[] | undefined =
-    Element_get_style_items(node);
+  const style_definitions: StyleDefinition[] | undefined = Element_get_style_items(node);
   let shape: string | undefined = StyleDefinitions_get_shape(style_definitions);
   let result =
     INDENTATION.repeat(nesting_level) +
-    `${node.id}${node.styleref === undefined ? "" : `:::${node.styleref.$refText}`}`;
+    `${node.id}${node.styleref === undefined ? '' : `:::${node.styleref.$refText}`}`;
   let label: string | undefined = Label_get_label(node.label);
   if (label.length == 0) {
     label = StyleDefinitions_get_label(style_definitions);
@@ -165,10 +152,10 @@ function render_node(node: Node, nesting_level: number): string {
   if (label !== undefined && label.length > 0) {
     s.push(`label: "${label}"`);
   }
-  result += `@{ ${s.join(", ")} }`;
+  result += `@{ ${s.join(', ')} }`;
 
   /* NOT YET IMPLEMENTED IN GRAMMAR: CHECK (NESTED) REDECLARATIONS */
-  return result + "\n";
+  return result + '\n';
 }
 
 /**
@@ -195,12 +182,11 @@ function render_link(
   nesting_level: number,
   link_style_dict: __mmd_link_style_dict,
 ): string {
-  const style_definitions: StyleDefinition[] | undefined =
-    Element_get_style_items(link);
+  const style_definitions: StyleDefinition[] | undefined = Element_get_style_items(link);
 
   // Rendering warnings and errors:
   const comments: string[] = [];
-  let comment = "";
+  let comment = '';
 
   let label: string | undefined = Label_get_label(link.label);
   if (label.length == 0 && link.styleref !== undefined) {
@@ -223,55 +209,52 @@ function render_link(
   // Link color:
   const link_color = to_mmd_color(
     //StyleDefinitions_get_line_color(style_definitions),
-    StyleDefinitions_get_color_value(style_definitions, ["LineColor"]),
-    "stroke",
+    StyleDefinitions_get_color_value(style_definitions, ['LineColor']),
+    'stroke',
   ); // MermaidJS: 'stroke'
 
   // Label (text) color:
   const label_color = to_mmd_color(
     //StyleDefinitions_get_label_color(style_definitions),
-    StyleDefinitions_get_color_value(style_definitions, ["LabelColor"]),
-    "color",
+    StyleDefinitions_get_color_value(style_definitions, ['LabelColor']),
+    'color',
   ); // MermaidJS: 'color' (named or #rgb or #rrggbb)
 
   // Link width:
   const stroke_width = to_mmd_line_width(
-    StyleDefinitions_get_line_width_value(style_definitions, ["LineWidth"]),
-    "stroke-width",
+    StyleDefinitions_get_line_width_value(style_definitions, ['LineWidth']),
+    'stroke-width',
   ); // MermaidJS: 'width' (with unit)
 
   // Line opacity:
   const link_opacity = to_mmd_opacity(
-    StyleDefinitions_get_opacity_value(style_definitions, ["LineOpacity"]),
-    "stroke-opacity",
+    StyleDefinitions_get_opacity_value(style_definitions, ['LineOpacity']),
+    'stroke-opacity',
   ); // MermaidJS: 'stroke-opacity' (0..1) or 0%..100%)
 
-  const style_items: string[] = [
-    link_color,
-    label_color,
-    stroke_width,
-    link_opacity,
-  ].filter((s) => s !== undefined); // TODO
+  const style_items: string[] = [link_color, label_color, stroke_width, link_opacity].filter(
+    (s) => s !== undefined,
+  ); // TODO
 
   // Render the link
   // MermaidJS: A -->|label| B
   let edge: string | undefined = undefined;
   if (label === undefined || label.length == 0) {
-    label = "";
+    label = '';
   } else {
     // Escape '|' characters in the edge label:
-    label = `|${label.replaceAll("|", "\|")}|`;
+    label = `|${label.replaceAll('|', '\|')}|`;
   }
 
   // A link either has property 'relation' defined ('to' | 'with'), or 'link' (obeying GraphTerminals.LINK_TYPE)
   if (link.relation !== undefined && link.relation.length > 0) {
     // 'relation' defined:
     switch (link.relation) {
-      case "to":
-        edge = "-->";
+      case 'to':
+        edge = '-->';
         break;
-      case "with":
-        edge = "---";
+      case 'with':
+        edge = '---';
         break;
       default: // Error - shouldn't happen
         break;
@@ -281,37 +264,37 @@ function render_link(
     if (link.link !== undefined && link.link.length > 0) {
       const match = GraphTerminals.LINK_TYPE.exec(link.link);
       if (match) {
-        let src_head = match[1] ?? "";
-        let line = match[2] ?? "";
-        let dst_head = match[3] ?? "";
+        let src_head = match[1] ?? '';
+        let line = match[2] ?? '';
+        let dst_head = match[3] ?? '';
 
         // Arrowhead at source:
         if (src_head.length > 0) {
           switch (src_head) {
-            case "<":
-            case "o":
-            case "x":
+            case '<':
+            case 'o':
+            case 'x':
               break;
             default:
               comment = `Warning: source arrowhead '${src_head}' is not available in a MermaidJS graph. Will render as '<'. Source: '${link.$cstNode?.text}'`;
               comments.push(comment);
               console.warn(chalk.red(comment));
-              src_head = "<";
+              src_head = '<';
           }
         }
 
         // Arrowhead at destination:
         if (dst_head.length > 0) {
           switch (dst_head) {
-            case ">":
-            case "o":
-            case "x":
+            case '>':
+            case 'o':
+            case 'x':
               break;
             default:
               comment = `Warning: destination arrowhead '${dst_head}' is not available in a MermaidJS graph. Will render as '>'. Source: '${link.$cstNode?.text}'`;
               comments.push(comment);
               console.warn(chalk.red(comment));
-              dst_head = ">";
+              dst_head = '>';
           }
         }
 
@@ -320,7 +303,7 @@ function render_link(
           if (/(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)/.exec(line) === null) {
             comment = `Warning: line style '${line}' is not available in a MermaidJS graph. Will render as '...'. Source: '${link.$cstNode?.text}'`;
             console.warn(chalk.red(comment));
-            edge = "...";
+            edge = '...';
           }
 
           if (src_head.length == 0 && dst_head.length == 0) {
@@ -339,13 +322,13 @@ function render_link(
         comment = `Error: invalid line style: '${link.$cstNode?.text}'. Will render as '...'. Source: '${link.$cstNode?.text}'`;
         comments.push(comment);
         console.error(chalk.red(comment));
-        edge = "...";
+        edge = '...';
       }
     } else {
       comment = `Error: line style missing: '${link.$cstNode?.text}'. Will render as '...'. Source: '${link.$cstNode?.text}'`;
       comments.push(comment);
       console.error(chalk.red(comment));
-      edge = "...";
+      edge = '...';
     }
   }
 
@@ -361,7 +344,7 @@ function render_link(
 
   // Collapse string array of style fragments to string:
   if (style_items.length > 0) {
-    const link_style = style_items.join(",");
+    const link_style = style_items.join(',');
 
     // A styled link will be added to the link_style_dict.styled_links array
     if (!(link_style in link_style_dict.styled_links)) {
@@ -385,12 +368,12 @@ function render_link(
   return (
     (comments.length > 0
       ? INDENTATION.repeat(nesting_level) +
-        "%% " +
-        comments.join("\n" + INDENTATION.repeat(nesting_level) + "%% ") +
-        "\n"
-      : "") +
+        '%% ' +
+        comments.join('\n' + INDENTATION.repeat(nesting_level) + '%% ') +
+        '\n'
+      : '') +
     INDENTATION.repeat(nesting_level) +
-    `${src_links.join(" & ")} ${edge}${label} ${dst_links.join(" & ")}\n`
+    `${src_links.join(' & ')} ${edge}${label} ${dst_links.join(' & ')}\n`
   );
 }
 
@@ -410,7 +393,7 @@ function render_graph(
   if (label.length > 0) {
     label = label.trim();
   } else {
-    label = "";
+    label = '';
   }
   // Only render non-empty graph labels as MMD subgraph title:
   if (label.length > 0) {
@@ -419,7 +402,7 @@ function render_graph(
   return [
     `\n${INDENTATION.repeat(nesting_level)}subgraph ${graph.id}${label}\n`,
     ...render_node_contents(graph, nesting_level + 1, link_style_dict),
-    INDENTATION.repeat(nesting_level) + "end\n\n",
+    INDENTATION.repeat(nesting_level) + 'end\n\n',
   ];
 }
 
@@ -438,35 +421,33 @@ function render_style(style: Style, nesting_level: number): string {
   // Link color:
   const fill_color = to_mmd_color(
     //StyleDefinitions_get_fill_color(style.definition.items),
-    StyleDefinitions_get_color_value(style.definition.items, ["FillColor"]),
-    "fill",
+    StyleDefinitions_get_color_value(style.definition.items, ['FillColor']),
+    'fill',
   ); // MermaidJS: 'fill'
 
   const border_color = to_mmd_color(
     //StyleDefinitions_get_fill_color(style.definition.items),
-    StyleDefinitions_get_color_value(style.definition.items, ["BorderColor"]),
-    "stroke",
+    StyleDefinitions_get_color_value(style.definition.items, ['BorderColor']),
+    'stroke',
   ); // MermaidJS: 'stroke'
 
   // Label (text) color:
   const label_color = to_mmd_color(
     //StyleDefinitions_get_label_color(style.definition.items),
-    StyleDefinitions_get_color_value(style.definition.items, ["LabelColor"]),
-    "color",
+    StyleDefinitions_get_color_value(style.definition.items, ['LabelColor']),
+    'color',
   ); // MermaidJS: 'color' (named or #rgb or #rrggbb)
 
   // Link width:
   const border_width = to_mmd_line_width(
-    StyleDefinitions_get_line_width_value(style.definition.items, [
-      "BorderWidth",
-    ]),
-    "stroke-width",
+    StyleDefinitions_get_line_width_value(style.definition.items, ['BorderWidth']),
+    'stroke-width',
   ); // MermaidJS: 'width' (with unit)
 
   // Line opacity:
   const border_opacity = to_mmd_opacity(
-    StyleDefinitions_get_opacity_value(style.definition.items, ["LineOpacity"]),
-    "stroke-opacity",
+    StyleDefinitions_get_opacity_value(style.definition.items, ['LineOpacity']),
+    'stroke-opacity',
   ); // MermaidJS: 'stroke-opacity' (0..1) or 0%..100%)
 
   const style_items: string[] = [
@@ -479,12 +460,10 @@ function render_style(style: Style, nesting_level: number): string {
 
   let result =
     INDENTATION.repeat(nesting_level) +
-    `%% style ${style.id} ${style.definition.$cstNode?.text.replaceAll(/[\r\n\s]+/g, " ")}`;
+    `%% style ${style.id} ${style.definition.$cstNode?.text.replaceAll(/[\r\n\s]+/g, ' ')}`;
   if (style_items.length > 0) {
     result +=
-      "\n" +
-      INDENTATION.repeat(nesting_level) +
-      `classDef ${style.id} ${style_items.join(",")};`;
+      '\n' + INDENTATION.repeat(nesting_level) + `classDef ${style.id} ${style_items.join(',')};`;
   }
   return result;
 }
@@ -507,7 +486,7 @@ function shape_to_mmd_shape(shape: string | undefined): string | undefined {
       `shape_to_mmd_shape(${shape}) - unknown shape - not yet implemented (will use 'rect').`,
     ),
   );
-  return "rect";
+  return 'rect';
 }
 
 /**
@@ -531,10 +510,10 @@ function to_mmd_color(
       const green = colorValue.green;
       const blue = colorValue.blue;
       color =
-        "#" +
-        ("00" + red.toString(16)).slice(-2) +
-        ("00" + green.toString(16)).slice(-2) +
-        ("00" + blue.toString(16)).slice(-2);
+        '#' +
+        ('00' + red.toString(16)).slice(-2) +
+        ('00' + green.toString(16)).slice(-2) +
+        ('00' + blue.toString(16)).slice(-2);
     } else if (isHexColorDefinition(colorValue)) {
       color = colorValue.hex_color;
     } else {
@@ -543,11 +522,11 @@ function to_mmd_color(
   }
   console.info(
     chalk.gray(
-      `to_mmd_color(${style_item?.topic}: ${style_item?.$cstNode?.text ?? "<$cstNode undefined>"}): mmd style: [ ${mmd_style_topic} ] -> color = "${color ?? "<undefined>"}"`,
+      `to_mmd_color(${style_item?.topic}: ${style_item?.$cstNode?.text ?? '<$cstNode undefined>'}): mmd style: [ ${mmd_style_topic} ] -> color = "${color ?? '<undefined>'}"`,
     ),
   );
   if (color !== undefined) {
-    return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${color}`;
+    return `${mmd_style_topic?.length == 0 ? '' : `${mmd_style_topic}:`}${color}`;
   }
   return undefined;
 }
@@ -565,32 +544,26 @@ function to_mmd_line_width(
   let match: RegExpMatchArray | null | undefined = null;
   let errors = 0;
 
-  if (isLineStyleDefinition(style_item) && style_item.topic == "LineWidth") {
+  if (isLineStyleDefinition(style_item) && style_item.topic == 'LineWidth') {
     // Check the line style definition -- already checked in graph-validator.ts
     match = /^(\d+|\.\d+|\d*\.\d+)( *([a-z]{2,3}))?$/.exec(style_item.value);
     if (match) {
       const value = match[1];
       const unit = match[3];
-      const allowed_units = ["mm", "cm", "pc", "pt", "em", "ex", "rem", "rex"];
+      const allowed_units = ['mm', 'cm', 'pc', 'pt', 'em', 'ex', 'rem', 'rex'];
       if (value.length == 0) {
-        console.error(
-          chalk.red(
-            `Link width has invalid numeric value: '${style_item.value}'`,
-          ),
-        );
+        console.error(chalk.red(`Link width has invalid numeric value: '${style_item.value}'`));
         errors++;
       }
       if (unit.length > 0 && !allowed_units.includes(unit)) {
-        console.error(
-          chalk.red(`Link width has invalid unit: '${style_item.value}'`),
-        );
+        console.error(chalk.red(`Link width has invalid unit: '${style_item.value}'`));
         errors++;
       }
       if (errors == 0) {
         if (unit.length > 0) {
-          return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${value}${unit}`;
+          return `${mmd_style_topic?.length == 0 ? '' : `${mmd_style_topic}: `}${value}${unit}`;
         }
-        return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}: `}${value}`;
+        return `${mmd_style_topic?.length == 0 ? '' : `${mmd_style_topic}: `}${value}`;
       }
     }
   }
@@ -610,12 +583,12 @@ function to_mmd_opacity(
 ) {
   if (
     isOpacityStyleDefinition(style_item) &&
-    ["LineAlpha", "LineOpacity"].includes(style_item.topic)
+    ['LineAlpha', 'LineOpacity'].includes(style_item.topic)
   ) {
     // NOTE: checking already happened in graph-validator.ts
     const value = style_item.value;
     const opacity: number = value.opacity;
-    return `${mmd_style_topic?.length == 0 ? "" : `${mmd_style_topic}:`}${opacity}${value.isPct == true ? "%" : ""}`;
+    return `${mmd_style_topic?.length == 0 ? '' : `${mmd_style_topic}:`}${opacity}${value.isPct == true ? '%' : ''}`;
   }
   return undefined;
 }
