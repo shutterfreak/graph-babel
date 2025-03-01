@@ -8,6 +8,7 @@
 node_modules/
 
 # Compiled JS:
+dist/
 out/
 
 # Generated grammar and AST:
