@@ -70,7 +70,10 @@ async function startLanguageClient(context: vscode.ExtensionContext): Promise<La
 
   // Options to control the language client
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: '*', language: 'graph' }],
+    documentSelector: [
+      { scheme: 'file', language: 'graph' },
+      { scheme: 'builtin', language: 'graph' },
+    ],
     synchronize: { fileEvents: workspace.createFileSystemWatcher('**/*') },
   };
 
