@@ -74,7 +74,7 @@ async function startLanguageClient(context: vscode.ExtensionContext): Promise<La
       { scheme: 'file', language: 'graph' },
       { scheme: 'builtin', language: 'graph' },
     ],
-    synchronize: { fileEvents: workspace.createFileSystemWatcher('**/*') },
+    synchronize: { fileEvents: workspace.createFileSystemWatcher('**/*.graph') }, // See also GraphLanguageMetaData.fileExtensions (array of possible extensions)
   };
 
   // Create the language client and start the client.
