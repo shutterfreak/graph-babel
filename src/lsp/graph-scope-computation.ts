@@ -6,22 +6,17 @@ import {
   LangiumDocument,
   MultiMap,
   PrecomputedScopes,
+  isNamed,
 } from 'langium';
 import { inspect } from 'util';
 
-import { Graph, Model, isElement, isGraph, isStyle } from '../language/generated/ast.js';
+import { Graph, Model, isGraph } from '../language/generated/ast.js';
 import { render_text } from './graph-lsp-util.js';
 
 export class GraphScopeComputation extends DefaultScopeComputation {
   private processCount = 0;
 
   override async computeLocalScopes(document: LangiumDocument): Promise<PrecomputedScopes> {
-    /*
-    console.log(
-      `computeLocalScopes() - document identity: ${render_text(inspect(document), 'document')}`,
-    );
-    */
-
     console.log(`computeLocalScopes() - Document URI: ${document.uri.toString()}`);
 
     console.log(
@@ -105,7 +100,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
 
     // Process styles
     for (const style of model.styles) {
-      if (this.isNamed(style)) {
+      if (isNamed(style)) {
         console.log(`${prefix}: isNamed(style) is true for style: ${style.name}`);
         console.log(`${prefix}: Before createDescription for style: ${style.name}`);
 
@@ -134,7 +129,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
 
     // Process elements
     for (const element of model.elements) {
-      if (this.isNamed(element)) {
+      if (isNamed(element)) {
         const description = this.descriptions.createDescription(element, element.name, document);
         //localDescriptions.push(elementDescription);
         const descriptionKey = `${description.name}-${description.path}-${description.type}`; // Create a unique key.
@@ -153,13 +148,13 @@ export class GraphScopeComputation extends DefaultScopeComputation {
     // Collect descriptions for logging
     const allDescriptions: AstNodeDescription[] = [];
     for (const style of model.styles) {
-      if (this.isNamed(style)) {
+      if (isNamed(style)) {
         const description = this.descriptions.createDescription(style, style.name, document);
         allDescriptions.push(description);
       }
     }
     for (const element of model.elements) {
-      if (this.isNamed(element)) {
+      if (isNamed(element)) {
         const description = this.descriptions.createDescription(element, element.name, document);
         allDescriptions.push(description);
       }
@@ -192,7 +187,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
 
     // Process styles within the Graph
     for (const style of graph.styles) {
-      if (this.isNamed(style)) {
+      if (isNamed(style)) {
         console.log(`${prefix}: isNamed(style) is true for style: ${style.name}`);
         console.log(`${prefix}: Before createDescription for style: ${style.name}`);
 
@@ -218,7 +213,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
 
     // Process elements within the Graph
     for (const element of graph.elements) {
-      if (this.isNamed(element)) {
+      if (isNamed(element)) {
         const description = this.descriptions.createDescription(element, element.name, document);
         console.log(
           `${prefix}: Pushing elementDescription to localDescriptions: type "${element.$type}" name "${element.name}"`,
@@ -276,7 +271,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
 
     // Process styles within the nested Graph
     for (const style of graph.styles) {
-      if (this.isNamed(style)) {
+      if (isNamed(style)) {
         console.log(`${prefix}: isNamed(style) is true for style: ${style.name}`);
         console.log(`${prefix}: Before createDescription for style: ${style.name}`);
 
@@ -302,7 +297,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
 
     // Process elements within the nested Graph
     for (const element of graph.elements) {
-      if (this.isNamed(element)) {
+      if (isNamed(element)) {
         const description = this.descriptions.createDescription(element, element.name, document);
         //localDescriptions.push(description);
         const descriptionKey = `${description.name}-${description.path}-${description.type}`; // Create a unique key.
@@ -406,12 +401,5 @@ export class GraphScopeComputation extends DefaultScopeComputation {
         );
       }
     }
-  }
-
-  private isNamed(node: AstNode): boolean {
-    if (isElement(node) || isStyle(node)) {
-      return typeof node.name === 'string' && node.name.length > 0;
-    }
-    return false;
   }
 }
