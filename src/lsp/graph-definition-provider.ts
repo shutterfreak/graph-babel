@@ -15,8 +15,6 @@ import { CancellationToken, DefinitionParams, LocationLink } from 'vscode-langua
 import { isElement, isStyle } from '../language/generated/ast.js';
 import { render_text } from './graph-lsp-util.js';
 
-// import { LangiumDocuments } from 'langium/lib/workspace/documents';
-
 /**
  * Custom DefinitionProvider for the Graph language, handling hierarchical Style scopes and document-level Element scopes.
  */
@@ -42,33 +40,6 @@ export class GraphDefinitionProvider implements DefinitionProvider {
    * @param cancelToken A cancellation token that can be used to cancel the request.
    * @returns A promise that resolves to an array of LocationLinks or undefined.
    */
-  /*
-  getDefinition(
-    document: LangiumDocument,
-    params: DefinitionParams,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    cancelToken = CancellationToken.None,
-  ): MaybePromise<Location | LocationLink[] | undefined> {
-    const rootNode = document.parseResult.value;
-    if (rootNode.$cstNode) {
-      const cst = rootNode.$cstNode;
-      const sourceCstNode = CstUtils.findDeclarationNodeAtOffset(
-        cst,
-        document.textDocument.offsetAt(params.position),
-        this.services.parser.GrammarConfig.nameRegexp,
-      );
-      if (sourceCstNode) {
-        if (isStyle(sourceCstNode.astNode)) {
-          return this.collectStyleLocationLinks(sourceCstNode, params, document);
-        } else if (isElement(sourceCstNode.astNode)) {
-          return this.collectElementLocationLinks(sourceCstNode, params, document);
-        } else {
-          return this.collectLocationLinks(sourceCstNode, params);
-        }
-      }
-    }
-    return undefined;
-  }*/
   getDefinition(
     document: LangiumDocument,
     params: DefinitionParams,
@@ -135,14 +106,13 @@ export class GraphDefinitionProvider implements DefinitionProvider {
     _params: DefinitionParams,
     document: LangiumDocument,
   ): Promise<LocationLink[] | undefined> {
-    // Return Promise<LocationLink[] | undefined>
-    const goToLink = await this.findElementDefinition(document, sourceCstNode); // Await the promise
+    const goToLink = await this.findElementDefinition(document, sourceCstNode);
     if (goToLink) {
       return [
         LocationLink.create(
           goToLink.targetDocument.textDocument.uri,
-          goToLink.target.range, // Use goToLink.target.range directly
-          goToLink.target.range, // Use goToLink.target.range directly
+          (goToLink.target.astNode.$cstNode ?? goToLink.target).range,
+          goToLink.target.range,
           sourceCstNode.range,
         ),
       ];
@@ -157,7 +127,8 @@ export class GraphDefinitionProvider implements DefinitionProvider {
    * @returns A GoToLink object or undefined.
    */
   protected findStyleDefinition(source: CstNode, document: LangiumDocument): GoToLink | undefined {
-    console.log('GraphDefinitionProvider.findStyleDefinition() called for: ', source.text);
+    const prefix = `GraphDefinitionProvider.findStyleDefinition()`;
+    console.log(`${prefix} called for: "${source.text}"`);
 
     let current: AstNode | undefined = source.astNode;
     while (current && current.$cstNode) {
@@ -167,18 +138,24 @@ export class GraphDefinitionProvider implements DefinitionProvider {
           const targetDocument = AstUtils.getDocument(target.astNode);
           if (targetDocument.uri.toString() === document.uri.toString()) {
             console.log(
-              'GraphDefinitionProvider.findStyleDefinition() - Style definition found:',
-              target.astNode.$cstNode?.text,
-            ); // Add this line
+              `${prefix} - Style definition found:`,
+              render_text(
+                target.astNode.$cstNode?.text,
+                'target.astNode.$cstNode.text',
+                '\\n',
+                target.astNode.$cstNode?.range.start.line,
+              ),
+            );
+
             return { source, target, targetDocument };
           }
         } catch (err) {
-          console.error('An error has occurred:', err);
+          console.error(`${prefix} An error has occurred:`, err);
         }
       }
       current = current.$container;
     }
-    console.log('GraphDefinitionProvider.findStyleDefinition() - Style definition not found.');
+    console.log(`${prefix} - Style definition not found.`);
     return undefined;
   }
 
@@ -192,14 +169,11 @@ export class GraphDefinitionProvider implements DefinitionProvider {
     document: LangiumDocument,
     source: CstNode,
   ): Promise<GoToLink | undefined> {
-    console.log('GraphDefinitionProvider.findElementDefinition() called for: ', source.text);
-    console.log(
-      'GraphDefinitionProvider.findElementDefinition() document URI: ',
-      document.uri.toString(),
-    );
+    const prefix = `GraphDefinitionProvider.findElementDefinition()`;
+    console.log(`${prefix} called for: "${source.text}"`);
+    console.log(`${prefix} document URI: ${document.uri.toString()}`);
 
     const offset = source.offset;
-    // const position = document.textDocument.positionAt(offset);
 
     const rootNode = document.parseResult.value;
     if (!rootNode.$cstNode) {
@@ -218,10 +192,10 @@ export class GraphDefinitionProvider implements DefinitionProvider {
     }
 
     console.log(
-      `GraphDefinitionProvider.findElementDefinition() - leafNode (container property: ${node.grammarSource?.$containerProperty}):\n${render_text(node.text, 'leafNode.text', '\\n', node.range.start.line)}`,
+      `${prefix} - leafNode (container property: ${node.grammarSource?.$containerProperty}):\n${render_text(node.text, 'leafNode.text', '\\n', node.range.start.line)}`,
     );
     console.log(
-      `GraphDefinitionProvider.findElementDefinition() - declarationNode (container property: ${declarationNode.grammarSource?.$containerProperty}):\n${render_text(declarationNode.text, 'declarationNode.text', '\\n', declarationNode.range.start.line)}`,
+      `${prefix} - declarationNode (container property: ${declarationNode.grammarSource?.$containerProperty}):\n${render_text(declarationNode.text, 'declarationNode.text', '\\n', declarationNode.range.start.line)}`,
     );
     console.log(render_text(inspect(declarationNode, false, 1), 'declarationNode'));
 
@@ -236,11 +210,9 @@ export class GraphDefinitionProvider implements DefinitionProvider {
     const containerProperty = node.grammarSource?.$containerProperty ?? '';
 
     console.log(
-      `GraphDefinitionProvider.findElementDefinition() called for: ${declarationNode.astNode.name} -- containerProperty = "${containerProperty}"`,
+      `${prefix} called for: ${declarationNode.astNode.name} -- containerProperty = "${containerProperty}"`,
     );
-    console.log(
-      `GraphDefinitionProvider.findElementDefinition() document URI: ${document.uri.toString()}`,
-    );
+    console.log(`${prefix} document URI: ${document.uri.toString()}`);
 
     if (containerProperty.length == 0) {
       return undefined;
@@ -263,30 +235,24 @@ export class GraphDefinitionProvider implements DefinitionProvider {
     };
     const scope = this.scopeProvider.getScope(context);
 
+    console.log(`${prefix} -- calling getScope(\n${render_text(inspect(context), 'context')}\n)`);
     console.log(
-      `GraphDefinitionProvider.findElementDefinition() -- calling getScope(\n${render_text(inspect(context), 'context')}\n)`,
-    );
-    console.log(
-      `GraphDefinitionProvider.findElementDefinition() refText = "${refText}" (declarationNode.astNode.$type ${declarationNode.astNode.$type})`,
+      `${prefix} refText = "${refText}" (declarationNode.astNode.$type ${declarationNode.astNode.$type})`,
     );
 
     const descriptions = scope.getAllElements().toArray();
 
-    console.log(
-      `GraphDefinitionProvider.findElementDefinition() -- scope descriptions: ${descriptions.length}`,
-    ); //Added log
+    console.log(`${prefix} -- scope descriptions: ${descriptions.length}`);
     descriptions.forEach((desc) => {
       console.log(
-        `GraphDefinitionProvider.findElementDefinition() -- scope description: ${desc.name} path: ${desc.path} type: ${desc.type} document URI: ${desc.documentUri.toString()}`,
-      ); //Added log
+        `${prefix} -- scope description: ${desc.name} path: ${desc.path} type: ${desc.type} document URI: ${desc.documentUri.toString()}`,
+      );
     });
 
     const target = descriptions.find((description) => description.name === refText);
 
     if (!target) {
-      console.log(
-        'GraphDefinitionProvider.findElementDefinition() - Element definition not found.',
-      );
+      console.log('${prefix} - Element definition not found.');
       return undefined;
     }
 
@@ -337,8 +303,8 @@ export class GraphDefinitionProvider implements DefinitionProvider {
         return [
           LocationLink.create(
             targetDocument.textDocument.uri,
-            declarationNode.astNode.$cstNode.range, // Use $cstNode.range
-            declarationNode.astNode.$cstNode.range, // Use $cstNode.range
+            (declarationNode.astNode.$cstNode ?? declarationNode.astNode).range,
+            declarationNode.astNode.$cstNode.range,
             sourceCstNode.range,
           ),
         ];
