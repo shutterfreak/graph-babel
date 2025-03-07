@@ -19,6 +19,7 @@ import {
 } from 'vscode-languageserver';
 
 import { isElement } from '../language/generated/ast.js';
+import { range_toString, render_text } from './graph-lsp-util.js';
 
 export class GraphRenameProvider extends DefaultRenameProvider {
   constructor(services: LangiumServices) {
@@ -37,26 +38,29 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     console.log('GraphRenameProvider.prepareRename() called, params.position : ', params.position);
     const node = this.findDeclarationNode(document, params.position);
     console.log(
-      `GraphRenameProvider.prepareRename() found node of type '${node?.$type}' defined as:\n${node?.$cstNode?.text}\n\n\n`,
-      // + inspect(node),
+      `GraphRenameProvider.prepareRename() found node of type '${node?.$type}' defined as:\n${render_text(node?.$cstNode?.text, `'${node?.$type}' text`, '\\n', node?.$cstNode?.range.start.line)}\n`,
     );
-    // If a valid node is found, return its name range; otherwise, return undefined
+    //console.log(render_text(inspect(node),`${node?.$type} AST node`));
 
+    // If a valid node is found, return its name range; otherwise, return undefined
     if (!node) {
       return Promise.resolve(undefined);
     }
 
     const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'name');
     console.log(
-      `GraphRenameProvider.prepareRename() found CST node with property "name": (${inspect(cstIdNode?.range)}) : [${cstIdNode?.text}]\n` +
+      `GraphRenameProvider.prepareRename() found CST node with property "name" at range: (${range_toString(cstIdNode?.range)}) : [${cstIdNode?.text}]\n`,
+    );
+    console.log(
+      render_text(
         inspect(cstIdNode),
+        `${node.$type} ${isNamed(node) ? `name="${node.name}"` : ''} CST node`,
+        ',',
+        0,
+      ),
     );
 
-    return Promise.resolve(
-      // node ? this.nameProvider.getNameNode(node)?.range : undefined,
-      // namedNode?.range
-      cstIdNode?.range,
-    );
+    return Promise.resolve(cstIdNode?.range);
   }
 
   /**
@@ -71,7 +75,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     const node = this.findDeclarationNode(document, params.position);
     console.log('GraphRenameProvider.rename() called, params : ', inspect(params));
     console.log(
-      `GraphRenameProvider.rename() found node of type '${node?.$type}' defined as:\n${node?.$cstNode?.text}\n\n\n`,
+      `GraphRenameProvider.rename() found node of type '${node?.$type}' defined as:\n${render_text(node?.$cstNode?.text, `'${node?.$type}' text`, '\\n', node?.$cstNode?.range.start.line)}\n`,
     );
 
     if (!node || !isElement(node)) {
@@ -100,7 +104,12 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     // Find the AST node at the given cursor position
     const declarationNode = this.findAstNodeAtPosition(rootNode.$cstNode, position);
     console.log(
-      `GraphRenameProvider.findDeclarationNode() - will return node of type '${declarationNode?.$type}' defined as:\n${declarationNode?.$cstNode?.text}\n\n\n`,
+      `GraphRenameProvider.findDeclarationNode() - will return node of type '${declarationNode?.$type}' defined as:\n${render_text(
+        declarationNode?.$cstNode?.text,
+        `declaration node type: ${declarationNode?.$type}`,
+        '\\n',
+        declarationNode?.$cstNode?.range.start.line,
+      )}\n\n\n`,
     );
 
     return declarationNode;
@@ -144,7 +153,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
           astNode.$containerProperty ?? '<unknown container property>'
         }) - cstNode <${astNode.$cstNode.grammarSource?.$type ?? 'undefined'}: ${
           astNode.$cstNode.grammarSource?.$containerProperty ?? '<container property not set>'
-        }> @ (line ${start.line}, char ${start.character}) to (line ${end.line}, char ${end.character}) -- length = ${astNode.$cstNode.length}`,
+        }> @ (${range_toString(astNode.$cstNode.range)}) -- length = ${astNode.$cstNode.length}`,
       );
       console.log(
         astNode.$cstNode.text
@@ -199,7 +208,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     }
 
     console.log(
-      `GraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'name' will be renamed from "${node.name ?? ''}" to "${newName}"`,
+      `GraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'name' will be renamed from "${node.name}" to "${newName}"`,
     );
 
     // Collect all existing IDs in the document to avoid naming conflicts
@@ -254,7 +263,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       }
 
       console.log(
-        `GraphRenameProvider.createRenameEdit() - Renaming reference '${ref.$refText}' at ${inspect(ref.$refNode?.range)}`,
+        `GraphRenameProvider.createRenameEdit() - Renaming reference '${ref.$refText}' at ${range_toString(ref.$refNode?.range)}`,
       );
 
       if (ref.$refNode) {
@@ -269,7 +278,9 @@ export class GraphRenameProvider extends DefaultRenameProvider {
 
     const changes = { changes: { [document.uri.toString()]: edits } };
 
-    console.log(`GraphRenameProvider.createRenameEdit() - will return:\n${inspect(changes)}\n`);
+    console.log(
+      `GraphRenameProvider.createRenameEdit() - will return:\n${render_text(inspect(changes), 'changes')}\n`,
+    );
 
     return changes;
   }
