@@ -1,247 +1,349 @@
-import { AstUtils, CstNode, CstUtils, LangiumDocument, MaybePromise, Reference } from 'langium';
-import { DefaultDefinitionProvider, GoToLink, LangiumServices } from 'langium/lsp';
-import { inspect } from 'util';
-// import { Position as vscodePosition, Range as vscodeRange } from 'vscode';
 import {
-  CancellationToken,
-  DefinitionParams,
-  LocationLink,
-  Position,
-  Range,
-} from 'vscode-languageserver';
+  AstNode,
+  AstUtils,
+  CstNode,
+  CstUtils,
+  LangiumDocument,
+  LangiumDocuments,
+  MaybePromise,
+  ScopeProvider,
+} from 'langium';
+import { DefinitionProvider, GoToLink, LangiumServices } from 'langium/lsp';
+import { inspect } from 'util';
+import { CancellationToken, DefinitionParams, LocationLink } from 'vscode-languageserver';
 
-export class GraphDefinitionProvider extends DefaultDefinitionProvider {
-  constructor(services: LangiumServices) {
-    super(services);
+import { isElement, isStyle } from '../language/generated/ast.js';
+import { render_text } from './graph-lsp-util.js';
+
+// import { LangiumDocuments } from 'langium/lib/workspace/documents';
+
+/**
+ * Custom DefinitionProvider for the Graph language, handling hierarchical Style scopes and document-level Element scopes.
+ */
+export class GraphDefinitionProvider implements DefinitionProvider {
+  /**
+   * Constructs a new GraphDefinitionProvider.
+   * @param services The Langium services.
+   */
+  constructor(protected readonly services: LangiumServices) {}
+
+  protected get documents(): LangiumDocuments {
+    return this.services.shared.workspace.LangiumDocuments;
   }
 
-  // Override the getDefinition method.
-  override getDefinition(
+  protected get scopeProvider(): ScopeProvider {
+    return this.services.references.ScopeProvider;
+  }
+
+  /**
+   * Handles the go-to-definition request.
+   * @param document The document in which the definition request was triggered.
+   * @param params The parameters of the definition request.
+   * @param cancelToken A cancellation token that can be used to cancel the request.
+   * @returns A promise that resolves to an array of LocationLinks or undefined.
+   */
+  /*
+  getDefinition(
     document: LangiumDocument,
     params: DefinitionParams,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    cancelToken?: CancellationToken,
-  ): MaybePromise<LocationLink[] | undefined> {
-    console.log(
-      `GraphDefinitionProvider.getDefinition() called for document URI "${document.uri.toString()}" with params:\n${inspect(params)}\n`,
-    );
-
+    cancelToken = CancellationToken.None,
+  ): MaybePromise<Location | LocationLink[] | undefined> {
     const rootNode = document.parseResult.value;
     if (rootNode.$cstNode) {
-      // Get the root CST node (representing the entire document)
       const cst = rootNode.$cstNode;
       const sourceCstNode = CstUtils.findDeclarationNodeAtOffset(
         cst,
         document.textDocument.offsetAt(params.position),
-        this.grammarConfig.nameRegexp,
+        this.services.parser.GrammarConfig.nameRegexp,
       );
       if (sourceCstNode) {
-        console.info(
-          `GraphDefinitionProvider.getDefinition() - Found leafNode with text [${sourceCstNode.text}] at ${this.range_toString(
-            sourceCstNode.range,
-          )}:\nLeaf node :\n${this.render_text(inspect(sourceCstNode, false, 1), 'LeafNode')}\n`,
-        );
-        return this.collectLocationLinks(sourceCstNode, params);
+        if (isStyle(sourceCstNode.astNode)) {
+          return this.collectStyleLocationLinks(sourceCstNode, params, document);
+        } else if (isElement(sourceCstNode.astNode)) {
+          return this.collectElementLocationLinks(sourceCstNode, params, document);
+        } else {
+          return this.collectLocationLinks(sourceCstNode, params);
+        }
       }
     }
-    console.error(
-      `GraphDefinitionProvider.getDefinition() - ${rootNode.$cstNode ? 'sourceCstNode' : 'rootNode.cst'} undefined!`,
-    );
     return undefined;
-
-    //return super.getDefinition(document, params, cancelToken);
-  }
-
-  /*
-  override findLink(source: CstNode): GoToLink | undefined {
-    const target = this.references.findDeclarationNode(source);
-    if (target?.astNode) {
-      const targetDocument = AstUtils.getDocument(target.astNode);
-      console.log(`GraphDefinitionProvider.findLink(${source.text}) --> [${target.text}] @ ${targetDocument.uri.toString()}`)
-      return { source, target, targetDocument };
-    }
-
-    return undefined;
-  }
-    */
-
-  override findLink(source: CstNode): GoToLink | undefined {
-    const target = this.references.findDeclarationNode(source);
-    const sourceDocument = AstUtils.getDocument(source.astNode); // Get the source document
-
-    console.log(
-      `GraphDefinitionProvider.findLink(${source.text}) @ ${sourceDocument.uri.toString()} --> [${target?.text ?? '<target not lnked to AST node>'}]`,
-    );
-
-    if (target?.astNode) {
-      const targetDocument = AstUtils.getDocument(target.astNode);
-      console.log(
-        `GraphDefinitionProvider.findLink(${source.text}) @ ${sourceDocument.uri.toString()} --> [${target.text}] @ ${targetDocument.uri.toString()} -- will return {source, target, targetDocument}`,
+  }*/
+  getDefinition(
+    document: LangiumDocument,
+    params: DefinitionParams,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    cancelToken = CancellationToken.None,
+  ): MaybePromise<LocationLink[] | undefined> {
+    const rootNode = document.parseResult.value;
+    if (rootNode.$cstNode) {
+      const cst = rootNode.$cstNode;
+      const sourceCstNode = CstUtils.findDeclarationNodeAtOffset(
+        cst,
+        document.textDocument.offsetAt(params.position),
+        this.services.parser.GrammarConfig.nameRegexp,
       );
-      // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-      if (target && targetDocument) {
-        return { source, target, targetDocument };
+      if (sourceCstNode) {
+        if (isStyle(sourceCstNode.astNode)) {
+          return this.collectStyleLocationLinks(sourceCstNode, params, document);
+        } else if (isElement(sourceCstNode.astNode)) {
+          return this.collectElementLocationLinks(sourceCstNode, params, document);
+        } else {
+          return this.collectLocationLinks(sourceCstNode, params);
+        }
       }
     }
     return undefined;
-
-    /*
-    const target = this.references.findDeclarationNode(source);
-    if (target?.astNode) {
-      const targetDocument = AstUtils.getDocument(target.astNode);
-      const sourceDocument = AstUtils.getDocument(source.astNode); // Get the source document
-
-      console.log(
-        `GraphDefinitionProvider.findLink(${source.text}) @ ${sourceDocument.uri.toString()} --> [${target.text}] @ ${targetDocument.uri.toString()}`,
-      );
-
-      if (targetDocument.uri.toString() === sourceDocument.uri.toString()) {
-        // Check if documents are the same
-        console.log(
-          `GraphDefinitionProvider.findLink(${source.text}) --> [${target.text}] @ ${targetDocument.uri.toString()}`,
-        );
-        return { source, target, targetDocument };
-      } else {
-        console.log(
-          `GraphDefinitionProvider.findLink(${source.text}) --> [${target.text}] @ ${targetDocument.uri.toString()} (Different document)`,
-        );
-        // If the target is in a different document, return undefined.
-        return undefined;
-      }
-    }
-    return undefined;
-    */
   }
 
   /**
-   * Finds a reference at the given position in the document.
+   * Collects location links for Style node definitions, handling hierarchical scope.
+   * @param sourceCstNode The CST node of the source Style.
+   * @param _params The definition parameters.
+   * @param document The document containing the source Style.
+   * @returns A promise that resolves to an array of LocationLinks or undefined.
    */
-  protected findReferenceAtPosition(
+  protected collectStyleLocationLinks(
+    sourceCstNode: CstNode,
+    _params: DefinitionParams,
     document: LangiumDocument,
-    position: { line: number; character: number },
-  ): Reference | undefined {
-    const i = 0;
-    const matches: Reference[] = [];
-
-    for (const ref of document.references) {
-      console.log(
-        `findReferenceAtPosition(${this.position_toString(position, false)}) - "${ref.$refText}" --> [type ${ref.$refNode?.astNode.$type}] at ${this.range_toString(ref.ref?.$cstNode?.range)} in [ ${ref.ref?.$cstNode?.grammarSource?.$document?.uri.toString()} ] defined as:\n${this.render_text(ref.ref?.$cstNode?.text, 'ref.ref?.$cstNode?.text', '\\n', ref.ref?.$cstNode?.range.start.line)}\n`,
-      );
+  ): MaybePromise<LocationLink[] | undefined> {
+    const target = this.findStyleDefinition(sourceCstNode, document);
+    if (target) {
+      return [
+        LocationLink.create(
+          target.targetDocument.textDocument.uri,
+          (target.target.astNode.$cstNode ?? target.target).range,
+          target.target.range,
+          sourceCstNode.range,
+        ),
+      ];
     }
-    for (const ref of document.references) {
-      console.log(
-        `findReferenceAtPosition() (round 2) - "${ref.$refText}" --> [type ${ref.$refNode?.astNode.$type}] at ${this.range_toString(ref.ref?.$cstNode?.range)} in [ ${ref.ref?.$cstNode?.grammarSource?.$document?.uri.toString()} ] defined as:\n${this.render_text(ref.ref?.$cstNode?.text, 'ref.ref?.$cstNode?.text', '\\n', ref.ref?.$cstNode?.range.start.line)}\n`,
-      );
-      if (!ref.$refNode) continue;
+    return undefined;
+  }
 
-      const refRange = ref.$refNode.range;
-      /*
-        if (
-            position.line >= refRange.start.line &&
-            position.line <= refRange.end.line &&
-            position.character >= refRange.start.character &&
-            position.character <= refRange.end.character
-        ) {
-            return ref;
-        }
-        */
+  /**
+   * Collects location links for Element node definitions, handling document-level scope.
+   * @param sourceCstNode The CST node of the source Element.
+   * @param _params The definition parameters.
+   * @param document The document containing the source Element.
+   * @returns A promise that resolves to an array of LocationLinks or undefined.
+   */
+  protected async collectElementLocationLinks(
+    // Make method async
+    sourceCstNode: CstNode,
+    _params: DefinitionParams,
+    document: LangiumDocument,
+  ): Promise<LocationLink[] | undefined> {
+    // Return Promise<LocationLink[] | undefined>
+    const goToLink = await this.findElementDefinition(document, sourceCstNode); // Await the promise
+    if (goToLink) {
+      return [
+        LocationLink.create(
+          goToLink.targetDocument.textDocument.uri,
+          goToLink.target.range, // Use goToLink.target.range directly
+          goToLink.target.range, // Use goToLink.target.range directly
+          sourceCstNode.range,
+        ),
+      ];
+    }
+    return undefined;
+  }
 
-      const { start, end } = refRange;
+  /**
+   * Finds the definition of a Style node within the same document, traversing the container hierarchy.
+   * @param source The CST node of the source Style.
+   * @param document The document containing the source Style.
+   * @returns A GoToLink object or undefined.
+   */
+  protected findStyleDefinition(source: CstNode, document: LangiumDocument): GoToLink | undefined {
+    console.log('GraphDefinitionProvider.findStyleDefinition() called for: ', source.text);
 
-      // Check if cursor in astNode's Cst node range:
-      if (position.line < start.line) {
-        // cstNode before cursor (line level) -- SKIP
-        continue;
-      } else if (position.line > end.line) {
-        // cstNode after cursor (line level) -- SKIP
-        continue;
-      } else {
-        // cursor line in cstNode range
-        if (position.line === start.line && position.character < start.character) {
-          // cstNode after cursor (char level) -- SKIP
-          continue;
-        } else if (position.line === end.line && position.character > end.character) {
-          // cstNode before cursor (char level) -- SKIP
-          continue;
+    let current: AstNode | undefined = source.astNode;
+    while (current && current.$cstNode) {
+      const target = this.services.references.References.findDeclarationNode(current.$cstNode);
+      if (target?.astNode) {
+        try {
+          const targetDocument = AstUtils.getDocument(target.astNode);
+          if (targetDocument.uri.toString() === document.uri.toString()) {
+            console.log(
+              'GraphDefinitionProvider.findStyleDefinition() - Style definition found:',
+              target.astNode.$cstNode?.text,
+            ); // Add this line
+            return { source, target, targetDocument };
+          }
+        } catch (err) {
+          console.error('An error has occurred:', err);
         }
       }
-      // MATCH
-
-      const astNode = ref.ref;
-
-      if (!astNode) {
-        console.warn(`findReferenceAtPosition() -- ref.ref is UNDEFINED -- skipped`);
-        continue;
-      }
-
-      // Potential candidate found
-      console.log(`POTENTIAL MATCH: cursor position within cstNode range`);
-
-      console.log(
-        `\nAST ${String('    ' + i).slice(-4)} | ${astNode.$type} (${
-          astNode.$containerProperty ?? '<unknown container property>'
-        }) - cstNode <${astNode.$cstNode?.grammarSource?.$type ?? 'undefined'}: ${
-          astNode.$cstNode?.grammarSource?.$containerProperty ?? '<container property not set>'
-        }> @ (${this.range_toString(refRange)}) -- length = ${astNode.$cstNode?.length}`,
-      );
-      console.log(
-        this.render_text(astNode.$cstNode?.text, 'astNode.$cstNode.text', '\\n', start.line),
-      );
-
-      // We found a possible match of type Element (Graph, Node, Link) or Style
-      matches.push(ref);
+      current = current.$container;
     }
+    console.log('GraphDefinitionProvider.findStyleDefinition() - Style definition not found.');
+    return undefined;
+  }
 
-    // Now get the AST node with the "smallest match":
-    const m = matches.sort(
-      (a, b) => (a.ref?.$cstNode?.length ?? 0) - (b.ref?.$cstNode?.length ?? 0),
+  /**
+   * Finds the definition of an Element node within the same document.
+   * @param document The document containing the source Element.
+   * @param source The CST node of the source Element.
+   * @returns A GoToLink object or undefined.
+   */
+  protected async findElementDefinition(
+    document: LangiumDocument,
+    source: CstNode,
+  ): Promise<GoToLink | undefined> {
+    console.log('GraphDefinitionProvider.findElementDefinition() called for: ', source.text);
+    console.log(
+      'GraphDefinitionProvider.findElementDefinition() document URI: ',
+      document.uri.toString(),
     );
+
+    const offset = source.offset;
+    // const position = document.textDocument.positionAt(offset);
+
+    const rootNode = document.parseResult.value;
+    if (!rootNode.$cstNode) {
+      return undefined;
+    }
+
+    const node = CstUtils.findLeafNodeAtOffset(rootNode.$cstNode, offset);
+    if (!node) {
+      return undefined;
+    }
+
+    const declarationNode = this.services.references.References.findDeclarationNode(node);
+
+    if (!declarationNode) {
+      return undefined;
+    }
 
     console.log(
-      this.render_text(
-        m[0].ref?.$cstNode?.text ?? '<Error: CST Node is undefined>',
-        'MATCH astNode.$cstNode.text',
-        '\\n',
-        m[0].ref?.$cstNode?.range.start.line,
-      ),
+      `GraphDefinitionProvider.findElementDefinition() - leafNode (container property: ${node.grammarSource?.$containerProperty}):\n${render_text(node.text, 'leafNode.text', '\\n', node.range.start.line)}`,
+    );
+    console.log(
+      `GraphDefinitionProvider.findElementDefinition() - declarationNode (container property: ${declarationNode.grammarSource?.$containerProperty}):\n${render_text(declarationNode.text, 'declarationNode.text', '\\n', declarationNode.range.start.line)}`,
+    );
+    console.log(render_text(inspect(declarationNode, false, 1), 'declarationNode'));
+
+    if (!isElement(declarationNode.astNode)) {
+      return undefined;
+    }
+
+    const refText = declarationNode.astNode.name ?? '';
+    if (refText.length == 0) {
+      return undefined;
+    }
+    const containerProperty = node.grammarSource?.$containerProperty ?? '';
+
+    console.log(
+      `GraphDefinitionProvider.findElementDefinition() called for: ${declarationNode.astNode.name} -- containerProperty = "${containerProperty}"`,
+    );
+    console.log(
+      `GraphDefinitionProvider.findElementDefinition() document URI: ${document.uri.toString()}`,
     );
 
-    return m[0];
+    if (containerProperty.length == 0) {
+      return undefined;
+    }
+    // Find the Link node as the container
+    let linkNode: AstNode | undefined = node.astNode.$container; //Use the reference node to find the link.
+    while (linkNode) {
+      if (linkNode.$type === 'Link') {
+        break;
+      }
+      linkNode = linkNode.$container;
+    }
+    if (!linkNode) {
+      return undefined;
+    }
+    const context = {
+      reference: { $refText: refText },
+      container: linkNode, // Use the Link node as the container
+      property: containerProperty,
+    };
+    const scope = this.scopeProvider.getScope(context);
+
+    console.log(
+      `GraphDefinitionProvider.findElementDefinition() -- calling getScope(\n${render_text(inspect(context), 'context')}\n)`,
+    );
+    console.log(
+      `GraphDefinitionProvider.findElementDefinition() refText = "${refText}" (declarationNode.astNode.$type ${declarationNode.astNode.$type})`,
+    );
+
+    const descriptions = scope.getAllElements().toArray();
+
+    console.log(
+      `GraphDefinitionProvider.findElementDefinition() -- scope descriptions: ${descriptions.length}`,
+    ); //Added log
+    descriptions.forEach((desc) => {
+      console.log(
+        `GraphDefinitionProvider.findElementDefinition() -- scope description: ${desc.name} path: ${desc.path} type: ${desc.type} document URI: ${desc.documentUri.toString()}`,
+      ); //Added log
+    });
+
+    const target = descriptions.find((description) => description.name === refText);
+
+    if (!target) {
+      console.log(
+        'GraphDefinitionProvider.findElementDefinition() - Element definition not found.',
+      );
+      return undefined;
+    }
+
+    const targetDocument = await this.documents.getOrCreateDocument(target.documentUri);
+
+    if (!target.node || !target.nameSegment) {
+      return undefined;
+    }
+
+    if (!target.node.$cstNode) {
+      return undefined;
+    }
+
+    return {
+      source,
+      target: declarationNode,
+      targetDocument,
+    };
   }
 
-  protected position_toString(
-    position: Position | undefined,
-    show_brackets: boolean = true,
-  ): string {
-    if (!position) {
-      return '<position undefined>';
-    }
-    return `${show_brackets ? '(' : ''}line ${position.line}, char ${position.character}${show_brackets ? ')' : ''}`;
-  }
+  /**
+   * Collects location links for other node types using the default behavior.
+   * @param sourceCstNode The CST node of the source.
+   * @param _params The definition parameters.
+   * @returns A promise that resolves to an array of LocationLinks or undefined.
+   */
 
-  protected range_toString(range: Range | undefined): string {
-    if (!range) {
-      return '<range undefined>';
-    }
-    if (range.start.line == range.end.line) {
-      return `(line ${range.start.line}, char ${range.start.character} -- ${range.end.character})`;
-    } else {
-      return `(${this.position_toString(range.start, false)} -- ${this.position_toString(range.end, false)})`;
-    }
-  }
+  protected collectLocationLinks(
+    sourceCstNode: CstNode,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _params: DefinitionParams,
+  ): MaybePromise<LocationLink[] | undefined> {
+    const declarationNode = this.services.references.References.findDeclarationNode(sourceCstNode);
+    console.log(
+      `collectLocationLinks() - (container property: ${sourceCstNode.grammarSource?.$containerProperty}):\n${render_text(
+        sourceCstNode.text,
+        'sourceCstNode.text',
+        '\\n',
+        sourceCstNode.range.start.line,
+      )}`,
+    );
 
-  protected render_text(
-    text: string | undefined,
-    prefix: string = '',
-    suffix: string = '',
-    start_line: number = 0,
-  ): string {
-    return (text ?? '<undefined text>')
-      .split(/\r?\n|\r|\n/g)
-      .map(
-        (line, index) =>
-          `  ${prefix == '' ? '' : prefix + ':'} ${String('    ' + (index + start_line + 1)).slice(-4)}|${line}${suffix}`,
-      )
-      .join('\n');
+    if (declarationNode?.astNode) {
+      const targetDocument = AstUtils.getDocument(declarationNode.astNode);
+
+      if (declarationNode.astNode.$cstNode) {
+        // Check if $cstNode exists
+        return [
+          LocationLink.create(
+            targetDocument.textDocument.uri,
+            declarationNode.astNode.$cstNode.range, // Use $cstNode.range
+            declarationNode.astNode.$cstNode.range, // Use $cstNode.range
+            sourceCstNode.range,
+          ),
+        ];
+      }
+    }
+    return undefined;
   }
 }

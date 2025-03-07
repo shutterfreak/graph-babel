@@ -9,8 +9,8 @@ Element:
 
 Graph:
     'graph'
-    StyleID?
-    id=ID
+    StyleRef?
+    name=ID
     label=Label?
     '{'
     (elements+=Element | styles+=Style)*
@@ -19,17 +19,17 @@ Graph:
 
 Node:
     'node'
-    StyleID?
-    id=ID
+    StyleRef?
+    name=ID
     label=Label?
 ;
 
 Link:
     'link'
-    StyleID?
+    StyleRef?
     (
         '('
-        id=ID
+        name=ID
         ')'
     )?
     src+=[Element:ID] ( ',' src+=[Element:ID] )*
@@ -49,14 +49,14 @@ terminal LINK_TYPE:
     /([xo]|[<][|>]?)?(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)([xo]|[|<]?[>])?/
 ;
 
-fragment StyleID:
+fragment StyleRef:
     ':' styleref=[Style:ID]
 ;
 
 Style:
     'style'
-    StyleID?
-	id=ID
+    StyleRef?
+	name=ID
 	definition=StyleBlock
     // { infer Style }
 ;

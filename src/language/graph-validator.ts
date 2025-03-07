@@ -1,5 +1,11 @@
 import chalk from 'chalk';
-import { AstNode, AstUtils, type ValidationAcceptor, type ValidationChecks } from 'langium';
+import {
+  AstNode,
+  AstUtils,
+  type ValidationAcceptor,
+  type ValidationChecks,
+  isNamed,
+} from 'langium';
 
 import {
   Element,
@@ -29,7 +35,7 @@ import {
   NAMED_COLORS,
   NAMED_SHAPES,
   STYLE_TOPICS,
-  StyleDefinition_toString,
+  //StyleDefinition_toString,
 } from './model-helpers.js';
 
 /**
@@ -55,8 +61,8 @@ export function registerValidationChecks(services: GraphServices) {
 
 // The issue codes can help to select code actions for issues encountered while validating the document
 export const IssueCodes = {
-  IdMissing: 'id-missing',
-  IdDuplicate: 'id-duplicate',
+  IdMissing: 'name-missing',
+  IdDuplicate: 'name-duplicate',
   SrcArrowheadEmpty: 'src-arrowhead-empty',
   SrcArrowheadInvalid: 'src-arrowhead-empty',
   DstArrowheadEmpty: 'dst-arrowhead-empty',
@@ -96,36 +102,37 @@ export class GraphValidator {
     const identifiers = new Set<string>();
 
     function traverseElement(element: Element): void {
-      const preamble = `traverseElement(${element.$type} element (${element.id ?? '<no name>'}))`;
+      const preamble = `traverseElement(${element.$type} element (${element.name ?? '<no name>'}))`;
       console.log(chalk.white(`${preamble} - START`));
       if (
         (isNode(element) || isGraph(element)) &&
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        (element.id === undefined || element.id.length == 0)
+        (!isNamed(element) || element.name.length == 0)
       ) {
+        /*
         console.error(
-          chalk.redBright(`${element.$type} must have a nonempty id [${element.$cstNode?.text}]`),
+          chalk.redBright(`${element.$type} must have a nonempty name [${element.$cstNode?.text}]`),
         );
-        accept('error', `${element.$type} must have a nonempty id [${element.$cstNode?.text}]`, {
+        */
+        accept('error', `${element.$type} must have a nonempty name [${element.$cstNode?.text}]`, {
           node: element,
-          property: 'id',
+          property: 'name',
           code: IssueCodes.IdMissing,
         });
       }
-      if (element.id !== undefined) {
+      if (isNamed(element) && element.name.length > 0) {
         // The element has a name (note: links have an optional name)
-        if (identifiers.has(element.id)) {
+        if (identifiers.has(element.name)) {
           // report an error if the identifier is not unique
           console.warn(
-            chalk.red(`${preamble} - Duplicate name ${element.id} found for ${element.$type}.`),
+            chalk.red(`${preamble} - Duplicate name ${element.name} found for ${element.$type}.`),
           );
-          accept('error', `Duplicate name '${element.id}'`, {
+          accept('error', `Duplicate name '${element.name}'`, {
             node: element,
-            property: 'id',
+            property: 'name',
             code: IssueCodes.IdDuplicate,
           });
         } else {
-          identifiers.add(element.id);
+          identifiers.add(element.name);
         }
       }
 
@@ -136,7 +143,7 @@ export class GraphValidator {
         }
       }
 
-      console.log(chalk.white(`${preamble} - END`));
+      ///console.log(chalk.white(`${preamble} - END`));
     }
 
     console.log(chalk.whiteBright('checkUniqueElementNames() - START'));
@@ -146,7 +153,7 @@ export class GraphValidator {
       traverseElement(element);
     }
 
-    console.log(chalk.whiteBright('checkUniqueElementNames() - END'));
+    ///console.log(chalk.whiteBright('checkUniqueElementNames() - END'));
   };
   /**
    * Check the Style nodes through the entire Model hierarchy:
@@ -245,13 +252,15 @@ export class GraphValidator {
 
     // Traverse the model top-down) and store the graph nodes and their levels:
     const style_dict: _find_style_dict[] = find_styles(model, 0, 0, accept);
-    for (const item of style_dict) {
+    /*
+    for (const item of style_dict) { // DEBUG LOG
       console.info(
         chalk.cyan(
-          `checkStyles(model): ${item.containerID} - ${item.level} : Style '${item.style.id}' : [ ${StyleDefinition_toString(item.style.definition.items)} ]`,
+          `checkStyles(model): ${item.containerID} - ${item.level} : Style '${item.style.name}' : [ ${StyleDefinition_toString(item.style.definition.items)} ]`,
         ),
       );
     }
+    */
 
     // Check style_dict at all (container_name, level) for duplicate style declarations:
 
@@ -264,11 +273,11 @@ export class GraphValidator {
         // Initialize:
         d[item.containerID] = {};
       }
-      if (!(item.style.id in d[item.containerID])) {
-        d[item.containerID][item.style.id] = [];
+      if (!(item.style.name in d[item.containerID])) {
+        d[item.containerID][item.style.name] = [];
       }
       // Push to array:
-      d[item.containerID][item.style.id].push(item.style);
+      d[item.containerID][item.style.name].push(item.style);
     }
 
     // Now compute counts per node:
@@ -278,17 +287,19 @@ export class GraphValidator {
         if (d[container_id][style_name].length > 1) {
           // Multiple Style definitions with same name: issue warning
           for (const duplicate_style_definition of d[container_id][style_name]) {
+            /*
             console.warn(
               chalk.red(
                 `Error: Multiple style definitions with name '${style_name}' at the same level should be merged. Found: ${StyleDefinition_toString(duplicate_style_definition.definition.items)}`,
               ),
             );
+            */
             accept(
               'error',
               `Found multiple style definitions with the same name '${style_name}' at the same level.`,
               {
                 node: duplicate_style_definition,
-                property: 'id',
+                property: 'name',
                 code: IssueCodes.StyleMultipleDefinitions,
               },
             );
@@ -298,13 +309,15 @@ export class GraphValidator {
     }
   };
   checkStyleNames = (style: Style, accept: ValidationAcceptor) => {
-    if (style.id === undefined || style.id.length == 0) {
+    if (!isNamed(style) || style.name.length == 0) {
+      /*
       console.error(
-        chalk.redBright(`ERROR: checkStyleNames() - style has no id: [${style.$cstNode?.text}]`),
+        chalk.redBright(`ERROR: checkStyleNames() - style has no name: [${style.$cstNode?.text}]`),
       );
+      */
       accept('error', 'A style must have a nonempty name.', {
         node: style,
-        property: 'id',
+        property: 'name',
         code: IssueCodes.IdMissing,
       });
     }
@@ -350,10 +363,10 @@ export class GraphValidator {
     }
   };
   checkStyleSubstyles = (style: Style, accept: ValidationAcceptor) => {
-    if (style.id !== undefined && style.id.length > 0 && style.id == style.styleref?.$refText) {
+    if (isNamed(style) && style.name.length > 0 && style.name == style.styleref?.$refText) {
       accept(
         'error',
-        `Style '${style.id}' cannot refer to itself. Please remove ":${style.styleref.$refText}"`,
+        `Style '${style.name}' cannot refer to itself. Please remove ":${style.styleref.$refText}"`,
         {
           node: style,
           property: 'styleref',
@@ -394,17 +407,21 @@ export class GraphValidator {
     accept: ValidationAcceptor,
   ): void => {
     const code_length = hex_color_definition.hex_color.length;
+    /*
     console.info(
       chalk.cyanBright(
         `checkHexColorDefinitions(${hex_color_definition.$cstNode?.text}): hex_color='${hex_color_definition.hex_color}' (length=${code_length})}`,
       ),
     );
+    */
     if (![4, 7].includes(code_length)) {
+      /*
       console.warn(
         chalk.red(
           `Error: invalid hexadecimal color code '${hex_color_definition.hex_color}' (expecting '#' plus 3 or 6 hexadecimal digits, found ${code_length - 1}).`,
         ),
       );
+      */
       accept(
         'error',
         `Error: invalid hexadecimal color code '${hex_color_definition.hex_color}' (expecting '#' plus 3 or 6 hexadecimal digits, found ${code_length - 1}).`,
@@ -519,9 +536,11 @@ export class GraphValidator {
       );
     } else {
       if ((width_value.unit?.length ?? 0) > 0 && !LENGTH_UNITS.includes(width_value.unit ?? '')) {
+        /*
         console.error(
           `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
         );
+        */
         accept(
           'error',
           `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
@@ -550,7 +569,7 @@ export class GraphValidator {
       if (Number.isInteger(opacity)) {
         if (opacity < 0 || opacity > 100) {
           // Out of bounds
-          console.error(`Link opacity value out of range (0% - 100%): found '${opacity}%'`);
+          ///console.error(`Link opacity value out of range (0% - 100%): found '${opacity}%'`);
           accept('error', `Link opacity value out of range (0% - 100%): found '${opacity}%'`, {
             node: opacity_style_item,
             property: 'value',
@@ -558,7 +577,7 @@ export class GraphValidator {
           });
         }
       } else {
-        console.error(`Expecting integer percentage value: found '${opacity}%'`);
+        ///console.error(`Expecting integer percentage value: found '${opacity}%'`);
         accept('error', `Expecting integer percentage value: found '${opacity}%'`, {
           node: opacity_style_item,
           property: 'value',
@@ -569,7 +588,7 @@ export class GraphValidator {
       // Opacity as float value (0--1)
       if (opacity < 0.0 || opacity > 1.0) {
         // Out of bounds (one)
-        console.error(`Link opacity value out of range (0...1): found '${opacity}'`);
+        ///console.error(`Link opacity value out of range (0...1): found '${opacity}'`);
         accept('error', `Link opacity value out of range (0...1): found '${opacity}'`, {
           node: opacity_style_item,
           property: 'value',
@@ -599,7 +618,7 @@ function find_styles(
     // Add the style:
     style_dict.push({
       level,
-      containerID: `${seq}::` + (isModel(container) === true ? '' : container.id),
+      containerID: `${seq}::` + (isModel(container) === true ? '' : container.name),
       style,
     });
   }
@@ -615,38 +634,47 @@ function check_styles_defined_before_elements(
   accept: ValidationAcceptor,
   level = 0,
 ) {
-  console.debug(`${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) - START`);
-  let elementCount = 0,
-    styleCount = 0;
+  ///console.debug(`${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) - START`);
+  let elementCount = 0; ///, styleCount = 0;
   for (const childNode of AstUtils.streamContents(node)) {
     // Check that all Style nodes appear before Element nodes
     if (isElement(childNode)) {
       elementCount++;
-      console.debug(
-        `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Element node #${elementCount} of type '${childNode.$type}' ${childNode.id === undefined ? '' : ` with name '${childNode.id}'`}`,
+      /***
+       console.debug(
+        `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Element node #${elementCount} of type '${childNode.$type}' ${childNode.name === undefined ? '' : ` with name '${childNode.name}'`}`,
       );
+      ***/
       if (isGraph(childNode)) {
         // recurse
+        /***
         console.debug(
           `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) -- BEGIN recursion`,
         );
+        ***/
         check_styles_defined_before_elements(childNode, accept, level + 1);
+        /***
         console.debug(
           `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) -- END recursion`,
         );
+        ***/
       }
     } else if (isStyle(childNode)) {
+      /***
       styleCount++;
       console.debug(
-        `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Style node #${styleCount} with name '${childNode.id}'`,
+        `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Style node #${styleCount} with name '${childNode.name}'`,
       );
+      ***/
 
       if (elementCount > 0) {
+        /***
         console.error(
           chalk.red(
             `Style definitions must appear before any graph elements. Found ${elementCount} graph element(s) so far.`,
           ),
         );
+        ***/
         accept('error', 'Style definitions must appear before any graph elements.', {
           node: childNode,
           code: IssueCodes.StyleAfterElement,
@@ -654,7 +682,9 @@ function check_styles_defined_before_elements(
       }
     }
   }
+  /***
   console.debug(
     `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) - END -  [elements: ${elementCount}, styles: ${styleCount}]`,
   );
+  ***/
 }

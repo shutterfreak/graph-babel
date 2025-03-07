@@ -5,6 +5,7 @@ import {
   LeafCstNode,
   LeafCstNodeImpl,
   MaybePromise,
+  isNamed,
 } from 'langium';
 import { CstUtils } from 'langium';
 import { CodeActionProvider } from 'langium/lsp';
@@ -38,10 +39,10 @@ export class GraphCodeActionProvider implements CodeActionProvider {
       }
     }
 
-    // Handle manually triggered source actions (like rename ID)
+    // Handle manually triggered source actions (like rename name)
     if (params.context.only && params.context.only.includes(CodeActionKind.Source)) {
       console.log('getCodeActions() - Source actions requested!');
-      result.push(this.renameGraphElementId(document));
+      result.push(this.renameGraphElementName(document));
     }
 
     console.log('getCodeActions() - Returning code actions:', inspect(result));
@@ -58,7 +59,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     ) {
       case IssueCodes.IdDuplicate:
       case IssueCodes.IdMissing:
-        return this.generateNewId(diagnostic, document);
+        return this.generateNewName(diagnostic, document);
       case IssueCodes.StyleSelfReference:
         return this.removeStyleSelfReference(diagnostic, document);
       case IssueCodes.LinkWidthUnitUnknown:
@@ -79,11 +80,11 @@ export class GraphCodeActionProvider implements CodeActionProvider {
    * Code actions without triggering diagnostic code:
    */
 
-  private renameGraphElementId(document: LangiumDocument): CodeAction {
-    console.log('renameGraphElementId() called!'); // Debugging output
+  private renameGraphElementName(document: LangiumDocument): CodeAction {
+    console.log('renameGraphElementName() called!'); // Debugging output
 
     return {
-      title: 'Rename graph element ID',
+      title: 'Rename graph element name',
       kind: CodeActionKind.Source, // This makes it a source action, not a quick fix
       edit: {
         changes: {
@@ -91,9 +92,9 @@ export class GraphCodeActionProvider implements CodeActionProvider {
             {
               range: {
                 start: { line: 0, character: 0 }, // Placeholder range, should be dynamic
-                end: { line: 0, character: 5 }, // Replace with the actual 'id' range
+                end: { line: 0, character: 7 }, // Replace with the actual 'name' range
               },
-              newText: 'new-id', // Placeholder, should prompt for user input
+              newText: 'new-name', // Placeholder, should prompt for user input
             },
           ],
         },
@@ -106,12 +107,12 @@ export class GraphCodeActionProvider implements CodeActionProvider {
    */
 
   /**
-   * Generate a new, nonxisting id
+   * Generate a new, nonxisting name
    * @param diagnostic
    * @param document
    * @returns
    */
-  private generateNewId(diagnostic: Diagnostic, document: LangiumDocument): CodeAction {
+  private generateNewName(diagnostic: Diagnostic, document: LangiumDocument): CodeAction {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
     const rootNode = document.parseResult.value;
     const rootCst = rootNode.$cstNode;
@@ -119,14 +120,14 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     const existingIds = new Set<string>();
 
     if (!rootCst) {
-      console.error('generateNewId() - rootCst undefined!');
+      console.error('generateNewName() - rootCst undefined!');
       return undefined!;
     }
 
     // Find the cstNode at the zero-based offset in the document:
     const cstNode = CstUtils.findLeafNodeAtOffset(rootCst, offset);
     if (!cstNode) {
-      console.error('generateNewId() - cstNode undefined!');
+      console.error('generateNewName() - cstNode undefined!');
       return undefined!;
     }
 
@@ -135,7 +136,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     // Ensure that astNode is valid and has a type:
     if (!('$type' in astNode) || typeof astNode.$type !== 'string') {
       console.error(
-        "generateNewId() - astNode has no '$type' property or '$type' property is not string!\ncstNode:\n",
+        "generateNewName() - astNode has no '$type' property or '$type' property is not string!\ncstNode:\n",
         inspect(astNode),
       );
       return undefined!;
@@ -143,13 +144,17 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
     // Collect all existing IDs in the AST
     for (const childNode of AstUtils.streamAllContents(rootNode)) {
-      if ((isElement(childNode) || isStyle(childNode)) && childNode.id !== undefined) {
-        existingIds.add(childNode.id);
+      if (
+        (isElement(childNode) || isStyle(childNode)) &&
+        isNamed(childNode) &&
+        childNode.name.length > 0
+      ) {
+        existingIds.add(childNode.name);
       }
     }
 
-    // Generate the new id from the lowercased first letter of the cstNode $type plus an int sequence number:
-    console.info(`generateNewId() - cstNode.astNode.$type = '${cstNode.astNode.$type}`);
+    // Generate the new name from the lowercased first letter of the cstNode $type plus an int sequence number:
+    console.info(`generateNewName() - cstNode.astNode.$type = '${cstNode.astNode.$type}`);
     const baseId = cstNode.astNode.$type.charAt(0).toLowerCase();
 
     let counter = 1;
@@ -160,11 +165,11 @@ export class GraphCodeActionProvider implements CodeActionProvider {
       newId = baseId + counter;
     }
 
-    console.info('generateNewId() - found IDs: { ', [...existingIds].join(', '), '}');
+    console.info('generateNewName() - found IDs: { ', [...existingIds].join(', '), '}');
     console.info('diagnostics:\n', inspect(diagnostic));
 
     return {
-      title: 'Generate new id',
+      title: 'Generate new name',
       kind: CodeActionKind.QuickFix,
       diagnostics: [diagnostic],
       isPreferred: true,

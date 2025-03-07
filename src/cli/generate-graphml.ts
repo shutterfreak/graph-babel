@@ -304,7 +304,7 @@ export function generate_graphml_graph(
       const element_count: number = childNode.elements.length;
       const style_count: number = childNode.styles.length;
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
-      debug_log_message = `${preamble} and name '${childNode.id}' "${Label_get_label(childNode.label)}" -- ${element_count} element(s), ${style_count} style(s)`;
+      debug_log_message = `${preamble} and name '${childNode.name}' "${Label_get_label(childNode.label)}" -- ${element_count} element(s), ${style_count} style(s)`;
     } else if (isNode(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
       debug_log_message = `${preamble} "${Label_get_label(childNode.label)}"`;
@@ -326,12 +326,12 @@ export function generate_graphml_graph(
       debug_log_message = `${preamble} ${src_links.join(',')} ${link} ${dst_links.join(',')} "${Label_get_label(childNode.label)}"`;
     } else if (isStyle(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
-      debug_log_message = `${preamble} with name '${childNode.id}' (no direct access to StyleBlock)`;
+      debug_log_message = `${preamble} with name '${childNode.name}' (no direct access to StyleBlock)`;
     } else if (isStyleBlock(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
       debug_log_message = `${preamble} -- ${childNode.items.length | 0} item(s)`;
     } else if (isStyleDefinition(childNode)) {
-      debug_log_message = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.id}: ${StyleDefinition_toString([childNode])}"`;
+      debug_log_message = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.name}: ${StyleDefinition_toString([childNode])}"`;
     } else if (isStringLabel(childNode)) {
       debug_log_message = `${childNode.$type} "${Label_get_label(childNode)}"`;
     } else {
@@ -395,14 +395,14 @@ export function generate_graphml_graph(
 
     console.log(
       chalk.magenta(
-        `render_Graph(${graph.id}) - style := `,
+        `render_Graph(${graph.name}) - style := `,
         inspect(Element_get_style_items(graph)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
 
     return (
       `
-<node id="${graph.id}">
+<node id="${graph.name}">
   <!-- Graph rendered as node -->
   <data key="d5">${label}</data>` +
       graph.elements
@@ -424,7 +424,7 @@ export function generate_graphml_graph(
 
     console.log(
       chalk.magenta(
-        `render_Node(${node.id}) - style := `,
+        `render_Node(${node.name}) - style := `,
         inspect(style_items?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
@@ -439,9 +439,9 @@ export function generate_graphml_graph(
     const shape = StyleDefinitions_get_shape(style_items);
     const graphml_shape: yworks_graphml_shape = NAMED_SHAPES_to_yworks_graphml_shape(shape);
 
-    // return `<node id="${node.id}" /><!-- label: "${label}" -->`;
+    // return `<node id="${node.name}" /><!-- label: "${label}" -->`;
 
-    return `<node id="${node.id}">
+    return `<node id="${node.name}">
   <data key="d5"/>
   <data key="d6">
     <y:${graphml_shape.type}${graphml_shape.type == 'GenericNode' ? ` configuration="${graphml_shape.shape}"` : ''} >
@@ -469,7 +469,7 @@ export function generate_graphml_graph(
 
     console.log(
       chalk.magenta(
-        `render_Link(${link.id ?? '<no name>'}) - style := `,
+        `render_Link(${link.name ?? '<no name>'}) - style := `,
         inspect(Element_get_style_items(link)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
@@ -638,7 +638,7 @@ export function generate_graphml_graph(
     for (const src of src_links) {
       for (const dst of dst_links) {
         lines.push(`
-<edge ${link.id == null ? '' : `id="${link.id}" `}source="${src}" target="${dst}">
+<edge ${link.name == null ? '' : `id="${link.name}" `}source="${src}" target="${dst}">
   <data key="d9"/>
   <data key="d10">
     <y:PolyLineEdge>

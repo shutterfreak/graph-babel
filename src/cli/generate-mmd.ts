@@ -138,7 +138,7 @@ function render_node(node: Node, nesting_level: number): string {
   let shape: string | undefined = StyleDefinitions_get_shape(style_definitions);
   let result =
     INDENTATION.repeat(nesting_level) +
-    `${node.id}${node.styleref === undefined ? '' : `:::${node.styleref.$refText}`}`;
+    `${node.name}${node.styleref === undefined ? '' : `:::${node.styleref.$refText}`}`;
   let label: string | undefined = Label_get_label(node.label);
   if (label.length == 0) {
     label = StyleDefinitions_get_label(style_definitions);
@@ -400,7 +400,7 @@ function render_graph(
     label = ` [${label}]`;
   }
   return [
-    `\n${INDENTATION.repeat(nesting_level)}subgraph ${graph.id}${label}\n`,
+    `\n${INDENTATION.repeat(nesting_level)}subgraph ${graph.name}${label}\n`,
     ...render_node_contents(graph, nesting_level + 1, link_style_dict),
     INDENTATION.repeat(nesting_level) + 'end\n\n',
   ];
@@ -460,10 +460,10 @@ function render_style(style: Style, nesting_level: number): string {
 
   let result =
     INDENTATION.repeat(nesting_level) +
-    `%% style ${style.id} ${style.definition.$cstNode?.text.replaceAll(/[\r\n\s]+/g, ' ')}`;
+    `%% style ${style.name} ${style.definition.$cstNode?.text.replaceAll(/[\r\n\s]+/g, ' ')}`;
   if (style_items.length > 0) {
     result +=
-      '\n' + INDENTATION.repeat(nesting_level) + `classDef ${style.id} ${style_items.join(',')};`;
+      '\n' + INDENTATION.repeat(nesting_level) + `classDef ${style.name} ${style_items.join(',')};`;
   }
   return result;
 }

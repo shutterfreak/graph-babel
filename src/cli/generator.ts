@@ -68,7 +68,7 @@ export function generate_cleaned_graph(
       const element_count: number = childNode.elements.length;
       const style_count: number = childNode.styles.length;
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
-      debug_log_message = `${preamble} and name '${childNode.id}' "${Label_get_label(childNode.label)}" -- ${element_count} element(s), ${style_count} style(s)`;
+      debug_log_message = `${preamble} and name '${childNode.name}' "${Label_get_label(childNode.label)}" -- ${element_count} element(s), ${style_count} style(s)`;
     } else if (isNode(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type} with style '${childNode.styleref ? `:${childNode.styleref.$refText}` : ''}'`;
       debug_log_message = `${preamble} "${Label_get_label(childNode.label)}"`;
@@ -90,12 +90,12 @@ export function generate_cleaned_graph(
       debug_log_message = `${preamble} ${src_links.join(',')} ${link} ${dst_links.join(',')} "${Label_get_label(childNode.label)}"`;
     } else if (isStyle(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
-      debug_log_message = `${preamble} with name '${childNode.id}' (no direct access to StyleBlock)`;
+      debug_log_message = `${preamble} with name '${childNode.name}' (no direct access to StyleBlock)`;
     } else if (isStyleBlock(childNode)) {
       const preamble = `[${childNode.$containerIndex}] ${childNode.$type}`;
       debug_log_message = `${preamble} -- ${childNode.items.length | 0} item(s)`;
     } else if (isStyleDefinition(childNode)) {
-      debug_log_message = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.id}: ${StyleDefinition_toString([childNode])}"`;
+      debug_log_message = `[${childNode.$containerIndex}] for style ${childNode.$container.$container.name}: ${StyleDefinition_toString([childNode])}"`;
     } else if (isStringLabel(childNode)) {
       debug_log_message = `${childNode.$type} "${Label_get_label(childNode)}"`;
     } else {
@@ -131,13 +131,13 @@ export function generate_cleaned_graph(
 
     console.log(
       chalk.magenta(
-        `render_Graph(${graph.id}) - style := `,
+        `render_Graph(${graph.name}) - style := `,
         inspect(Element_get_style_items(graph)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
 
     return (
-      `${INDENTATION.repeat(level)}graph${graph.styleref ? `:${graph.styleref.$refText}` : ''} ${graph.id}${label !== '' ? ` "${label}"` : ''} {\n` +
+      `${INDENTATION.repeat(level)}graph${graph.styleref ? `:${graph.styleref.$refText}` : ''} ${graph.name}${label !== '' ? ` "${label}"` : ''} {\n` +
       graph.elements.map((element) => render_Element(element, level + 1)).join('\n') +
       (graph.elements.length > 0 ? '\n' : '') +
       graph.styles.map((style) => render_Style(style, level + 1)).join('\n') +
@@ -151,12 +151,12 @@ export function generate_cleaned_graph(
 
     console.log(
       chalk.magenta(
-        `render_Node(${node.id}) - style := `,
+        `render_Node(${node.name}) - style := `,
         inspect(Element_get_style_items(node)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
 
-    return `${INDENTATION.repeat(level)}node${node.styleref ? `:${node.styleref.$refText}` : ''} ${node.id}${label !== '' ? ` "${label}"` : ''}`;
+    return `${INDENTATION.repeat(level)}node${node.styleref ? `:${node.styleref.$refText}` : ''} ${node.name}${label !== '' ? ` "${label}"` : ''}`;
   }
 
   function render_Link(link: Link, level: number): string {
@@ -164,7 +164,7 @@ export function generate_cleaned_graph(
 
     console.log(
       chalk.magenta(
-        `render_Link(${link.id ?? '<no name>'}) - style := `,
+        `render_Link(${link.name ?? '<no name>'}) - style := `,
         inspect(Element_get_style_items(link)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
@@ -194,11 +194,11 @@ export function generate_cleaned_graph(
       console.error("Error: this can't happen.");
     }
 
-    return `${INDENTATION.repeat(level)}link${link.styleref ? `:${link.styleref.$refText}` : ''} ${link.id != null ? `(${link.id}) ` : ''}${src_links.join(',')} ${link_definition} ${dst_links.join(',')}${label !== '' ? ` "${label}"` : ''}`;
+    return `${INDENTATION.repeat(level)}link${link.styleref ? `:${link.styleref.$refText}` : ''} ${link.name != null ? `(${link.name}) ` : ''}${src_links.join(',')} ${link_definition} ${dst_links.join(',')}${label !== '' ? ` "${label}"` : ''}`;
   }
 
   function render_Style(style: Style, level: number): string {
-    return `${INDENTATION.repeat(level)}style ${style.id} {\n${style.definition.items
+    return `${INDENTATION.repeat(level)}style ${style.name} {\n${style.definition.items
       .map((it) => `${INDENTATION.repeat(level + 1)}${StyleDefinition_toString([it])}";`)
       .join('\n')}\n${INDENTATION.repeat(level)}}`;
   }

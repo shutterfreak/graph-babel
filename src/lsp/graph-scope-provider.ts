@@ -1,82 +1,153 @@
 import {
   AstNode,
+  AstNodeDescription,
   AstUtils,
   DefaultScopeProvider,
-  EMPTY_SCOPE,
   LangiumCoreServices,
+  LangiumDocument,
+  MultiMap,
   ReferenceInfo,
   Scope,
-  ScopeComputation,
+  Stream,
   StreamScope,
+  stream,
 } from 'langium';
+import { inspect } from 'util';
 
-import { isStyle } from '../language/generated/ast.js';
+import { isElement } from '../language/generated/ast.js';
+import { render_text } from './graph-lsp-util.js';
 
 export class GraphScopeProvider extends DefaultScopeProvider {
-  protected readonly scopeComputation: ScopeComputation;
+  private globalElementDescriptions: MultiMap<string, AstNodeDescription> | undefined = undefined;
+  private cnt = 0;
 
   constructor(services: LangiumCoreServices) {
     super(services);
-    this.scopeComputation = services.references.ScopeComputation;
   }
 
   override getScope(context: ReferenceInfo): Scope {
-    if (isStyle(context.container) && context.property === 'extends') {
-      const scopes = this.getContainerScopes(context.container);
-      return this.createScopeFromContainers(scopes);
-    }
-    return super.getScope(context);
-  }
+    this.cnt++;
+    const document = AstUtils.getDocument(context.container);
+    const prefix = `getScope(#${this.cnt}: document state=${document.state},refText="${context.reference.$refText})"`;
 
-  private getContainerScopes(node: AstNode): Scope[] {
-    const scopes: Scope[] = [];
-    let current: AstNode | undefined = node;
-    while (current) {
-      const localScope = this.getScopeForNode(current);
-      if (localScope) {
-        scopes.push(localScope);
-      }
-      current = current.$container;
-    }
-    return scopes; // Return the array of scopes.
-  }
-
-  private getScopeForNode(node: AstNode): Scope | undefined {
-    let document = undefined;
-    try {
-      document = AstUtils.getDocument(node);
-    } catch (err) {
-      console.error('An error occurred:', err);
-      return undefined;
+    console.log(`\n${prefix} START`);
+    if (!this.globalElementDescriptions) {
+      console.log(
+        `${prefix} globalElementDescriptions is undefined: will invoke populateGlobalElementDescriptions()`,
+      );
+      this.populateGlobalElementDescriptions(document);
     }
 
-    // Properly handle the Promise returned by computeLocalScopes.
-    this.scopeComputation
-      .computeLocalScopes(document)
-      .then((localScopes) => {
-        const descriptions = localScopes.get(node);
-        if (descriptions.length > 0) {
-          // Log the descriptions
-          console.log('Found descriptions for node:', descriptions);
+    const scopes: Stream<AstNodeDescription>[] = [];
+    const referenceType = this.reflection.getReferenceType(context);
+
+    if (document.precomputedScopes) {
+      console.log(
+        `${prefix} Found precomputed scopes: ${document.precomputedScopes.keys().count()}`,
+      );
+
+      console.log(`getScope() - Found precomputed scopes: ${document.precomputedScopes.size}`);
+      document.precomputedScopes.forEach((description, node) =>
+        console.log(
+          `${prefix} - precomputedScopes: description: [ name: "${description.name}", path: "${description.path}", type: "${description.type}" ], node type: "${node.$type}"`,
+        ),
+      );
+
+      let currentNode: AstNode | undefined = context.container;
+      do {
+        const allDescriptions = document.precomputedScopes.get(currentNode);
+        if (allDescriptions.length > 0) {
+          console.log(
+            `${prefix} Found descriptions for current node of type '${currentNode.$type}': ${allDescriptions.length}`,
+          );
+          scopes.push(stream(allDescriptions));
         }
-      })
-      .catch((err) => {
-        console.error('Error computing local scopes:', err);
+        currentNode = currentNode.$container;
+      } while (currentNode);
+    } else {
+      console.log(`${prefix} No precomputed scope found !`);
+    }
+
+    let result: Scope | undefined = undefined;
+    if (this.globalElementDescriptions) {
+      const fileGlobalScope: Stream<AstNodeDescription> = stream(
+        this.globalElementDescriptions.get(referenceType),
+      );
+
+      result = new StreamScope(fileGlobalScope, this.getGlobalScope(referenceType, context));
+    } else {
+      result = this.getGlobalScope(referenceType, context);
+    }
+
+    for (let i = scopes.length - 1; i >= 0; i--) {
+      console.log(
+        `${prefix} - context:\n${render_text(inspect(scopes[i]), `${prefix} createScope(): scopes[${i}]`)}`,
+      );
+
+      result = this.createScope(scopes[i], result);
+    }
+    console.log(
+      `${prefix} - context:\n${render_text(inspect(result, false, 4), `${prefix} result`)}`,
+    );
+
+    if (result instanceof StreamScope) {
+      console.log(`${prefix} - Inspecting StreamScope elements:`);
+      result.getAllElements().forEach((e, i) => {
+        console.log(
+          `${prefix} - StreamScope element #${i}: name "${e.name}", node type "${e.node?.$type}", path "${e.path}"`,
+        );
+      });
+    }
+    if (this.globalElementDescriptions) {
+      console.log(
+        `${prefix} - globalElementDescriptions size: ${this.globalElementDescriptions.size}`,
+      );
+      console.log(
+        `${prefix} - globalElementDescriptions keys: ${Array.from(this.globalElementDescriptions.keys()).join(', ')}`,
+      );
+    }
+
+    console.log(`${prefix} END\n`);
+    return result;
+  }
+
+  private populateGlobalElementDescriptions(document: LangiumDocument): void {
+    if (!this.globalElementDescriptions) {
+      console.log(
+        `populateGlobalElementDescriptions() - fetching descriptions for all named Element nodes...`,
+      );
+      //      console.log(inspect(document))
+      this.globalElementDescriptions = new MultiMap<string, AstNodeDescription>();
+
+      // AstUtils.streamAllContents(model).forEach((element, i) => {
+      AstUtils.streamAllContents(document.parseResult.value).forEach((element, i) => {
+        console.log(
+          `populateGlobalElementDescriptions() - processing AstNode ${i} of type "${element.$type}"`,
+        );
+        if (isElement(element)) {
+          const name = element.name ?? '';
+          console.log(
+            `populateGlobalElementDescriptions() - Found ${element.$type} with name="${name}"`,
+          );
+          if (name.length > 0) {
+            const description = this.descriptions.createDescription(element, name, document);
+            console.log(
+              `populateGlobalElementDescriptions() - Adding description of ${element.$type} with name="${name}"`,
+            );
+            console.log(
+              render_text(inspect(description), `description for ${element.$type} "${name}"`),
+            );
+            this.globalElementDescriptions!.add(element.$type, description);
+          }
+        }
       });
 
-    // return undefined because this function is not async, and therefore cannot return a scope.
-    return undefined;
-  }
-
-  private createScopeFromContainers(scopes: Scope[]): Scope {
-    if (scopes.length === 0) {
-      return EMPTY_SCOPE;
+      console.log(
+        `populateGlobalElementDescriptions() - globalElementDescriptions size: ${this.globalElementDescriptions.size}`,
+      );
+      console.log(
+        `populateGlobalElementDescriptions() - globalElementDescriptions keys: ${Array.from(this.globalElementDescriptions.keys()).join(', ')}`,
+      );
     }
-    let combinedElements = scopes[0].getAllElements();
-    for (let i = 1; i < scopes.length; i++) {
-      combinedElements = combinedElements.concat(scopes[i].getAllElements());
-    }
-
-    return new StreamScope(combinedElements);
   }
 }

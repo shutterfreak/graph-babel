@@ -512,11 +512,11 @@ function generate_style_definition_stack(
     if (isModel(ancestor) || isGraph(ancestor)) {
       // Useless check (required for linter)
       for (const s of ancestor.styles) {
-        if (s.id === style_name) {
+        if (s.name === style_name) {
           // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
           console.info(
             chalk.yellowBright(
-              `DBG::Element_get_style_items(style '${style_name}', level: ${level}) - Found style '${s.id}'`,
+              `DBG::Element_get_style_items(style '${style_name}', level: ${level}) - Found style '${s.name}'`,
             ),
             chalk.redBright(
               `${s.styleref === undefined ? '' : ` REFERRING TO style '${s.styleref.$refText}'`}\n`,
@@ -572,7 +572,7 @@ function generate_filtered_style_definition(
     if (isModel(ancestor) || isGraph(ancestor)) {
       // Useless check (required for linter)
       for (const s of ancestor.styles) {
-        if (s.id === style_ref_text) {
+        if (s.name === style_ref_text) {
           // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
           for (const d of s.definition.items) {
           */

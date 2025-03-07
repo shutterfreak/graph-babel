@@ -1,4 +1,11 @@
-import { type AstNode, AstUtils, CstNode, GrammarUtils, type LangiumDocument } from 'langium';
+import {
+  type AstNode,
+  AstUtils,
+  CstNode,
+  GrammarUtils,
+  type LangiumDocument,
+  isNamed,
+} from 'langium';
 import { DefaultRenameProvider, LangiumServices } from 'langium/lsp';
 import { inspect } from 'node:util';
 import {
@@ -39,9 +46,9 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       return Promise.resolve(undefined);
     }
 
-    const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'id');
+    const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'name');
     console.log(
-      `GraphRenameProvider.prepareRename() found CST node with property "id": (${inspect(cstIdNode?.range)}) : [${cstIdNode?.text}]\n` +
+      `GraphRenameProvider.prepareRename() found CST node with property "name": (${inspect(cstIdNode?.range)}) : [${cstIdNode?.text}]\n` +
         inspect(cstIdNode),
     );
 
@@ -184,33 +191,33 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     newName: string,
   ): WorkspaceEdit | undefined {
     console.log(
-      `\n\nGraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'id' will be renamed to "${newName}"`,
+      `\n\nGraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'name' will be renamed to "${newName}"`,
     );
 
-    if (!isElement(node) || node.id == null) {
+    if (!isElement(node) || !isNamed(node)) {
       return undefined;
     }
 
     console.log(
-      `GraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'id' will be renamed from "${node.id ?? ''}" to "${newName}"`,
+      `GraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'name' will be renamed from "${node.name ?? ''}" to "${newName}"`,
     );
 
     // Collect all existing IDs in the document to avoid naming conflicts
     const existingIds = new Set<string>();
     for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
-      if (isElement(childNode) && childNode.id != null) {
-        existingIds.add(childNode.id);
+      if (isElement(childNode) && childNode.name != null) {
+        existingIds.add(childNode.name);
       }
     }
 
     console.log(
-      `GraphRenameProvider.createRenameEdit() - existing 'id' values: [${[...existingIds].join(', ')}] -- should not contain "${newName}"`,
+      `GraphRenameProvider.createRenameEdit() - existing 'name' values: [${[...existingIds].join(', ')}] -- should not contain "${newName}"`,
     );
 
     // Validate the new name to prevent conflicts with existing identifiers or keywords
     if (existingIds.has(newName) || this.isKeyword(newName)) {
       console.warn(
-        `GraphRenameProvider.createRenameEdit() - Error: "${newName}" already exists as 'id' or is a reserved keyword`,
+        `GraphRenameProvider.createRenameEdit() - Error: "${newName}" already exists as 'name' or is a reserved keyword`,
       );
       return undefined;
     }
@@ -218,11 +225,11 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     const edits: TextEdit[] = [];
 
     // Rename the actual declaration
-    const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'id');
+    const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'name');
     if (cstIdNode) {
       edits.push(TextEdit.replace(cstIdNode.range, newName));
     } else {
-      console.warn("No CST node for 'id' property found.");
+      console.warn("No CST node for 'name' property found. NOT YET IMPLEMENTED");
     }
 
     // Find all references
@@ -242,8 +249,8 @@ export class GraphRenameProvider extends DefaultRenameProvider {
 
     // Rename all references
     for (const ref of document.references) {
-      if (ref.$refText !== node.id) {
-        continue; // Skip references that don't match the original ID
+      if (ref.$refText !== node.name) {
+        continue; // Skip references that don't match the original name
       }
 
       console.log(
