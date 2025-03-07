@@ -112,28 +112,21 @@ export class GraphScopeProvider extends DefaultScopeProvider {
   }
 
   private populateGlobalElementDescriptions(document: LangiumDocument): void {
+    const prefix = `populateGlobalElementDescriptions()`;
     if (!this.globalElementDescriptions) {
-      console.log(
-        `populateGlobalElementDescriptions() - fetching descriptions for all named Element nodes...`,
-      );
+      console.log(`${prefix} - fetching descriptions for all named Element nodes...`);
       //      console.log(inspect(document))
       this.globalElementDescriptions = new MultiMap<string, AstNodeDescription>();
 
       // AstUtils.streamAllContents(model).forEach((element, i) => {
       AstUtils.streamAllContents(document.parseResult.value).forEach((element, i) => {
-        console.log(
-          `populateGlobalElementDescriptions() - processing AstNode ${i} of type "${element.$type}"`,
-        );
+        console.log(`${prefix} - processing AstNode ${i} of type "${element.$type}"`);
         if (isElement(element)) {
           const name = element.name ?? '';
-          console.log(
-            `populateGlobalElementDescriptions() - Found ${element.$type} with name="${name}"`,
-          );
+          console.log(`${prefix} - Found ${element.$type} with name="${name}"`);
           if (name.length > 0) {
             const description = this.descriptions.createDescription(element, name, document);
-            console.log(
-              `populateGlobalElementDescriptions() - Adding description of ${element.$type} with name="${name}"`,
-            );
+            console.log(`${prefix} - Adding description of ${element.$type} with name="${name}"`);
             console.log(
               render_text(inspect(description), `description for ${element.$type} "${name}"`),
             );
@@ -143,10 +136,10 @@ export class GraphScopeProvider extends DefaultScopeProvider {
       });
 
       console.log(
-        `populateGlobalElementDescriptions() - globalElementDescriptions size: ${this.globalElementDescriptions.size}`,
+        `${prefix} - globalElementDescriptions size: ${this.globalElementDescriptions.size}`,
       );
       console.log(
-        `populateGlobalElementDescriptions() - globalElementDescriptions keys: ${Array.from(this.globalElementDescriptions.keys()).join(', ')}`,
+        `${prefix} - globalElementDescriptions keys: ${Array.from(this.globalElementDescriptions.keys()).join(', ')}`,
       );
     }
   }
