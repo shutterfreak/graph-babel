@@ -8,7 +8,7 @@ import {
   MaybePromise,
   ScopeProvider,
 } from 'langium';
-import { DefinitionProvider, GoToLink, LangiumServices } from 'langium/lsp';
+import { DefaultDefinitionProvider, GoToLink, LangiumServices } from 'langium/lsp';
 import { inspect } from 'util';
 import { CancellationToken, DefinitionParams, LocationLink } from 'vscode-languageserver';
 
@@ -18,12 +18,10 @@ import { render_text } from './graph-lsp-util.js';
 /**
  * Custom DefinitionProvider for the Graph language, handling hierarchical Style scopes and document-level Element scopes.
  */
-export class GraphDefinitionProvider implements DefinitionProvider {
-  /**
-   * Constructs a new GraphDefinitionProvider.
-   * @param services The Langium services.
-   */
-  constructor(protected readonly services: LangiumServices) {}
+export class GraphDefinitionProvider extends DefaultDefinitionProvider {
+  constructor(protected readonly services: LangiumServices) {
+    super(services);
+  }
 
   protected get documents(): LangiumDocuments {
     return this.services.shared.workspace.LangiumDocuments;
@@ -40,7 +38,7 @@ export class GraphDefinitionProvider implements DefinitionProvider {
    * @param cancelToken A cancellation token that can be used to cancel the request.
    * @returns A promise that resolves to an array of LocationLinks or undefined.
    */
-  getDefinition(
+  override getDefinition(
     document: LangiumDocument,
     params: DefinitionParams,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -79,13 +77,13 @@ export class GraphDefinitionProvider implements DefinitionProvider {
     _params: DefinitionParams,
     document: LangiumDocument,
   ): MaybePromise<LocationLink[] | undefined> {
-    const target = this.findStyleDefinition(sourceCstNode, document);
-    if (target) {
+    const goToDefinition = this.findStyleDefinition(sourceCstNode, document);
+    if (goToDefinition) {
       return [
         LocationLink.create(
-          target.targetDocument.textDocument.uri,
-          (target.target.astNode.$cstNode ?? target.target).range,
-          target.target.range,
+          goToDefinition.targetDocument.textDocument.uri,
+          (goToDefinition.target.astNode.$cstNode ?? goToDefinition.target).range,
+          goToDefinition.target.range,
           sourceCstNode.range,
         ),
       ];
@@ -101,7 +99,6 @@ export class GraphDefinitionProvider implements DefinitionProvider {
    * @returns A promise that resolves to an array of LocationLinks or undefined.
    */
   protected async collectElementLocationLinks(
-    // Make method async
     sourceCstNode: CstNode,
     _params: DefinitionParams,
     document: LangiumDocument,
@@ -230,7 +227,7 @@ export class GraphDefinitionProvider implements DefinitionProvider {
     }
     const context = {
       reference: { $refText: refText },
-      container: linkNode, // Use the Link node as the container
+      container: linkNode,
       property: containerProperty,
     };
     const scope = this.scopeProvider.getScope(context);
@@ -271,45 +268,5 @@ export class GraphDefinitionProvider implements DefinitionProvider {
       target: declarationNode,
       targetDocument,
     };
-  }
-
-  /**
-   * Collects location links for other node types using the default behavior.
-   * @param sourceCstNode The CST node of the source.
-   * @param _params The definition parameters.
-   * @returns A promise that resolves to an array of LocationLinks or undefined.
-   */
-
-  protected collectLocationLinks(
-    sourceCstNode: CstNode,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _params: DefinitionParams,
-  ): MaybePromise<LocationLink[] | undefined> {
-    const declarationNode = this.services.references.References.findDeclarationNode(sourceCstNode);
-    console.log(
-      `collectLocationLinks() - (container property: ${sourceCstNode.grammarSource?.$containerProperty}):\n${render_text(
-        sourceCstNode.text,
-        'sourceCstNode.text',
-        '\\n',
-        sourceCstNode.range.start.line,
-      )}`,
-    );
-
-    if (declarationNode?.astNode) {
-      const targetDocument = AstUtils.getDocument(declarationNode.astNode);
-
-      if (declarationNode.astNode.$cstNode) {
-        // Check if $cstNode exists
-        return [
-          LocationLink.create(
-            targetDocument.textDocument.uri,
-            (declarationNode.astNode.$cstNode ?? declarationNode.astNode).range,
-            declarationNode.astNode.$cstNode.range,
-            sourceCstNode.range,
-          ),
-        ];
-      }
-    }
-    return undefined;
   }
 }

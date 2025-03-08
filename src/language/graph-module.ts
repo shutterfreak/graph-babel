@@ -1,5 +1,6 @@
-import { type Module, inject } from 'langium';
+import { DefaultScopeProvider, type Module, inject } from 'langium';
 import {
+  DefaultDefinitionProvider,
   type DefaultSharedModuleContext,
   type LangiumServices,
   type LangiumSharedServices,
@@ -9,11 +10,10 @@ import {
 } from 'langium/lsp';
 
 import { GraphCodeActionProvider } from '../lsp/graph-code-actions.js';
-import { GraphDefinitionProvider } from '../lsp/graph-definition-provider.js';
+//import { GraphDefinitionProvider } from '../lsp/graph-definition-provider.js';
 import { GraphNameProvider } from '../lsp/graph-name-provider.js';
 import { GraphRenameProvider } from '../lsp/graph-rename-provider.js';
 import { GraphScopeComputation } from '../lsp/graph-scope-computation.js';
-import { GraphScopeProvider } from '../lsp/graph-scope-provider.js';
 import { GraphGeneratedModule, GraphGeneratedSharedModule } from './generated/module.js';
 import { GraphValidator, registerValidationChecks } from './graph-validator.js';
 
@@ -61,8 +61,7 @@ export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAd
     /**
      * Registers the custom GraphScopeProvider for scope access.
      */
-    // ScopeProvider: (services) => new DefaultScopeProvider(services),
-    ScopeProvider: (services) => new GraphScopeProvider(services),
+    ScopeProvider: (services) => new DefaultScopeProvider(services),
   },
   lsp: {
     /**
@@ -72,7 +71,8 @@ export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAd
     /**
      * Registers the custom GraphDefinitionProvider for "Go to Definition" functionality.
      */
-    DefinitionProvider: (services) => new GraphDefinitionProvider(services),
+    // DefinitionProvider: (services) => new GraphDefinitionProvider(services),
+    DefinitionProvider: (services) => new DefaultDefinitionProvider(services),
     /**
      * Registers the custom GraphRenameProvider for rename refactoring.
      */
