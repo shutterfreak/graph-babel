@@ -46,10 +46,11 @@ export function range_toString(range: Range | undefined): string {
 
 /**
  * Renders a string or undefined text into a multiline string, with optional prefix, suffix, and starting line number.
+ * Line endings are treated individually, and suffix is only appended after lines ending with a line ending.
  *
  * @param text The string to render. Can be undefined.
  * @param prefix An optional prefix to add to each line. Defaults to ''.
- * @param suffix An optional suffix to add to each line. Defaults to ''.
+ * @param suffix An optional suffix to add to lines ending with a line ending. Defaults to ''.
  * @param start_line The starting line number for the rendered text. Defaults to 0.
  * @returns A multiline string representation of the input text, or '<undefined text>' if text is undefined.
  *
@@ -60,6 +61,22 @@ export function range_toString(range: Range | undefined): string {
  * //   DEBUG:   11|Line 1END
  * //   DEBUG:   12|Line 2END
  * //   DEBUG:   13|Line 3END
+ *
+ * const myText2 = "Line 1\nLine 2\nLine 3\n\n";
+ * const renderedText2 = render_text(myText2, "DEBUG", "END", 10);
+ * // Returns:
+ * //   DEBUG:   11|Line 1END
+ * //   DEBUG:   12|Line 2END
+ * //   DEBUG:   13|Line 3END
+ * //   DEBUG:   14|END
+ * //   DEBUG:   15|END
+ *
+ * const myText3 = "Line 1\nLine 2\nLine 3";
+ * const renderedText3 = render_text(myText3, "DEBUG", "END", 10);
+ * // Returns:
+ * //   DEBUG:   11|Line 1END
+ * //   DEBUG:   12|Line 2END
+ * //   DEBUG:   13|Line 3
  */
 export function render_text(
   text: string | undefined,
@@ -67,13 +84,34 @@ export function render_text(
   suffix: string = '',
   start_line: number = 0,
 ): string {
-  return (text ?? '<undefined text>')
-    .split(/\r?\n|\r|\n/g)
-    .map(
-      (line, index) =>
-        `  ${prefix == '' ? '' : prefix + ':'} ${String('    ' + (index + start_line + 1)).slice(-4)}|${line}${suffix}`,
-    )
-    .join('\n');
+  if (text === undefined) {
+    return `  ${prefix == '' ? '' : prefix + ':'} <undefined text>`;
+  }
+
+  let lineNumber = start_line + 1;
+  let result = '';
+  let currentLine = '';
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '\r' || char === '\n') {
+      if (char === '\r' && text[i + 1] === '\n') {
+        i++; // Skip the '\n' in '\r\n'
+      }
+      result += `  ${prefix == '' ? '' : prefix + ':'} ${String('    ' + lineNumber).slice(-4)}|${currentLine}${suffix}\n`;
+      lineNumber++;
+      currentLine = '';
+    } else {
+      currentLine += char;
+    }
+  }
+
+  // Handle the last line (if it doesn't end with a line ending)
+  if (currentLine.length > 0) {
+    result += `  ${prefix == '' ? '' : prefix + ':'} ${String('    ' + lineNumber).slice(-4)}|${currentLine}`;
+  }
+
+  return result;
 }
 
 /**
