@@ -10,6 +10,7 @@ import {
 } from 'langium/lsp';
 
 import { GraphCodeActionProvider } from '../lsp/graph-code-actions.js';
+import { GraphFormatter } from '../lsp/graph-formatter.js';
 //import { GraphDefinitionProvider } from '../lsp/graph-definition-provider.js';
 import { GraphNameProvider } from '../lsp/graph-name-provider.js';
 import { GraphRenameProvider } from '../lsp/graph-rename-provider.js';
@@ -77,6 +78,10 @@ export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAd
      * Registers the custom GraphRenameProvider for rename refactoring.
      */
     RenameProvider: (services) => new GraphRenameProvider(services),
+    /**
+     * Registers the custom GraphFormatter for formatting.
+     */
+    Formatter: () => new GraphFormatter(),
   },
 };
 
