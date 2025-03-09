@@ -58,7 +58,6 @@ Style:
     StyleRef?
 	name=ID
 	definition=StyleBlock
-    // { infer Style }
 ;
 
 StyleBlock:
@@ -91,7 +90,6 @@ LabelStyleDefinition:
 ColorStyleDefinition:
     topic=COLOR_STYLE_TOPIC
     ':'
-    // value=( STRING | ID )
     value=ColorDefinition
 ;
 OpacityStyleDefinition:
