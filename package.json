@@ -30,6 +30,7 @@
     "@codingame/monaco-vscode-editor-service-override": "~3.2.3",
     "@codingame/monaco-vscode-keybindings-service-override": "~3.2.3",
     "chalk": "~5.4.1",
+    "chevrotain": "^11.0.3",
     "commander": "~13.1.0",
     "langium": "~3.4.0",
     "monaco-editor": "npm:@codingame/monaco-vscode-editor-api@~3.2.3",
@@ -49,7 +50,7 @@
     "@types/vscode": "~1.98.0",
     "@vscode/vsce": "^3.2.2",
     "concurrently": "~9.1.2",
-    "esbuild": "~0.25.0",
+    "esbuild": "~0.25.1",
     "eslint": "~9.22.0",
     "eslint-config-prettier": "^10.1.1",
     "http-server": "~14.1.1",
@@ -62,7 +63,7 @@
     "vite": "~6.2.1",
     "vitest": "~3.0.8"
   },
-  "packageManager": "pnpm@10.5.2",
+  "packageManager": "pnpm@10.6.2",
   "pnpm": {
     "onlyBuiltDependencies": [
       "@vscode/vsce-sign",
