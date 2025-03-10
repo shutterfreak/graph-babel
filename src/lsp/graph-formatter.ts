@@ -1,5 +1,6 @@
 import { AstNode, CstNode, CstUtils } from 'langium';
-import { AbstractFormatter, Formatting } from 'langium/lsp';
+import { AbstractFormatter, Formatting, NodeFormatter } from 'langium/lsp';
+import { inspect } from 'util';
 
 import * as ast from '../language/generated/ast.js';
 import { render_text } from './graph-lsp-util.js';
@@ -16,18 +17,11 @@ export class GraphFormatter extends AbstractFormatter {
    * @param node The AST node to format.
    */
   protected format(node: AstNode): void {
-    console.log(`format(${node.$type})`);
+    console.log(
+      `format(${node.$type}) - Grammar source: type "${node.$cstNode?.grammarSource?.$type}"\n${render_text(inspect(node.$cstNode?.grammarSource), `${node.$type}: node.$cstNode?.grammarSource`)}"`,
+    );
     if (ast.isModel(node)) {
-      // Format top-level styles and elements with no indentation.
-      node.styles.forEach((style) => {
-        const styleFormatter = this.getNodeFormatter(style);
-        styleFormatter.node(style).prepend(Formatting.noIndent());
-      });
-      node.elements.forEach((element) => {
-        const elementFormatter = this.getNodeFormatter(element);
-        elementFormatter.node(element).prepend(Formatting.noIndent());
-      });
-      // TODO: Control whitespace between elements and styles (example: add one empty line)
+      this.formatModel(node);
     } else if (ast.isGraph(node)) {
       this.formatGraph(node);
     } else if (ast.isNode(node)) {
@@ -43,6 +37,17 @@ export class GraphFormatter extends AbstractFormatter {
     }
   }
 
+  private formatModel(node: ast.Model): void {
+    node.styles.forEach((style) => {
+      const styleFormatter = this.getNodeFormatter(style);
+      styleFormatter.node(style).prepend(Formatting.noIndent());
+    });
+    node.elements.forEach((element) => {
+      const elementFormatter = this.getNodeFormatter(element);
+      elementFormatter.node(element).prepend(Formatting.noIndent());
+    });
+  }
+
   /**
    * Formats a Graph node.
    * Adds spacing around the 'graph' keyword, optional StyleRef, name, and label.
@@ -52,24 +57,20 @@ export class GraphFormatter extends AbstractFormatter {
    */
   private formatGraph(node: ast.Graph): void {
     const formatter = this.getNodeFormatter(node);
-    formatter.keyword('graph').append(Formatting.oneSpace());
+    formatter.keyword('graph').surround(Formatting.noSpace()).prepend(Formatting.newLine());
 
     if (node.styleref) {
       formatter.keyword(':').surround(Formatting.noSpace());
       formatter.property('styleref').append(Formatting.oneSpace());
     }
 
-    formatter.property('name').append(Formatting.oneSpace());
+    formatter.property('name').surround(Formatting.noSpace()).prepend(Formatting.oneSpace());
     if (node.label) {
-      formatter.property('label').append(Formatting.oneSpace());
+      formatter.property('label').surround(Formatting.oneSpace());
     }
 
-    const bracesOpen = formatter.keyword('{');
-    const bracesClose = formatter.keyword('}');
-
-    formatter.interior(bracesOpen, bracesClose).prepend(Formatting.indent());
-    bracesOpen.append(Formatting.newLine());
-    bracesClose.prepend(Formatting.newLine());
+    // Format braces
+    this.formatBracesWithIndent(formatter);
   }
 
   /**
@@ -80,17 +81,19 @@ export class GraphFormatter extends AbstractFormatter {
    */
   private formatNode(node: ast.Node): void {
     const formatter = this.getNodeFormatter(node);
-    formatter.keyword('node').append(Formatting.oneSpace());
+    formatter.keyword('node').surround(Formatting.noSpace()).prepend(Formatting.newLine());
 
     if (node.styleref) {
       formatter.keyword(':').surround(Formatting.noSpace());
       formatter.property('styleref').append(Formatting.oneSpace());
     }
 
-    formatter.property('name').append(Formatting.oneSpace());
+    formatter.property('name').surround(Formatting.oneSpace());
+    /*
     if (node.label) {
       formatter.property('label').append(Formatting.oneSpace());
     }
+    */
   }
 
   /**
@@ -102,10 +105,10 @@ export class GraphFormatter extends AbstractFormatter {
    */
   private formatLink(node: ast.Link): void {
     const formatter = this.getNodeFormatter(node);
-    formatter.keyword('link').append(Formatting.oneSpace());
+    formatter.keyword('link').surround(Formatting.noSpace()).prepend(Formatting.newLine());
+    formatter.keyword(':').surround(Formatting.noSpace());
 
     if (node.styleref) {
-      formatter.keyword(':').surround(Formatting.noSpace());
       formatter.property('styleref').append(Formatting.oneSpace());
     }
 
@@ -115,27 +118,29 @@ export class GraphFormatter extends AbstractFormatter {
       formatter.keyword(')').surround(Formatting.noSpace()).append(Formatting.oneSpace());
     }
 
-    formatter.property('src').append(Formatting.oneSpace());
+    formatter.property('src').prepend(Formatting.oneSpace());
     if (node.src_arrowhead !== undefined) {
-      formatter.keyword(':').surround(Formatting.noSpace());
-      formatter.property('src_arrowhead').append(Formatting.oneSpace());
+      formatter.property('src_arrowhead').surround(Formatting.noSpace());
     }
 
-    formatter.property('link').append(Formatting.oneSpace());
-    formatter.property('relation').append(Formatting.oneSpace());
+    if (node.relation !== undefined) {
+      formatter.property('relation').surround(Formatting.oneSpace());
+    }
+    if (node.link !== undefined) {
+      formatter.property('link').surround(Formatting.oneSpace());
+    }
 
-    formatter.property('dst').append(Formatting.oneSpace());
+    formatter.property('dst').surround(Formatting.noSpace()).prepend(Formatting.oneSpace());
     if (node.dst_arrowhead !== undefined) {
-      formatter.keyword(':').surround(Formatting.noSpace());
-      formatter.property('dst_arrowhead').append(Formatting.oneSpace());
+      formatter.property('dst_arrowhead').surround(Formatting.noSpace());
     }
 
     if (node.label) {
-      formatter.property('label').append(Formatting.oneSpace());
+      formatter.property('label').surround(Formatting.noSpace()).prepend(Formatting.oneSpace());
     }
 
-    // Add whitespace around commas (no space before, one space after)
-    formatter.keyword(',').append(Formatting.oneSpace());
+    // Handle commas (no space before, one space after)
+    formatter.keyword(',').surround(Formatting.noSpace()).append(Formatting.oneSpace());
   }
 
   /**
@@ -146,82 +151,38 @@ export class GraphFormatter extends AbstractFormatter {
    */
   private formatStyle(node: ast.Style): void {
     const formatter = this.getNodeFormatter(node);
-    formatter.keyword('style').append(Formatting.oneSpace()); // Add space after 'style'
+    formatter.keyword('style').surround(Formatting.noSpace()).prepend(Formatting.newLine());
 
     if (node.styleref) {
-      formatter.keyword(':').surround(Formatting.noSpace()); // No space around colon
-      formatter.property('styleref').append(Formatting.oneSpace()); // Add space after styleref
+      formatter.keyword(':').surround(Formatting.noSpace());
+      formatter.property('styleref').surround(Formatting.noSpace());
     }
 
-    formatter.property('name').append(Formatting.oneSpace()); // Add space after name
+    formatter.property('name').surround(Formatting.oneSpace());
   }
 
   private formatStyleBlock(node: ast.StyleBlock): void {
-    console.log(
-      `formatStyleBlock()\n${render_text(node.$cstNode?.text, `StyleBlock text`, '\\n', node.$cstNode?.range.start.line)}`,
-    );
     const formatter = this.getNodeFormatter(node);
-    const bracesOpen = formatter.keyword('{');
-    const bracesClose = formatter.keyword('}');
-    formatter
-      .interior(bracesOpen, bracesClose)
-      .prepend(Formatting.indent())
-      .surround(Formatting.noSpace());
-    // Only add newline after opening brace if the first item is on a different line
-    if (node.items.length > 0 && node.$cstNode) {
-      const firstItem = node.items[0];
-      if (
-        firstItem.$cstNode &&
-        firstItem.$cstNode.range.start.line !== node.$cstNode.range.start.line
-      ) {
-        bracesOpen.append(Formatting.newLine());
-      }
-    } else {
-      bracesOpen.append(Formatting.newLine());
-    }
-    bracesClose.prepend(Formatting.newLine());
+
+    this.formatBracesWithIndent(formatter);
+
+    node.items.forEach((item) => {
+      const itemFormatter = this.getNodeFormatter(item);
+      itemFormatter.property('topic').prepend(Formatting.newLine()).prepend(Formatting.indent());
+    });
 
     if (node.$cstNode) {
-      // DEBUG
-      const startLineNode = CstUtils.getStartlineNode(node.$cstNode);
-      for (
-        let n: CstNode | undefined = startLineNode, i = 1;
-        n !== undefined;
-        n = CstUtils.getNextNode(n, true)
-      ) {
-        console.log(
-          `formatStyleBlock() DBG ${i++}: [type "${n.grammarSource?.$type}", containerProperty "${n.grammarSource?.$containerProperty}", containerIndex "${n.grammarSource?.$containerIndex}"]${n.hidden ? ' -- HIDDEN' : ''}\n${render_text(n.text, `startLineNode`, '\\n', n.range.start.line)}`,
-        );
-      }
-      CstUtils.streamCst(node.$cstNode).forEach((cstNode, index) => {
-        console.log(
-          `formatStyleBlock() CST node ${index} grammarSource: [type "${cstNode.grammarSource?.$type}", containerProperty "${cstNode.grammarSource?.$containerProperty}", containerIndex "${cstNode.grammarSource?.$containerIndex}"]`,
-        );
-      });
-      // Format each StyleDefinition item within the StyleBlock
-      if (node.items.length > 0) {
-        node.items.forEach((item) => {
-          const itemFormatter = this.getNodeFormatter(item);
-          itemFormatter
-            .property('topic')
-            .prepend(Formatting.newLine())
-            .prepend(Formatting.indent());
-        });
-      }
-
-      // Handle semicolons
       const cstNodes = CstUtils.streamCst(node.$cstNode).toArray();
+      // Handle semicolons
       const semicolonNodes: CstNode[] = cstNodes.filter((cstNode) => cstNode.text === ';');
       formatter.cst(semicolonNodes).prepend(Formatting.oneSpace());
-
-      // TODO: Add semicolon after the last StyleDefinition if missing
+      // Handle colons
+      const colonNodes: CstNode[] = cstNodes.filter((cstNode) => cstNode.text === ':');
+      formatter.cst(colonNodes).surround(Formatting.noSpace());
     }
   }
 
   private formatStyleDefinition(node: ast.StyleDefinition): void {
-    console.log(
-      `formatStyleDefinition()\n${render_text(node.$cstNode?.text, `StyleDefinition text`, '\\n', node.$cstNode?.range.start.line)}`,
-    );
     const formatter = this.getNodeFormatter(node);
     if (node.$cstNode) {
       const cstNodes = CstUtils.streamCst(node.$cstNode).toArray();
@@ -232,5 +193,17 @@ export class GraphFormatter extends AbstractFormatter {
         formatter.cst(colonNodes).append(Formatting.oneSpace()).prepend(Formatting.noSpace());
       }
     }
+  }
+
+  private formatBracesWithIndent(formatter: NodeFormatter<AstNode>) {
+    const bracesOpen = formatter.keyword('{');
+    const bracesClose = formatter.keyword('}');
+    formatter
+      .interior(bracesOpen, bracesClose)
+      .prepend(Formatting.indent())
+      .surround(Formatting.noSpace());
+
+    bracesOpen.append(Formatting.newLine());
+    bracesClose.prepend(Formatting.newLine());
   }
 }
