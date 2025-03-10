@@ -15,7 +15,7 @@ import { GraphFormatter } from '../lsp/graph-formatter.js';
 import { GraphNameProvider } from '../lsp/graph-name-provider.js';
 import { GraphRenameProvider } from '../lsp/graph-rename-provider.js';
 import { GraphScopeComputation } from '../lsp/graph-scope-computation.js';
-import { GraphTokenBuilder } from '../lsp/graph-token-builder.js';
+//import { GraphTokenBuilder } from '../lsp/graph-token-builder.js';
 import { GraphGeneratedModule, GraphGeneratedSharedModule } from './generated/module.js';
 import { GraphValidator, registerValidationChecks } from './graph-validator.js';
 
@@ -30,13 +30,13 @@ import { GraphValidator, registerValidationChecks } from './graph-validator.js';
  * NOTE: Make sure custom Graph services referenced in GraphModule are also declared here!
  */
 export interface GraphAddedServices {
-  parser: {
-    /**
-     * Custom token builder for the Graph language.
-     * Overrides the default token builder to include whitespace tokens in the CST.
-     */
-    TokenBuilder: GraphTokenBuilder;
-  };
+  // parser: {
+  /**
+   * Custom token builder for the Graph language.
+   * Overrides the default token builder to include whitespace tokens in the CST.
+   */
+  /* TokenBuilder: GraphTokenBuilder;
+  }; */
 
   validation: {
     /**
@@ -92,10 +92,10 @@ export type GraphServices = LangiumServices & GraphAddedServices;
  * This module overrides Langium default services and contributes custom services.
  */
 export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAddedServices> = {
-  parser: {
-    /** Custom token builder to include whitespace tokens in the CST. */
-    TokenBuilder: () => new GraphTokenBuilder(),
-  },
+  // parser: {
+  /** Custom token builder to include whitespace tokens in the CST. */
+  /* TokenBuilder: () => new GraphTokenBuilder(),
+  }, */
   validation: {
     /** Registers the custom GraphValidator for language-specific validations. */
     GraphValidator: () => new GraphValidator(),
