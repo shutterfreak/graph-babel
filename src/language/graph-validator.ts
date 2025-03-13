@@ -24,6 +24,7 @@ import {
   WidthValue,
   isElement,
   isGraph,
+  isLink,
   isModel,
   isNode,
   isStyle,
@@ -99,11 +100,15 @@ export class GraphValidator {
    */
   checkUniqueElementNames = (model: Model, accept: ValidationAcceptor): void => {
     // Create a set of identifiers while traversing the AST
-    const identifiers = new Set<string>();
+    // const identifiers = new Set<string>();
+
+    // Map to store names and their corresponding AST nodes
+    const nameMap = new Map<string, Element[]>();
 
     function traverseElement(element: Element): void {
       const preamble = `traverseElement(${element.$type} element (${element.name ?? '<no name>'}))`;
       console.log(chalk.white(`${preamble} - START`));
+      // Check for missing name
       if (
         (isNode(element) || isGraph(element)) &&
         (!isNamed(element) || element.name.length == 0)
@@ -119,24 +124,19 @@ export class GraphValidator {
           code: IssueCodes.IdMissing,
         });
       }
+
+      // Handle named elements
       if (isNamed(element) && element.name.length > 0) {
         // The element has a name (note: links have an optional name)
-        if (identifiers.has(element.name)) {
-          // report an error if the identifier is not unique
-          console.warn(
-            chalk.red(`${preamble} - Duplicate name ${element.name} found for ${element.$type}.`),
-          );
-          accept('error', `Duplicate name '${element.name}'`, {
-            node: element,
-            property: 'name',
-            code: IssueCodes.IdDuplicate,
-          });
-        } else {
-          identifiers.add(element.name);
+        const name = element.name;
+        if (!nameMap.has(name)) {
+          nameMap.set(name, []);
         }
+        nameMap.get(name)?.push(element);
       }
 
-      if (element.$type === 'Graph') {
+      // Recurse for Graph elements
+      if (isGraph(element)) {
         // Recurse
         for (const e of element.elements) {
           traverseElement(e);
@@ -152,6 +152,42 @@ export class GraphValidator {
     for (const element of model.elements) {
       traverseElement(element);
     }
+    // Check for duplicate names and report errors
+    nameMap.forEach((elements, name) => {
+      if (elements.length > 1) {
+        elements.forEach((element) => {
+          accept('error', `Duplicate name '${name}'`, {
+            node: element,
+            property: 'name',
+            code: IssueCodes.IdDuplicate,
+          });
+        });
+      }
+    });
+
+    // Check Link references against duplicate names
+    AstUtils.streamAllContents(model)
+      .filter(isLink)
+      .forEach((link: Link) => {
+        link.src.forEach((ref) => {
+          if (nameMap.size > 0 && (nameMap.get(ref.$refText)?.length ?? 0) > 1) {
+            accept('error', `Reference to duplicate name '${ref.$refText}' in src`, {
+              node: link,
+              property: 'src',
+              code: IssueCodes.IdDuplicate,
+            });
+          }
+        });
+        link.dst.forEach((ref) => {
+          if (nameMap.size > 0 && (nameMap.get(ref.$refText)?.length ?? 0) > 1) {
+            accept('error', `Reference to duplicate name '${ref.$refText}' in dst`, {
+              node: link,
+              property: 'dst',
+              code: IssueCodes.IdDuplicate,
+            });
+          }
+        });
+      });
 
     ///console.log(chalk.whiteBright('checkUniqueElementNames() - END'));
   };
@@ -209,7 +245,7 @@ export class GraphValidator {
     if (link.link !== undefined) {
       const match = GraphTerminals.LINK_TYPE.exec(link.link);
       if (match) {
-        const src_head: string = match[1] ?? '';
+        const src_head: string = match[1]; // ?? '';
         // const line = match[2] ?? ""; -- already checked in the grammar
         const dst_head: string = match[3] ?? '';
 
