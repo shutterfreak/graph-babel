@@ -62,8 +62,8 @@ export function registerValidationChecks(services: GraphServices) {
 
 // The issue codes can help to select code actions for issues encountered while validating the document
 export const IssueCodes = {
-  IdMissing: 'name-missing',
-  IdDuplicate: 'name-duplicate',
+  NameMissing: 'name-missing',
+  NameDuplicate: 'name-duplicate',
   SrcArrowheadEmpty: 'src-arrowhead-empty',
   SrcArrowheadInvalid: 'src-arrowhead-empty',
   DstArrowheadEmpty: 'dst-arrowhead-empty',
@@ -121,7 +121,7 @@ export class GraphValidator {
         accept('error', `${element.$type} must have a nonempty name [${element.$cstNode?.text}]`, {
           node: element,
           property: 'name',
-          code: IssueCodes.IdMissing,
+          code: IssueCodes.NameMissing,
         });
       }
 
@@ -159,7 +159,7 @@ export class GraphValidator {
           accept('error', `Duplicate name '${name}'`, {
             node: element,
             property: 'name',
-            code: IssueCodes.IdDuplicate,
+            code: IssueCodes.NameDuplicate,
           });
         });
       }
@@ -174,7 +174,7 @@ export class GraphValidator {
             accept('error', `Reference to duplicate name '${ref.$refText}' in src`, {
               node: link,
               property: 'src',
-              code: IssueCodes.IdDuplicate,
+              code: IssueCodes.NameDuplicate,
             });
           }
         });
@@ -183,7 +183,7 @@ export class GraphValidator {
             accept('error', `Reference to duplicate name '${ref.$refText}' in dst`, {
               node: link,
               property: 'dst',
-              code: IssueCodes.IdDuplicate,
+              code: IssueCodes.NameDuplicate,
             });
           }
         });
@@ -354,7 +354,7 @@ export class GraphValidator {
       accept('error', 'A style must have a nonempty name.', {
         node: style,
         property: 'name',
-        code: IssueCodes.IdMissing,
+        code: IssueCodes.NameMissing,
       });
     }
   };

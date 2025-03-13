@@ -57,8 +57,8 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     switch (
       diagnostic.code // code as defined in 'graph-validator.ts' for each validation check
     ) {
-      case IssueCodes.IdDuplicate:
-      case IssueCodes.IdMissing:
+      case IssueCodes.NameDuplicate:
+      case IssueCodes.NameMissing:
         return this.generateNewName(diagnostic, document);
       case IssueCodes.StyleSelfReference:
         return this.removeStyleSelfReference(diagnostic, document);
