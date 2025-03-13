@@ -170,21 +170,69 @@ npm run build
 
 And now hit 'F5' in VS Code.
 
-### Code actions
+### Scope computation and Scope provider
 
-The following code actions have been implemented:
+Names of `Graph`, `Node` and `Link` nodes are available at file level irrespective of where they are defined. They can refer to other styles in that scope.
 
-| vscode diagnostic code |         code text         | description                            | code action and explanation                                                             |
-| :--------------------: | :-----------------------: | -------------------------------------- | --------------------------------------------------------------------------------------- |
-|       IdMissing        |       "id-missing"        | Object has a missing `ìd` property     | `generateNewId()` - generate a (new) unique `id`                                        |
-|      IdDuplicate       |      "id-duplicate"       | Object has a duplicate `ìd` property   | `generateNewId()` - generate a (new) unique `id`                                        |
-|   StyleSelfReference   |  "style-self-reference"   | `Style` references itself              | `removeStyleSelfReference` - remove ': styleref' from self-referencing style definition |
-|  LinkWidthUnitUnknown  | "link-width-unit-unknown" | `WidthValue` has an unknown width unit | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
-|   LinkWidthHasNoUnit   |   "link-width-no-unit"    | `WidthValue` has no width unit         | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
+Style definitions obey the Langium-based scoping, and can refer to other styles in that scope.
+
+See [graph-scope-computation.ts](src/lsp/graph-scope-computation.ts) and [graph-scope-provider.ts](src/lsp/graph-scope-provider.ts).
+
+### Name provider
+
+A custom name provider has been implemented, returning the name for `Style`nodes and for `Eleement` nodes with nonempty name (`Graph`, `Node`, `Link`).
+
+See [graph-name-provider.ts](src/lsp/graph-name-provider.ts).
+
+### Diagnostics and Code Actions
+
+The following diagonstics have been implemented, some of which also provide code actions:
+
+|   vscode diagnostic code    |            code text             | description                                   | code action and explanation                                                             |
+| :-------------------------: | :------------------------------: | --------------------------------------------- | --------------------------------------------------------------------------------------- |
+|         NameMissing         |          "name-missing"          | Object has a missing `name` property          | `generateNewName()` - generate a (new) unique `name`                                    |
+|        NameDuplicate        |         "name-duplicate"         | Object has a duplicate `name` property        | `generateNewName()` - generate a (new) unique `name`                                    |
+|     StyleSelfReference      |      "style-self-reference"      | `Style` references itself                     | `removeStyleSelfReference` - remove ': styleref' from self-referencing style definition |
+|    LinkWidthUnitUnknown     |    "link-width-unit-unknown"     | `WidthValue` has an unknown width unit        | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
+|     LinkWidthHasNoUnit      |       "link-width-no-unit"       | `WidthValue` has no width unit                | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
+|      SrcArrowheadEmpty      |      "src-arrowhead-empty"       | Source arrowhead is empty                     | No code action implemented                                                              |
+|     SrcArrowheadInvalid     |     "src-arrowhead-invalid"      | Source arrowhead is invalid                   | No code action implemented                                                              |
+|      DstArrowheadEmpty      |      "dst-arrowhead-empty"       | Destination arrowhead is empty                | No code action implemented                                                              |
+|     DstArrowheadInvalid     |     "dst-arrowhead-invalid"      | Destination arrowhead is invalid              | No code action implemented                                                              |
+|    SrcArrowheadRedefined    |    "src-arrowhead-redefined"     | Source arrowhead is redefined                 | No code action implemented                                                              |
+|    DstArrowheadRedefined    |    "dst-arrowhead-redefined"     | Destination arrowhead is redefined            | No code action implemented                                                              |
+|      LinkStyleInvalid       |       "link-style-invalid"       | Link style is invalid                         | No code action implemented                                                              |
+|      StyleAfterElement      |      "style-after-element"       | Style defined after element                   | No code action implemented                                                              |
+|  StyleMultipleDefinitions   |   "style-multiple-definitions"   | Multiple style definitions with the same name | No code action implemented                                                              |
+|  StyleDefinitionEmptyTopic  |  "style-definition-empty-topic"  | Style definition has an empty topic           | No code action implemented                                                              |
+| StyleDefinitionUnknownTopic | "style-definition-unknown-topic" | Style definition has an unknown topic         | No code action implemented                                                              |
+|      ShapeNameMissing       |       "shape-name-missing"       | Shape name is missing                         | No code action implemented                                                              |
+|      ShapeNameUnknown       |       "shape-name-unknown"       | Shape name is unknown                         | No code action implemented                                                              |
+|      ColorNameUnknown       |       "color-name-unknown"       | Color name is unknown                         | No code action implemented                                                              |
+|       HexColorInvalid       |       "hex-color-invalid"        | Hex color is invalid                          | No code action implemented                                                              |
+|   RgbChannelValueInvalid    |   "rgb-channel-value-invalid"    | RGB channel value is invalid                  | No code action implemented                                                              |
+|  RgbChannelValueOutOfRange  | "rgb-channel-value-out-of-range" | RGB channel value is out of range             | No code action implemented                                                              |
+|    LinkWidthValueInvalid    |    "link-width-value-invalid"    | Link width value is invalid                   | No code action implemented                                                              |
+|   OpacityValueOutOfRange    |   "opacity-value-out-of-range"   | Opacity value is out of range                 | No code action implemented                                                              |
+|     OpacityValueInvalid     |     "opacity-value-invalid"      | Opacity value is invalid                      | No code action implemented                                                              |
+
+See [graph-validators.ts](src/lsp/graph-validators.ts) and [graph-code-actions.ts](src/lsp/graph-code-actions.ts).
+
+### Formatting provider
+
+A custom formatting provider has been implemented to format an unformatted `.graph` file. It takes care of indentation, brace placement and single-line comments after an opening brace.
+
+See [graph-formatting-provider.ts](src/lsp/graph-formatting-provider.ts).
 
 ### Rename provider
 
 The vscode Rename Symbol `<F2>` context menu can be used to rename a Node, Graph or Link. References are automatically renamed as well. The rename operation will not be applied if the new name is empty or already exists as name. Reserved keywords are also not permitted.
+
+See [graph-rename-provider.ts](src/lsp/graph-rename-provider.ts).
+
+### Folding Range Provider
+
+`Graph` and `Style` items can be folded. See [graph-folding-provider.ts](src/lsp/graph-folding-provider.ts).
 
 ## Contributing
 
