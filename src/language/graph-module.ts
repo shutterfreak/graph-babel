@@ -10,6 +10,7 @@ import {
 } from 'langium/lsp';
 
 import { GraphCodeActionProvider } from '../lsp/graph-code-actions.js';
+import { GraphFoldingProvider } from '../lsp/graph-folding-range-provider.js';
 import { GraphFormatter } from '../lsp/graph-formatter.js';
 //import { GraphDefinitionProvider } from '../lsp/graph-definition-provider.js';
 import { GraphNameProvider } from '../lsp/graph-name-provider.js';
@@ -85,6 +86,12 @@ export interface GraphAddedServices {
      * Provides language-specific formatting rules.
      */
     Formatter: GraphFormatter;
+
+    /**
+     * Custom folding range provider for the Graph language.
+     * Provides code folding for Graph and Style nodes.
+     */
+    FoldingRangeProvider: GraphFoldingProvider;
   };
 }
 
@@ -125,6 +132,8 @@ export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAd
     RenameProvider: (services) => new GraphRenameProvider(services),
     /** Registers the custom GraphFormatter for formatting. */
     Formatter: () => new GraphFormatter(),
+    /** Registers the custom GraphFoldingProvider for code folding. */
+    FoldingRangeProvider: (services) => new GraphFoldingProvider(services),
   },
 };
 
