@@ -15,6 +15,7 @@ import {
   HexColorDefinition,
   Link,
   Model,
+  NodeAlias,
   OpacityStyleDefinition,
   RgbColorDefinition,
   ShapeStyleDefinition,
@@ -49,6 +50,7 @@ export function registerValidationChecks(services: GraphServices) {
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
     Link: [validator.checkLinkStyles],
     Style: [validator.checkStyleNames, validator.checkStyleSubstyles],
+    NodeAlias: [validator.checkNodeAliasStyleRef],
     StyleDefinition: [validator.checkStyleDefinitionTopics],
     HexColorDefinition: [validator.checkHexColorDefinitions],
     RgbColorDefinition: [validator.checkRgbColorDefinitions],
@@ -87,6 +89,7 @@ export const IssueCodes = {
   LinkWidthUnitUnknown: 'link-width-unit-unknown',
   OpacityValueOutOfRange: 'opacity-value-out-of-range',
   OpacityValueInvalid: 'opacity-value-invalid',
+  NodeAliasStyleRefNotFound: 'node-alias-style-ref-not-found',
 };
 
 /**
@@ -190,6 +193,22 @@ export class GraphValidator {
       });
 
     ///console.log(chalk.whiteBright('checkUniqueElementNames() - END'));
+  };
+  /**
+   * Check that the NodeAlias styleref resolves to a valid Style.
+   * @param nodeAlias
+   * @param accept
+   */
+  checkNodeAliasStyleRef = (nodeAlias: NodeAlias, accept: ValidationAcceptor) => {
+    if (nodeAlias.styleref) {
+      if (!nodeAlias.styleref.ref) {
+        accept('error', `Style reference '${nodeAlias.styleref.$refText}' not found.`, {
+          node: nodeAlias,
+          property: 'styleref',
+          code: IssueCodes.NodeAliasStyleRefNotFound,
+        });
+      }
+    }
   };
   /**
    * Check the Style nodes through the entire Model hierarchy:
