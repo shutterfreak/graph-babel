@@ -10,15 +10,17 @@ import {
   interruptAndCheck,
 } from 'langium';
 
+import { isNodeAlias } from '../language/generated/ast.js';
+
 /**
- * Custom scope computation class extending the default Langium scope computation.
- * Provides a file-global scope for all named elements (Graphs, Nodes, Links),
- * ensuring they are visible at all levels within the same document.
+ * Computes the scope for the Graph language, including file-global and local scopes.
+ * Extends the default Langium scope computation to handle 'NodeAlias' nodes and
+ * provide a file-global scope for cross-reference resolution.
  */
 export class GraphScopeComputation extends DefaultScopeComputation {
   /**
-   * Stores descriptions of all named elements in the document,
-   * making them accessible throughout the file.
+   * Stores descriptions of all named elements in the document, making them
+   * accessible throughout the file.
    */
   private fileGlobalScope: MultiMap<AstNode, AstNodeDescription> | undefined = undefined;
 
@@ -32,7 +34,8 @@ export class GraphScopeComputation extends DefaultScopeComputation {
   }
 
   /**
-   * Computes local scopes and initializes the file-global scope for a given Langium document.
+   * Computes local scopes and initializes the file-global scope for a given
+   * Langium document.
    *
    * @param document The Langium document for which to compute scopes.
    * @param cancelToken Optional cancellation token.
@@ -45,6 +48,8 @@ export class GraphScopeComputation extends DefaultScopeComputation {
     const rootNode = document.parseResult.value;
     const scopes = new MultiMap<AstNode, AstNodeDescription>();
 
+    // Store the file-global scope in precomputedScopes for the root node
+    const fileGlobalScope = new MultiMap<AstNode, AstNodeDescription>();
     // Initialize the file-global scope if it doesn't exist
     if (!this.fileGlobalScope) {
       this.fileGlobalScope = new MultiMap<AstNode, AstNodeDescription>();
@@ -63,8 +68,24 @@ export class GraphScopeComputation extends DefaultScopeComputation {
       }
     }
 
+    for (const node of AstUtils.streamAllContents(rootNode)) {
+      await interruptAndCheck(cancelToken);
+
+      const name = this.nameProvider.getName(node) ?? '';
+      if (name.length > 0) {
+        fileGlobalScope.add(
+          document.parseResult.value,
+          this.descriptions.createDescription(node, name, document),
+        );
+      }
+    }
+    document.precomputedScopes = scopes;
+    document.precomputedScopes.addAll(document.parseResult.value, fileGlobalScope.values());
+
     // Process each node to compute local scopes
     for (const node of AstUtils.streamAllContents(rootNode)) {
+      await interruptAndCheck(cancelToken);
+
       this.processNode(node, document, scopes);
     }
 
@@ -72,7 +93,8 @@ export class GraphScopeComputation extends DefaultScopeComputation {
   }
 
   /**
-   * Processes a single node during scope computation, adding it to the appropriate local scope.
+   * Processes a single node during scope computation, adding it to the
+   * appropriate local scope.
    *
    * @param node The AST node to process.
    * @param document The Langium document.
@@ -89,6 +111,14 @@ export class GraphScopeComputation extends DefaultScopeComputation {
     // Add named element to its container's local scope
     if (name.length > 0 && container) {
       scopes.add(container, this.descriptions.createDescription(node, name, document));
+    }
+
+    // Handle KeywordAlias
+    if (isNodeAlias(node)) {
+      scopes.add(
+        document.parseResult.value,
+        this.descriptions.createDescription(node, node.name, document),
+      ); // Add to file-global scope
     }
   }
 }

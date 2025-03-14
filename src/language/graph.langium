@@ -1,11 +1,19 @@
 grammar Graph
 
 entry Model:
-    (elements+=Element | styles+=Style)*
+    (elements+=Element | styles+=Style | aliases+=NodeAlias)*
 ;
 
 Element:
     Graph | Node | Link;
+
+NodeAlias:
+    'define'
+    name=ID
+    'node'
+    StyleRef?
+    definition=StyleBlock?
+;
 
 Graph:
     'graph'
@@ -13,12 +21,12 @@ Graph:
     name=ID
     label=Label?
     '{'
-    (elements+=Element | styles+=Style)*
+    (elements+=Element | styles+=Style | aliases+=NodeAlias)*
     '}'
 ;
 
 Node:
-    'node'
+    (alias=[NodeAlias:ID] | 'node')
     StyleRef?
     name=ID
     label=Label?
