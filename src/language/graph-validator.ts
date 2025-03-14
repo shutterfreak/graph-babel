@@ -245,8 +245,11 @@ export class GraphValidator {
     if (link.link !== undefined) {
       const match = GraphTerminals.LINK_TYPE.exec(link.link);
       if (match) {
-        const src_head: string = match[1]; // ?? '';
+        // ESLint Bug: match[i] can be undefined!
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        const src_head: string = match[1] ?? '';
         // const line = match[2] ?? ""; -- already checked in the grammar
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const dst_head: string = match[3] ?? '';
 
         if (link.src_arrowhead !== undefined && src_head.length > 0) {
