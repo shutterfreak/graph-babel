@@ -1,13 +1,13 @@
 import {
   AstUtils,
   CstNode,
+  CstUtils,
   LangiumDocument,
   LeafCstNode,
   LeafCstNodeImpl,
   MaybePromise,
   isNamed,
 } from 'langium';
-import { CstUtils } from 'langium';
 import { CodeActionProvider } from 'langium/lsp';
 import { inspect } from 'util';
 import { CodeActionKind, Diagnostic } from 'vscode-languageserver';
