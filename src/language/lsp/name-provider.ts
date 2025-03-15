@@ -1,6 +1,6 @@
 import { AstNode, DefaultNameProvider, isNamed } from 'langium';
 
-import { isElement, isNodeAlias, isStyle } from '../language/generated/ast.js';
+import { isElement, isNodeAlias, isStyle } from '../generated/ast.js';
 
 /**
  * Provides names for AST nodes in the Graph language.

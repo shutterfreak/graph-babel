@@ -1,7 +1,7 @@
 import { AstNode, LangiumDocument } from 'langium';
 import { DefaultFoldingRangeProvider, FoldingRangeAcceptor, LangiumServices } from 'langium/lsp';
 
-import { isGraph, isStyle } from '../language/generated/ast.js';
+import { isGraph, isStyle } from '../generated/ast.js';
 
 /**
  * Custom folding range provider for the Graph language.

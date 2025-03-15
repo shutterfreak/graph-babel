@@ -19,8 +19,8 @@ import {
   WorkspaceEdit,
 } from 'vscode-languageserver';
 
-import { isElement, isNodeAlias } from '../language/generated/ast.js';
-import { range_toString, render_text } from './graph-lsp-util.js';
+import { isElement, isNodeAlias } from '../generated/ast.js';
+import { range_toString, render_text } from './lsp-util.js';
 
 /**
  * Custom rename provider with validation for Graph language.

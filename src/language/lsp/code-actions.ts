@@ -14,9 +14,9 @@ import { CodeActionKind, Diagnostic } from 'vscode-languageserver';
 import { CodeActionParams } from 'vscode-languageserver-protocol';
 import { CodeAction, Command } from 'vscode-languageserver-types';
 
-import { isElement, isStyle, isWidthValue } from '../language/generated/ast.js';
-import { IssueCodes } from '../language/graph-validator.js';
-import { LENGTH_UNITS } from '../language/model-helpers.js';
+import { isElement, isStyle, isWidthValue } from '../generated/ast.js';
+import { IssueCodes } from '../graph-validator.js';
+import { LENGTH_UNITS } from '../model-helpers.js';
 
 /**
  * Provides code actions (quick fixes and refactorings) for the Graph language.

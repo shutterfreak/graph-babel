@@ -1,11 +1,4 @@
-import {
-  AstNode,
-  CstNode,
-  CstUtils,
-  // TextDocument,
-  isLeafCstNode,
-  isNamed,
-} from 'langium';
+import { AstNode, CstNode, CstUtils, isLeafCstNode, isNamed } from 'langium';
 import {
   AbstractFormatter,
   Formatting,
@@ -17,7 +10,7 @@ import { rangeToString } from 'langium/test';
 import { inspect } from 'util';
 import type { Range, TextEdit } from 'vscode-languageserver-protocol';
 
-import * as ast from '../language/generated/ast.js';
+import * as ast from '../generated/ast.js';
 
 /**
  * GraphFormatter provides custom formatting for the Graph language.

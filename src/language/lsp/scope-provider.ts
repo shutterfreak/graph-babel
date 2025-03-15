@@ -9,8 +9,8 @@ import {
   stream,
 } from 'langium';
 
-import { isGraph, isLink, isNode, isNodeAlias, isStyle } from '../language/generated/ast.js';
-import { path_get_file } from './graph-lsp-util.js';
+import { isGraph, isLink, isNode, isNodeAlias, isStyle } from '../generated/ast.js';
+import { path_get_file } from './lsp-util.js';
 
 /**
  * GraphScopeProvider restricts reference resolution to definitions declared within the same file.

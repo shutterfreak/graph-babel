@@ -9,17 +9,17 @@ import {
   createDefaultSharedModule,
 } from 'langium/lsp';
 
-import { GraphCodeActionProvider } from '../lsp/graph-code-actions.js';
-import { GraphFoldingProvider } from '../lsp/graph-folding-range-provider.js';
-import { GraphFormatter } from '../lsp/graph-formatter.js';
-//import { GraphDefinitionProvider } from '../lsp/graph-definition-provider.js';
-import { GraphNameProvider } from '../lsp/graph-name-provider.js';
-import { GraphRenameProvider } from '../lsp/graph-rename-provider.js';
-import { GraphScopeComputation } from '../lsp/graph-scope-computation.js';
-//import { GraphTokenBuilder } from '../lsp/graph-token-builder.js';
-import { GraphScopeProvider } from '../lsp/graph-scope-provider.js';
 import { GraphGeneratedModule, GraphGeneratedSharedModule } from './generated/module.js';
 import { GraphValidator, registerValidationChecks } from './graph-validator.js';
+import { GraphCodeActionProvider } from './lsp/code-actions.js';
+import { GraphFoldingProvider } from './lsp/folding-range-provider.js';
+import { GraphFormatter } from './lsp/formatter.js';
+//import { GraphDefinitionProvider } from './lsp/definition-provider.js';
+import { GraphNameProvider } from './lsp/name-provider.js';
+import { GraphRenameProvider } from './lsp/rename-provider.js';
+import { GraphScopeComputation } from './lsp/scope-computation.js';
+//import { GraphTokenBuilder } from './lsp/token-builder.js';
+import { GraphScopeProvider } from './lsp/scope-provider.js';
 
 /**
  * Declaration of custom services for the Graph language.

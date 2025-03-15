@@ -10,7 +10,7 @@ import {
   interruptAndCheck,
 } from 'langium';
 
-import { isNodeAlias, isStyle } from '../language/generated/ast.js';
+import { isNodeAlias, isStyle } from '../generated/ast.js';
 
 /**
  * Computes the scope for the Graph language, including file-global and local scopes.
