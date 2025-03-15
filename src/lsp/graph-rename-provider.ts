@@ -289,7 +289,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
    * Checks if a given name is a reserved keyword in the language to prevent invalid renaming.
    */
   protected isKeyword(name: string): boolean {
-    const keywords = new Set(['element', 'graph', 'link', 'node', 'style', 'to', 'with']);
+    const keywords = new Set(['define', 'element', 'graph', 'link', 'node', 'style', 'to', 'with']);
     // TODO refine the logic to avoid renaming to an existing NodeAlias
     return keywords.has(name);
   }
