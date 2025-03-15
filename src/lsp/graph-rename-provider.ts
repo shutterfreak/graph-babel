@@ -126,56 +126,26 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     const aliasNames = new Set<string>();
 
     for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
-      if (isElement(childNode) && isNamed(childNode) && childNode.name.length > 0) {
-        elementNames.add(childNode.name);
-      }
-      if (isNodeAlias(childNode) && childNode.name.length > 0) {
-        aliasNames.add(childNode.name);
+      if (isNamed(childNode) && childNode.name.length > 0) {
+        (isElement(childNode) ? elementNames : aliasNames).add(childNode.name);
       }
     }
 
-    const nodeRange = node.$cstNode?.range;
-    if (!nodeRange) {
+    if (!node.$cstNode?.range) {
       return false;
     }
 
-    // Check for naming conflicts
-    if (isElement(node)) {
-      if (elementNames.has(newName)) {
-        if (this.connection) {
-          this.connection.window.showErrorMessage(
-            `"${newName}" is already used by an Element (Graph, Node, Link).`,
-          );
-        }
-        return false;
-      }
-      if (aliasNames.has(newName)) {
-        if (this.connection) {
-          this.connection.window.showErrorMessage(`"${newName}" is already used by a NodeAlias.`);
-        }
-        return false;
-      } else if (this.isKeyword(newName)) {
-        if (this.connection) {
-          this.connection.window.showErrorMessage(
-            `"${newName}" is a reserved keyword. Consider using a different name.`,
-          );
-        }
-        return false;
-      }
-    } else if (isNodeAlias(node)) {
-      if (this.isKeyword(newName)) {
-        if (this.connection) {
-          this.connection.window.showErrorMessage(`"${newName}" is a reserved keyword.`);
-        }
-        return false;
-      } else if (aliasNames.has(newName)) {
-        if (this.connection) {
-          this.connection.window.showErrorMessage(
-            `"${newName}" is already used by another NodeAlias.`,
-          );
-        }
-        return false;
-      }
+    if (
+      (isElement(node) && elementNames.has(newName)) ||
+      (isNodeAlias(node) && aliasNames.has(newName))
+    ) {
+      this.connection?.window.showErrorMessage(`"${newName}" is already in use.`);
+      return false;
+    }
+
+    if (this.isKeyword(newName)) {
+      this.connection?.window.showErrorMessage(`"${newName}" is a reserved keyword.`);
+      return false;
     }
 
     return true;
