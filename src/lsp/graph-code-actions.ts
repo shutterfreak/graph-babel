@@ -18,7 +18,23 @@ import { isElement, isStyle, isWidthValue } from '../language/generated/ast.js';
 import { IssueCodes } from '../language/graph-validator.js';
 import { LENGTH_UNITS } from '../language/model-helpers.js';
 
+/**
+ * Provides code actions (quick fixes and refactorings) for the Graph language.
+ * This class handles diagnostics reported by the validator and offers suggestions
+ * to resolve common issues or perform automated refactorings.
+ */
 export class GraphCodeActionProvider implements CodeActionProvider {
+  /**
+   * Provides code actions for the given document and range.
+   *
+   * This method is the entry point for the code action provider. It analyzes the
+   * diagnostics reported for the given range and generates corresponding code actions.
+   * It also handles manually triggered source actions.
+   *
+   * @param document The Langium document.
+   * @param params Parameters for the code action request, including diagnostics and context.
+   * @returns A promise that resolves to an array of code actions or commands.
+   */
   getCodeActions(
     document: LangiumDocument,
     params: CodeActionParams,
@@ -27,14 +43,15 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
     const result: CodeAction[] = [];
 
-    if ('context' in params) {
+    // Process diagnostics to generate quick fixes
+    if (params.context.diagnostics.length > 0) {
       for (const diagnostic of params.context.diagnostics) {
         const codeActions = this.createCodeAction(diagnostic, document);
 
         if (Array.isArray(codeActions)) {
-          result.push(...codeActions); // Handle multiple actions
+          result.push(...codeActions); // Handle multiple actions for a single diagnostic
         } else if (codeActions) {
-          result.push(codeActions); // Handle single action
+          result.push(codeActions); // Handle single action for a single diagnostic
         }
       }
     }
@@ -50,6 +67,16 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     return result;
   }
 
+  /**
+   * Creates a code action or a list of code actions based on the given diagnostic.
+   *
+   * This method maps diagnostic codes (defined in the validator) to specific
+   * code action generators.
+   *
+   * @param diagnostic The diagnostic reported by the validator.
+   * @param document The Langium document.
+   * @returns A single code action, an array of code actions, or undefined if no action is available.
+   */
   private createCodeAction(
     diagnostic: Diagnostic,
     document: LangiumDocument,
@@ -77,15 +104,26 @@ export class GraphCodeActionProvider implements CodeActionProvider {
   // Define the code actions:
 
   /*
-   * Code actions without triggering diagnostic code:
+   * Code actions without triggering diagnostic code (Source Actions):
    */
 
+  /**
+   * Provides a code action to rename a graph element.
+   *
+   * This code action is triggered manually by the user (e.g., via a context menu)
+   * and allows renaming of a graph element. Currently, it's a placeholder and
+   * needs to be implemented to dynamically determine the element to rename and
+   * prompt the user for a new name.
+   *
+   * @param document The Langium document.
+   * @returns A code action for renaming.
+   */
   private renameGraphElementName(document: LangiumDocument): CodeAction {
     console.log('renameGraphElementName() called!'); // Debugging output
 
     return {
       title: 'Rename graph element name',
-      kind: CodeActionKind.Source, // This makes it a source action, not a quick fix
+      kind: CodeActionKind.Source, // Marks it as a source action (refactoring)
       edit: {
         changes: {
           [document.textDocument.uri]: [
@@ -103,14 +141,19 @@ export class GraphCodeActionProvider implements CodeActionProvider {
   }
 
   /*
-   * Code actions triggered by diagonstic code:
+   * Code actions triggered by diagnostic code (Quick Fixes):
    */
 
   /**
-   * Generate a new, nonxisting name
-   * @param diagnostic
-   * @param document
-   * @returns
+   * Generates a new, unique name for an element.
+   *
+   * This quick fix is triggered when a duplicate or missing name is detected.
+   * It generates a new name based on the element's type and ensures it doesn't
+   * conflict with existing names in the document.
+   *
+   * @param diagnostic The diagnostic reporting the name issue.
+   * @param document The Langium document.
+   * @returns A code action to generate a new name.
    */
   private generateNewName(diagnostic: Diagnostic, document: LangiumDocument): CodeAction {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
@@ -186,6 +229,16 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     };
   }
 
+  /**
+   * Removes a self-reference in a style definition.
+   *
+   * This quick fix is triggered when a style is referencing itself. It removes
+   * the self-referential part of the style definition.
+   *
+   * @param diagnostic The diagnostic reporting the self-reference.
+   * @param document The Langium document.
+   * @returns A code action to remove the self-reference.
+   */
   private removeStyleSelfReference(diagnostic: Diagnostic, document: LangiumDocument): CodeAction {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
     const rootNode = document.parseResult.value;
@@ -256,6 +309,16 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     };
   }
 
+  /**
+   * Fixes an incorrect or missing unit for a width value.
+   *
+   * This quick fix is triggered when a link width has an unknown unit or no unit
+   * at all. It provides multiple code actions, each suggesting a valid unit.
+   *
+   * @param diagnostic The diagnostic reporting the issue with the width unit.
+   * @param document The Langium document.
+   * @returns An array of code actions, each suggesting a valid unit.
+   */
   private fixIncorrectWidthUnit(diagnostic: Diagnostic, document: LangiumDocument): CodeAction[] {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
     const rootNode = document.parseResult.value;
