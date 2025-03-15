@@ -10,6 +10,7 @@ import { DefaultRenameProvider, LangiumServices } from 'langium/lsp';
 import { inspect } from 'node:util';
 import {
   CancellationToken,
+  Connection,
   Position,
   Range,
   RenameParams,
@@ -21,13 +22,23 @@ import {
 import { isElement, isNodeAlias } from '../language/generated/ast.js';
 import { range_toString, render_text } from './graph-lsp-util.js';
 
+/**
+ * Provides rename functionality with validation and diagnostics for the language.
+ */
 export class GraphRenameProvider extends DefaultRenameProvider {
+  private readonly connection: Connection | undefined;
+
   constructor(services: LangiumServices) {
     super(services);
+    this.connection = services.shared.lsp.Connection;
   }
 
   /**
    * Determines if a rename operation is valid and returns the range of the identifier to rename.
+   * @param document - The Langium document where renaming is attempted.
+   * @param params - The position parameters of the rename request.
+   * @param cancelToken - Optional cancellation token.
+   * @returns The range of the name to be renamed, or `undefined` if renaming is not possible.
    */
   override async prepareRename(
     document: LangiumDocument,
@@ -35,7 +46,8 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     cancelToken?: CancellationToken,
   ): Promise<Range | undefined> {
-    console.log('GraphRenameProvider.prepareRename() called, params.position : ', params.position);
+    console.log('GraphRenameProvider.prepareRename() called at position:', params.position);
+
     const node = this.findDeclarationNode(document, params.position);
     console.log(
       `GraphRenameProvider.prepareRename() found node of type '${node?.$type}' defined as:\n${render_text(node?.$cstNode?.text, `'${node?.$type}' text`, '\\n', node?.$cstNode?.range.start.line)}\n`,
@@ -64,7 +76,11 @@ export class GraphRenameProvider extends DefaultRenameProvider {
   }
 
   /**
-   * Performs the rename operation by updating all occurrences of the symbol in the document.
+   * Performs the rename operation after validation.
+   * @param document - The Langium document.
+   * @param params - The rename parameters including the new name.
+   * @param cancelToken - Optional cancellation token.
+   * @returns A `WorkspaceEdit` if the rename is successful, otherwise `undefined`.
    */
   override async rename(
     document: LangiumDocument,
@@ -81,12 +97,92 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     if (!node || !(isElement(node) || isNodeAlias(node)) || !isNamed(node)) {
       return undefined;
     }
-    // Generate the required text edits for renaming the element
+
+    // Validate rename and generate diagnostics if necessary
+    const proceedWithRename = this.validateRename(document, node, params.newName);
+
+    if (!proceedWithRename) {
+      console.log(
+        `rename() - ERRORS occurred for file "${document.uri.toString()}" -- aborting rename`,
+      );
+      return undefined; // Abort rename if there are errors
+    } else {
+      console.log(`rename() - will create RenameEdit for file "${document.uri.toString()}"`);
+    }
+
     return Promise.resolve(this.createRenameEdit(document, node, params.newName));
   }
 
   /**
-   * Finds the declaration node corresponding to the rename request.
+   * Validates whether the new name is acceptable, preventing conflicts and reserved keyword usage.
+   * @param document - The Langium document.
+   * @param node - The AST node being renamed.
+   * @param newName - The proposed new name.
+   * @returns A list of diagnostics indicating issues with the rename.
+   */
+  private validateRename(document: LangiumDocument, node: AstNode, newName: string): boolean {
+    // Collect all existing IDs in the document
+    const elementNames = new Set<string>();
+    const aliasNames = new Set<string>();
+
+    for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
+      if (isElement(childNode) && isNamed(childNode) && childNode.name.length > 0) {
+        elementNames.add(childNode.name);
+      }
+      if (isNodeAlias(childNode) && childNode.name.length > 0) {
+        aliasNames.add(childNode.name);
+      }
+    }
+
+    const nodeRange = node.$cstNode?.range;
+    if (!nodeRange) {
+      return false;
+    }
+
+    // Check for naming conflicts
+    if (isElement(node)) {
+      if (elementNames.has(newName)) {
+        if (this.connection) {
+          this.connection.window.showErrorMessage(
+            `"${newName}" is already used by an Element (Graph, Node, Link).`,
+          );
+        }
+        return false;
+      }
+      if (aliasNames.has(newName)) {
+        if (this.connection) {
+          this.connection.window.showErrorMessage(`"${newName}" is already used by a NodeAlias.`);
+        }
+        return false;
+      } else if (this.isKeyword(newName)) {
+        if (this.connection) {
+          this.connection.window.showErrorMessage(
+            `"${newName}" is a reserved keyword. Consider using a different name.`,
+          );
+        }
+        return false;
+      }
+    } else if (isNodeAlias(node)) {
+      if (this.isKeyword(newName)) {
+        if (this.connection) {
+          this.connection.window.showErrorMessage(`"${newName}" is a reserved keyword.`);
+        }
+        return false;
+      } else if (aliasNames.has(newName)) {
+        if (this.connection) {
+          this.connection.window.showErrorMessage(
+            `"${newName}" is already used by another NodeAlias.`,
+          );
+        }
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Finds the declaration AST node corresponding to the rename request.
    */
 
   protected findDeclarationNode(
@@ -192,7 +288,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
   }
 
   /**
-   * Creates the necessary text edits to rename an element, updating all references.
+   * Creates the necessary text edits to rename an element and update all references.
    */
   protected createRenameEdit(
     document: LangiumDocument,
@@ -212,28 +308,52 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     );
 
     // Collect all existing IDs in the document to avoid naming conflicts
-    const existingIds = new Set<string>();
+    const elementNames = new Set<string>();
+    const aliasNames = new Set<string>();
+
     for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
-      if (isElement(childNode) && childNode.name != null) {
-        existingIds.add(childNode.name);
+      if (isElement(childNode) && childNode.name != null && childNode.name.length > 0) {
+        elementNames.add(childNode.name);
+      }
+      if (isNodeAlias(childNode) && childNode.name.length > 0) {
+        aliasNames.add(childNode.name);
       }
     }
 
-    console.log(
-      `GraphRenameProvider.createRenameEdit() - existing 'name' values: [${[...existingIds].join(', ')}] -- should not contain "${newName}"`,
-    );
-
     // Validate the new name to prevent conflicts with existing identifiers or keywords
-    if (existingIds.has(newName) || this.isKeyword(newName)) {
-      console.warn(
-        `GraphRenameProvider.createRenameEdit() - Error: "${newName}" already exists as 'name' or is a reserved keyword`,
+    // Handle NodeAlias and Elements differently
+    if (isElement(node)) {
+      if (elementNames.has(newName)) {
+        console.warn(
+          `GraphRenameProvider.createRenameEdit() - Error: An Element with name "${newName}" already exists.`,
+        );
+        return undefined;
+      }
+      // Optionally warn (or flag with a diagnostic) if newName is a reserved keyword or used by a NodeAlias:
+      if (this.isKeyword(newName) || aliasNames.has(newName)) {
+        console.warn(
+          `GraphRenameProvider.createRenameEdit() - Warning: "${newName}" is a reserved keyword or used by a NodeAlias. Consider choosing a different name.`,
+        );
+        // You might choose to allow the rename here and let a custom validator issue a warning.
+      }
+      console.log(
+        `GraphRenameProvider.createRenameEdit() - existing Element 'name' values: [${[...elementNames].join(', ')}] -- should not contain "${newName}"`,
       );
-      return undefined;
+    } else if (isNodeAlias(node)) {
+      if (this.isKeyword(newName) || aliasNames.has(newName)) {
+        console.warn(
+          `GraphRenameProvider.createRenameEdit() - Error: "${newName}" is either a reserved keyword or already used by another NodeAlias.`,
+        );
+        return undefined;
+      }
+      console.log(
+        `GraphRenameProvider.createRenameEdit() - existing NodeAlias 'name' values: [${[...aliasNames].join(', ')}] -- should not contain "${newName}"`,
+      );
     }
 
     const edits: TextEdit[] = [];
 
-    // Rename the actual declaration
+    // Rename the declaration
     const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'name');
     if (cstIdNode) {
       edits.push(TextEdit.replace(cstIdNode.range, newName));
@@ -258,15 +378,11 @@ export class GraphRenameProvider extends DefaultRenameProvider {
 
     // Rename all references
     for (const ref of document.references) {
-      if (ref.$refText !== node.name) {
-        continue; // Skip references that don't match the original name
-      }
+      if (ref.$refText === node.name && ref.$refNode) {
+        console.log(
+          `GraphRenameProvider.createRenameEdit() - Renaming reference '${ref.$refText}' at ${range_toString(ref.$refNode.range)}`,
+        );
 
-      console.log(
-        `GraphRenameProvider.createRenameEdit() - Renaming reference '${ref.$refText}' at ${range_toString(ref.$refNode?.range)}`,
-      );
-
-      if (ref.$refNode) {
         edits.push(TextEdit.replace(ref.$refNode.range, newName));
       }
     }
@@ -286,11 +402,10 @@ export class GraphRenameProvider extends DefaultRenameProvider {
   }
 
   /**
-   * Checks if a given name is a reserved keyword in the language to prevent invalid renaming.
+   * Checks if a given name is a reserved keyword in the language.
    */
   protected isKeyword(name: string): boolean {
     const keywords = new Set(['define', 'element', 'graph', 'link', 'node', 'style', 'to', 'with']);
-    // TODO refine the logic to avoid renaming to an existing NodeAlias
     return keywords.has(name);
   }
 }
