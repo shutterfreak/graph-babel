@@ -48,9 +48,10 @@ export function registerValidationChecks(services: GraphServices) {
   const validator = services.validation.GraphValidator;
   const checks: ValidationChecks<GraphAstType> = {
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
+    Element: [validator.checkStyleRef],
     Link: [validator.checkLinkStyles],
     Style: [validator.checkStyleNames, validator.checkStyleSubstyles],
-    NodeAlias: [validator.checkNodeAliasStyleRef],
+    NodeAlias: [validator.checkStyleRef],
     StyleDefinition: [validator.checkStyleDefinitionTopics],
     HexColorDefinition: [validator.checkHexColorDefinitions],
     RgbColorDefinition: [validator.checkRgbColorDefinitions],
@@ -89,7 +90,8 @@ export const IssueCodes = {
   LinkWidthUnitUnknown: 'link-width-unit-unknown',
   OpacityValueOutOfRange: 'opacity-value-out-of-range',
   OpacityValueInvalid: 'opacity-value-invalid',
-  NodeAliasStyleRefNotFound: 'node-alias-style-ref-not-found',
+  StyleRefNotFound: 'style-ref-not-found',
+  StyleRefMissing: 'style-ref-missing',
 };
 
 /**
@@ -195,18 +197,37 @@ export class GraphValidator {
     ///console.log(chalk.whiteBright('checkUniqueElementNames() - END'));
   };
   /**
-   * Check that the NodeAlias styleref resolves to a valid Style.
-   * @param nodeAlias
+   * Check that the Element and NodeAlias styleref resolves to a valid Style.
+   * @param node
    * @param accept
    */
-  checkNodeAliasStyleRef = (nodeAlias: NodeAlias, accept: ValidationAcceptor) => {
-    if (nodeAlias.styleref) {
-      if (!nodeAlias.styleref.ref) {
-        accept('error', `Style reference '${nodeAlias.styleref.$refText}' not found.`, {
-          node: nodeAlias,
+  checkStyleRef = (node: Element | NodeAlias, accept: ValidationAcceptor) => {
+    console.log(
+      `checkStyleRef() called for ${node.$type}${isNamed(node) ? ` "${node.name}"` : '(unnamed)'} - Style reference '${node.styleref?.$refText}' (${node.styleref?.ref?.$cstNode?.astNode.$type ?? '<undefined>'})`,
+    );
+    if (node.styleref) {
+      if (node.styleref.$refText.length == 0) {
+        accept('error', `Style reference missing after the ':' token.`, {
+          node: node,
           property: 'styleref',
-          code: IssueCodes.NodeAliasStyleRefNotFound,
+          code: IssueCodes.StyleRefMissing,
         });
+      } else if (!node.styleref.ref) {
+        accept('error', `Style reference '${node.styleref.$refText}' not found.`, {
+          node: node,
+          property: 'styleref',
+          code: IssueCodes.StyleRefNotFound,
+        });
+      } else if (!isStyle(node.styleref.ref.$cstNode?.astNode)) {
+        accept(
+          'error',
+          `Style reference '${node.styleref.$refText}' not of type Style (found ${node.styleref.ref.$cstNode?.astNode.$type ?? '<undefined>'}).`,
+          {
+            node: node,
+            property: 'styleref',
+            code: IssueCodes.StyleRefNotFound,
+          },
+        );
       }
     }
   };
