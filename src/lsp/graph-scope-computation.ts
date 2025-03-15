@@ -10,7 +10,7 @@ import {
   interruptAndCheck,
 } from 'langium';
 
-import { isNodeAlias } from '../language/generated/ast.js';
+import { isNodeAlias, isStyle } from '../language/generated/ast.js';
 
 /**
  * Computes the scope for the Graph language, including file-global and local scopes.
@@ -18,78 +18,92 @@ import { isNodeAlias } from '../language/generated/ast.js';
  * provide a file-global scope for cross-reference resolution.
  */
 export class GraphScopeComputation extends DefaultScopeComputation {
-  /**
-   * Stores descriptions of all named elements in the document, making them
-   * accessible throughout the file.
-   */
-  private fileGlobalScope: MultiMap<AstNode, AstNodeDescription> | undefined = undefined;
+  //private elementScope: MultiMap<AstNode, AstNodeDescription> | undefined = undefined;
+  //private styleScope: MultiMap<AstNode, AstNodeDescription> | undefined = undefined;
+  private documentScopes = new Map<string, MultiMap<AstNode, AstNodeDescription>>();
+  private styleScopes = new Map<string, MultiMap<AstNode, AstNodeDescription>>();
 
-  /**
-   * Retrieves the file-global scope.
-   *
-   * @returns The MultiMap containing descriptions of named elements, or undefined if not initialized.
-   */
-  getFileGlobalScope(): MultiMap<AstNode, AstNodeDescription> | undefined {
-    return this.fileGlobalScope;
+  /*** 
+  getElementScope(): MultiMap<AstNode, AstNodeDescription> | undefined {
+    return this.elementScope;
   }
 
-  /**
-   * Computes local scopes and initializes the file-global scope for a given
-   * Langium document.
-   *
-   * @param document The Langium document for which to compute scopes.
-   * @param cancelToken Optional cancellation token.
-   * @returns A promise that resolves to the precomputed scopes.
-   */
+  getStyleScope(): MultiMap<AstNode, AstNodeDescription> | undefined {
+    return this.styleScope;
+  }
+  ***/
+
   override async computeLocalScopes(
     document: LangiumDocument,
     cancelToken = Cancellation.CancellationToken.None,
   ): Promise<PrecomputedScopes> {
     const rootNode = document.parseResult.value;
+    const documentUri = document.uri.toString();
     const scopes = new MultiMap<AstNode, AstNodeDescription>();
 
-    // Store the file-global scope in precomputedScopes for the root node
-    const fileGlobalScope = new MultiMap<AstNode, AstNodeDescription>();
-    // Initialize the file-global scope if it doesn't exist
-    if (!this.fileGlobalScope) {
-      this.fileGlobalScope = new MultiMap<AstNode, AstNodeDescription>();
-      // Collect all named elements (Graphs, Nodes, Links) into the file-global scope
+    //const elementScope = new MultiMap<AstNode, AstNodeDescription>();
+    const documentScope = new MultiMap<AstNode, AstNodeDescription>();
+    const styleScope = new MultiMap<AstNode, AstNodeDescription>();
+
+    this.documentScopes.set(documentUri, documentScope);
+    this.styleScopes.set(documentUri, styleScope);
+
+    /***
+    if (!this.elementScope) {
+      this.elementScope = new MultiMap<AstNode, AstNodeDescription>();
+      this.styleScope = new MultiMap<AstNode, AstNodeDescription>();
+
       for (const node of AstUtils.streamAllContents(rootNode)) {
         await interruptAndCheck(cancelToken);
 
         const name = this.nameProvider.getName(node) ?? '';
         if (name.length > 0) {
-          // Add the description to the file-global scope
-          this.fileGlobalScope.add(
-            document.parseResult.value,
-            this.descriptions.createDescription(node, name, document),
-          );
+          const description = this.descriptions.createDescription(node, name, document);
+          if (isStyle(node)) {
+            this.styleScope.add(document.parseResult.value, description);
+          } else if (isElement(node) || isNodeAlias(node)) {
+            this.elementScope.add(document.parseResult.value, description);
+          }
         }
       }
     }
+    ***/
 
     for (const node of AstUtils.streamAllContents(rootNode)) {
       await interruptAndCheck(cancelToken);
 
       const name = this.nameProvider.getName(node) ?? '';
       if (name.length > 0) {
-        fileGlobalScope.add(
-          document.parseResult.value,
-          this.descriptions.createDescription(node, name, document),
-        );
+        const description = this.descriptions.createDescription(node, name, document);
+        documentScope.add(document.parseResult.value, description);
+        if (isStyle(node)) {
+          styleScope.add(document.parseResult.value, description);
+        }
       }
     }
+
     document.precomputedScopes = scopes;
-    document.precomputedScopes.addAll(document.parseResult.value, fileGlobalScope.values());
+    document.precomputedScopes.addAll(document.parseResult.value, documentScope.values());
+    // Do NOT add styleScope to precomputedScopes here
+
+    //document.precomputedScopes.addAll(document.parseResult.value, elementScope.values());
+    //document.precomputedScopes.addAll(document.parseResult.value, styleScope.values()); // Add style scope as well
 
     // Process each node to compute local scopes
     for (const node of AstUtils.streamAllContents(rootNode)) {
       await interruptAndCheck(cancelToken);
-
       this.processNode(node, document, scopes);
     }
 
     return scopes;
+  }
+
+  getDocumentScope(documentUri: string): MultiMap<AstNode, AstNodeDescription> | undefined {
+    return this.documentScopes.get(documentUri);
+  }
+
+  getStyleScope(documentUri: string): MultiMap<AstNode, AstNodeDescription> | undefined {
+    return this.styleScopes.get(documentUri);
   }
 
   /**
@@ -118,7 +132,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
       scopes.add(
         document.parseResult.value,
         this.descriptions.createDescription(node, node.name, document),
-      ); // Add to file-global scope
+      );
     }
   }
 }

@@ -1,5 +1,4 @@
 import {
-  AstNode,
   AstNodeDescription,
   AstUtils,
   DefaultScopeProvider,
@@ -9,150 +8,163 @@ import {
   Stream,
   stream,
 } from 'langium';
-import { inspect } from 'util';
 
 import { isGraph, isLink, isNode, isNodeAlias, isStyle } from '../language/generated/ast.js';
-import { path_get_file, render_text } from './graph-lsp-util.js';
+import { path_get_file } from './graph-lsp-util.js';
 
 /**
- * Provides custom scope resolution for the Graph language.
- * Extends the default Langium scope provider to filter and customize
- * the scope based on the context of the reference.
+ * GraphScopeProvider restricts reference resolution to definitions declared within the same file.
+ *
+ * This custom scope provider extends the default Langium implementation by filtering
+ * definitions based on their type, name, and file location. Global scope merging is
+ * intentionally omitted so that references (e.g. 'styleref', 'src', 'dst', and 'alias')
+ * resolve only to nodes defined in the current document.
  */
 export class GraphScopeProvider extends DefaultScopeProvider {
   /**
-   * Constructs a new GraphScopeProvider.
+   * Constructs a new GraphScopeProvider instance.
    *
-   * @param services The Langium core services.
+   * @param services The Langium core services that provide necessary language infrastructure.
    */
   constructor(services: LangiumCoreServices) {
     super(services);
   }
 
   /**
-   * Retrieves the scope for a given reference context.
-   * Combines the local scope with the file-global scope, and applies
-   * context-specific filtering to ensure references resolve to the
-   * correct types of AST nodes.
+   * Returns the resolution scope for a given reference context by filtering precomputed scopes
+   * to only include definitions from the current file that match the reference's expected type
+   * and name.
    *
-   * @param context The reference context, containing information about the reference.
-   * @returns The combined and filtered scope.
+   * Global scope is explicitly omitted, ensuring that definitions from other files are not considered.
+   *
+   * @param context The reference context containing the container node, property, and reference details.
+   * @returns The scope containing only file-local definitions relevant to the reference.
    */
   override getScope(context: ReferenceInfo): Scope {
+    // Prepare a list for additional scopes (used for non-special cases)
     const scopes: Stream<AstNodeDescription>[] = [];
+    // Determine the expected type for the reference
     const referenceType = this.reflection.getReferenceType(context);
-    let fileGlobalScope: readonly AstNodeDescription[] = [];
-    // Get the local scope computed by the default scope provider
-    const localScope = super.getScope(context);
-
+    // Retrieve the document from the reference context
     const document = AstUtils.getDocument(context.container);
     const precomputed = document.precomputedScopes;
+    const documentUri = document.uri.toString();
 
-    // Debug logging for reference context (optional, can be removed in production)
+    // Log the current file being processed
+    console.log(`getScope(${path_get_file(documentUri)})`);
+    // Log all precomputed scope entries for debugging purposes
+    precomputed
+      ?.get(document.parseResult.value)
+      .forEach((ref, index) =>
+        console.log(
+          `precomputed scope ${index}: name: "${ref.name}", type: "${ref.type}", file: "${path_get_file(ref.documentUri.path)}", path: "${ref.path}"`,
+        ),
+      );
+
+    // Debug log: details of the current reference context
     console.log(
-      render_text(
-        inspect(context),
-        `getScope(${path_get_file(document.uri.toString())}) : context`,
-      ),
+      `getScope(${path_get_file(document.uri.toString())}) [context] property: "${context.property}" (in ${context.container.$type}) reference: "${context.reference.$refText}" (${context.reference.$refNode?.astNode.$type}) in ${
+        context.reference.$refNode
+          ? `"${path_get_file(AstUtils.getDocument(context.reference.$refNode.astNode).uri.toString())}"`
+          : '<no referenced document path found>'
+      }"`,
     );
 
     if (precomputed) {
-      // Retrieve file-global scope from LangiumDocument
-      fileGlobalScope = precomputed.get(document.parseResult.value);
+      const allDescriptions = precomputed.get(document.parseResult.value);
 
-      let currentNode: AstNode | undefined = context.container;
-      do {
-        const allDescriptions = precomputed.get(currentNode);
+      // Handling style references: only Style nodes declared in the same file should be considered.
+      if (context.property === 'styleref') {
+        console.log('Filtering for styleref (restricting to current file)');
+
+        const styleScope = stream(allDescriptions)
+          .filter(
+            (desc) =>
+              isStyle(desc.node) && // Must be a Style node
+              desc.name === context.reference.$refText && // Must have a matching name
+              desc.documentUri.toString() === documentUri, // Must be defined in the current file
+          )
+          .filter((desc) => this.reflection.isSubtype(desc.type, referenceType)); // Must be a subtype of the expected type
+
+        // Return a scope containing only the filtered Style nodes.
+        return this.createScope(
+          styleScope,
+          // Global scope intentionally omitted to enforce file-local resolution.
+        );
+      } else if (context.property === 'src' || context.property === 'dst') {
+        // For link source and destination references, restrict resolution to Node nodes.
+        if (isLink(context.container)) {
+          console.log(`Filtering for ${context.property} (restricting to current file)`);
+          const nodeScope = stream(allDescriptions)
+            .filter(
+              (desc) =>
+                isNode(desc.node) && // Must be a Node
+                desc.name === context.reference.$refText && // Must have a matching name
+                desc.documentUri.toString() === documentUri, // Must belong to the current file
+            )
+            .filter((desc) => this.reflection.isSubtype(desc.type, referenceType)); // Must be a subtype of the expected type
+
+          // Return a scope with only the filtered Node definitions.
+          return this.createScope(
+            nodeScope,
+            // Global scope intentionally omitted.
+          );
+        }
+      } else if (context.property === 'alias') {
+        // For alias references within Nodes, restrict resolution to NodeAlias nodes.
+        if (isNode(context.container)) {
+          const aliasScope = stream(allDescriptions).filter(
+            (desc) =>
+              isNodeAlias(desc.node) && // Must be a NodeAlias node
+              desc.name === context.reference.$refText, // Must have a matching name
+          );
+          return this.createScope(
+            aliasScope.filter((desc) => this.reflection.isSubtype(desc.type, referenceType)),
+            // Global scope intentionally omitted.
+          );
+        }
+        // Additional handling for alias in other contexts can be added here if needed.
+      } else {
+        // For other reference properties, add definitions if they match the expected type.
         if (allDescriptions.length > 0) {
           scopes.push(
             stream(allDescriptions).filter((desc) => {
-              // Debug logging for scope descriptions (optional, can be removed in production)
-              console.log(
-                `getScope(${path_get_file(document.uri.toString())}) -- context.property: "${context.property}", desc.type: "${desc.type}, desc.name: "${desc.name}", desc.path: "${desc.path}"`,
-              );
-
-              // Ensure 'styleref' only resolves to 'Style' nodes.
-              if (context.property === 'styleref' && !isStyle(desc.node)) {
-                console.warn(
-                  `getScope(${path_get_file(document.uri.toString())})-- context.property: "${context.property}", desc.type: "${desc.type}, desc.name: "${desc.name}", desc.path: "${desc.path}" -- Discarding description for 'StyleRef' that is NOT referring to a Style node`,
-                );
-                return false;
-              }
-
-              // Prevent 'Link' nodes from resolving to themselves in 'src' or 'dst'.
+              // In the case of link nodes with src/dst properties, exclude entries that are not Nodes or Graphs.
               if (
-                isLink(context.container) &&
-                (context.property === 'src' || context.property === 'dst') &&
-                context.container === desc.node
+                isLink(context.container) && // Link nodes
+                (context.property === 'src' || context.property === 'dst') && // src or dst property
+                !isNode(desc.node) && // Not a Node
+                !isGraph(desc.node) // Not a graph
               ) {
-                console.warn(
-                  `getScope(${path_get_file(document.uri.toString())})-- context.property: "${context.property}", desc.type: "${desc.type}, desc.name: "${desc.name}", desc.path: "${desc.path}" -- Discarding description for 'Link' that IS referring to a Link node`,
-                );
                 return false;
               }
-
-              // Ensure 'src' and 'dst' in 'Link' nodes resolve to 'Node', 'Graph', or 'NodeAlias' nodes.
-              if (
-                (context.property === 'src' || context.property === 'dst') &&
-                !isNode(desc.node) &&
-                !isGraph(desc.node) &&
-                !isNodeAlias(desc.node)
-              ) {
-                console.warn(
-                  `getScope(${path_get_file(document.uri.toString())})-- context.property: "${context.property}", desc.type: "${desc.type}, desc.name: "${desc.name}", desc.path: "${desc.path}" -- Discarding description for 'Link' that IS NOT referring to a Node, Graph or KeywordAlias node`,
-                );
-                return false;
-              }
-
-              // Include 'NodeAlias' nodes directly in the scope.
-              if (isNodeAlias(desc.node)) {
-                console.warn(
-                  `getScope(${path_get_file(document.uri.toString())})-- context.property: "${context.property}", desc.type: "${desc.type}, desc.name: "${desc.name}", desc.path: "${desc.path}" -- Keyword Alias description -- including directly`,
-                );
-
-                return true; // Include KeywordAlias nodes directly
-              }
-
               return this.reflection.isSubtype(desc.type, referenceType);
             }),
           );
         }
-        currentNode = currentNode.$container;
-      } while (currentNode);
+      }
     }
 
+    // For reference properties that do not have special filtering,
+    // fall back to the default local scope provided by the parent class.
+    console.log(`getScope() -- NOT a 'special' node type -- apply DEFAULT scoping`);
+    const localScope = super.getScope(context);
     let combinedScope = localScope;
 
-    // If the file-global scope exists, combine it with the local scope
-    if (fileGlobalScope.length > 0) {
-      combinedScope = this.createScope(fileGlobalScope, combinedScope);
+    if (scopes.length > 0) {
+      combinedScope = this.createScope(
+        scopes[0],
+        // Global scope intentionally omitted.
+      );
     }
 
-    // From Default implementation:
-    // let result: Scope = this.getGlobalScope(referenceType, context);
-    // for (let i = scopes.length - 1; i >= 0; i--) {
-    //   result = this.createScope(scopes[i], result);
-    // }
-    // return result;
-
-    // Resolve ID to KeywordAlias
-    if (context.reference.$refText.length > 0) {
-      const refText = context.reference.$refText;
-      for (const scope of scopes) {
-        for (const desc of scope) {
-          if (isNodeAlias(desc.node) && desc.node.name === refText) {
-            return this.createScope([desc], combinedScope);
-          }
-        }
-      }
-      if (fileGlobalScope.length > 0) {
-        for (const desc of fileGlobalScope) {
-          if (isNodeAlias(desc.node) && desc.node.name === refText) {
-            return this.createScope([desc], combinedScope);
-          }
-        }
-      }
-    }
+    // Final debug log: list all elements in the computed scope.
+    console.log(`Final scope for property "${context.property}" in ${path_get_file(documentUri)}:`);
+    combinedScope.getAllElements().forEach((element) => {
+      console.log(
+        `  - Name: ${element.name}, Type: ${element.type}, File: ${path_get_file(element.documentUri.toString())}`,
+      );
+    });
 
     return combinedScope;
   }

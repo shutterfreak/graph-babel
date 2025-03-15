@@ -1,6 +1,6 @@
 import { AstNode, DefaultNameProvider, isNamed } from 'langium';
 
-import { isElement, isStyle } from '../language/generated/ast.js';
+import { isElement, isNodeAlias, isStyle } from '../language/generated/ast.js';
 
 export class GraphNameProvider extends DefaultNameProvider {
   override getName(node: AstNode): string | undefined {
@@ -10,6 +10,9 @@ export class GraphNameProvider extends DefaultNameProvider {
         return node.name;
       }
       if (isStyle(node)) {
+        return node.name;
+      }
+      if (isNodeAlias(node)) {
         return node.name;
       }
     }
