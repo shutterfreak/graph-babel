@@ -22,6 +22,7 @@ Why this project? see [ABOUT](ABOUT.md).
 - Styling
 - Integration with other Node.js modules and libraries
 - Comprehensive documentation and examples will follow later on
+- **Semantic Token Highlighting in VS Code:** Provides enhanced code readability by highlighting different language elements with distinct colors based on their meaning.
 
 ## Installation
 
@@ -45,46 +46,71 @@ The [grammar](src/language/graph.langium) allows to describe graphs as follows:
 
 ```text
 // NOTE: the style object is still under active development
-style decision {
-    BorderColor: blue;
-    BorderWidth: 2pt;
-    FillColor: rgb(240,120,24);
-    LabelColor: black;
-    Shape: "diamond";
-}
-style yn { LineWidth: 10pt }
-style:yn yesno { // Style 'inherits' from style 'yn'
-    LineOpacity: .75;
-    LineWidth: 1.5pt;
-}
-style:yesno no {
-    LabelColor: #ff0000;
-    LabelText: "no";
-    LineColor: red;
-}
-style:yesno yes {
-    LabelColor: green;
-    LabelText: "yes";
-    LineColor: green;
+style decision
+{
+    BorderColor : blue ;
+    BorderWidth : 2pt ;
+    FillColor : rgb(240,120,24) ;
+    LabelColor : black ;
+    Shape : "diamond" ;
 }
 
-graph g1 "Main graph title" {
-    style decision { // Override style in this scope:
-        FillColor: darkorange;
-        BorderColor: red;
+style yn
+{
+    LineWidth : 10pt
+}
+
+style:yn yesno
+{
+   // Style 'inherits' from style 'yn'
+    LineOpacity : .75 ;
+    LineWidth : 1.5pt ;
+}
+
+style:yesno no
+{
+    LabelColor : #ff0000 ;
+    LabelText : "no" ;
+    LineColor : red ;
+}
+
+style:yesno yes
+{
+    LabelColor : green ;
+    LabelText : "yes" ;
+    LineColor : green ;
+}
+
+define decision node:decision
+
+graph g1 "Main graph title"
+{
+    style decision
+    {
+       // Override style in this scope:
+        FillColor : darkorange ;
+        BorderColor : red ;
     }
-    style yes {TextColor: lime; LineColor: lime}
+
+    style yes
+    {
+        LabelColor : lime ;
+        LineColor : lime
+    }
+
     node:decision n1 "a node in a graph"
+    decision d2 "A decision node"
     node n2 [bracketed node label]
     node n3 /* Empty node */
     link n1 <|-- n2 // Shorthand for delta arrowhead
     link n2 <>-- n3 // Shorthand notation for diamond arrowhead
 
     // Links don't have to have a name (identifier) defined:
-    link:yes n1,n2 ==> g2n1,g2n2
+    link:yes n1, n2 ==> g2n1, g2n2
     link:no n1 to n3
 
-    graph g2 "Graph g2 in graph g1" {
+    graph g2 "Graph g2 in graph g1"
+    {
         node g2n1 "graph 2 node 1"
         node g2n2 "graph 2 node 2"
         // A named link has the identifier between round brackets:
@@ -176,13 +202,13 @@ Names of `Graph`, `Node` and `Link` nodes are available at file level irrespecti
 
 Style definitions obey the Langium-based scoping, and can refer to other styles in that scope.
 
-See [graph-scope-computation.ts](src/lsp/graph-scope-computation.ts) and [graph-scope-provider.ts](src/lsp/graph-scope-provider.ts).
+See [scope-computation.ts](src/language/lsp/scope-computation.ts) and [scope-provider.ts](src/language/lsp/scope-provider.ts).
 
 ### Name provider
 
 A custom name provider has been implemented, returning the name for `Style`nodes and for `Eleement` nodes with nonempty name (`Graph`, `Node`, `Link`).
 
-See [graph-name-provider.ts](src/lsp/graph-name-provider.ts).
+See [name-provider.ts](src/language/lsp/name-provider.ts).
 
 ### Diagnostics and Code Actions
 
@@ -216,23 +242,46 @@ The following diagonstics have been implemented, some of which also provide code
 |   OpacityValueOutOfRange    |   "opacity-value-out-of-range"   | Opacity value is out of range                 | No code action implemented                                                              |
 |     OpacityValueInvalid     |     "opacity-value-invalid"      | Opacity value is invalid                      | No code action implemented                                                              |
 
-See [graph-validators.ts](src/lsp/graph-validators.ts) and [graph-code-actions.ts](src/lsp/graph-code-actions.ts).
+See [graph-validators.ts](src/language/graph-validators.ts) and [code-actions.ts](src/language/lsp/code-actions.ts).
+
+### Semantic Token Highlighting
+
+The Graph language extension provides semantic token highlighting, which enhances the visual representation of your code in VS Code. This feature uses the language's understanding of the code to colorize elements based on their meaning, making it easier to read and understand.
+
+The following table outlines the AST node types and properties for which semantic token highlighting has been implemented:
+
+|  AST Node Type  |    Property     | VS Code Token Type |
+| :-------------: | :-------------: | :----------------: |
+|    NodeAlias    |      name       |       macro        |
+|     Element     |      name       |      property      |
+|      Link       |      name       |      property      |
+|      Link       | src (elements)  |      property      |
+|      Link       | dst (elements)  |      property      |
+|      Link       |  src_arrowhead  |     enumMember     |
+|      Link       |  dst_arrowhead  |     enumMember     |
+|      Node       |      alias      |       macro        |
+| BracketedLabel  | label_bracketed |       string       |
+| StyleDefinition |      topic      |      property      |
+|      Style      |      name       |       class        |
+|     Element     |    styleref     |       class        |
+|      Style      |    styleref     |       class        |
+|    NodeAlias    |    styleref     |       class        |
 
 ### Formatting provider
 
 A custom formatting provider has been implemented to format an unformatted `.graph` file. It takes care of indentation, brace placement and single-line comments after an opening brace.
 
-See [graph-formatting-provider.ts](src/lsp/graph-formatting-provider.ts).
+See [formatting-provider.ts](src/language/lsp/formatting-provider.ts).
 
 ### Rename provider
 
 The vscode Rename Symbol `<F2>` context menu can be used to rename a Node, Graph or Link. References are automatically renamed as well. The rename operation will not be applied if the new name is empty or already exists as name. Reserved keywords are also not permitted.
 
-See [graph-rename-provider.ts](src/lsp/graph-rename-provider.ts).
+See [rename-provider.ts](src/language/lsp/rename-provider.ts).
 
 ### Folding Range Provider
 
-`Graph` and `Style` items can be folded. See [graph-folding-provider.ts](src/lsp/graph-folding-provider.ts).
+`Graph` and `Style` items can be folded. See [folding-provider.ts](src/language/lsp/folding-provider.ts).
 
 ## Contributing
 

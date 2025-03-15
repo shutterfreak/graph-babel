@@ -20,6 +20,7 @@ import { GraphRenameProvider } from './lsp/rename-provider.js';
 import { GraphScopeComputation } from './lsp/scope-computation.js';
 //import { GraphTokenBuilder } from './lsp/token-builder.js';
 import { GraphScopeProvider } from './lsp/scope-provider.js';
+import { GraphSemanticTokenProvider } from './lsp/semantic-token-provider.js';
 
 /**
  * Declaration of custom services for the Graph language.
@@ -92,6 +93,12 @@ export interface GraphAddedServices {
      * Provides code folding for Graph and Style nodes.
      */
     FoldingRangeProvider: GraphFoldingProvider;
+
+    /**
+     * Custom semantic token provider for the Graph language.
+     * Provides semantic highlighting for language elements, enhancing code readability.
+     */
+    SemanticTokenProvider: GraphSemanticTokenProvider;
   };
 }
 
@@ -134,6 +141,8 @@ export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAd
     Formatter: () => new GraphFormatter(),
     /** Registers the custom GraphFoldingProvider for code folding. */
     FoldingRangeProvider: (services) => new GraphFoldingProvider(services),
+    /** Registers the custom GraphSemanticTokenProvider for semantic token rendering. */
+    SemanticTokenProvider: (services) => new GraphSemanticTokenProvider(services),
   },
 };
 
