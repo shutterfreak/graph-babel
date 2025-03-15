@@ -38,6 +38,8 @@ export class GraphFormatter extends AbstractFormatter {
     );
     if (ast.isModel(node)) {
       this.formatModel(node);
+    } else if (ast.isNodeAlias(node)) {
+      this.formatNodeAlias(node);
     } else if (ast.isGraph(node)) {
       this.formatGraph(node);
     } else if (ast.isNode(node)) {
@@ -135,11 +137,14 @@ export class GraphFormatter extends AbstractFormatter {
     const formatter = this.getNodeFormatter(node);
 
     // Format 'node' keyword and optional style reference
-    formatter.keyword('node').surround(Formatting.noSpace()).prepend(Formatting.newLine());
+    const nodeStartTokenFormatter = node.alias
+      ? formatter.property('alias')
+      : formatter.keyword('node');
+    nodeStartTokenFormatter.surround(Formatting.noSpace()).prepend(Formatting.newLine());
 
     // Apply indent based on the container type
     if (node.$container.$type === 'Model') {
-      formatter.keyword('node').append(Formatting.newLine()).append(Formatting.indent());
+      nodeStartTokenFormatter.append(Formatting.newLine()).append(Formatting.indent());
     } else {
       formatter.node(node).prepend(Formatting.indent());
     }
@@ -237,7 +242,7 @@ export class GraphFormatter extends AbstractFormatter {
     );
 
     const formatter = this.getNodeFormatter(node);
-    console.log(`formatStyle() Formatting style: "${node.name}"`);
+    console.log(`format${node.$type}() Formatting style: "${node.name}"`);
     console.log(
       `format${node.$type}() Before formatting: [[${(node.$cstNode?.text ?? '<CST node undefined>').replaceAll('\r', '\\r').replaceAll('\n', '\\n')}]]`,
     );
@@ -252,6 +257,43 @@ export class GraphFormatter extends AbstractFormatter {
     }
     // Format style name and add newline
     formatter.property('name').surround(Formatting.oneSpace());
+    if (node.$cstNode) {
+      formatter.cst([node.$cstNode]).append(Formatting.newLine());
+      console.log(
+        `format${node.$type}() appended newline to: [[${node.$cstNode.text.replaceAll('\r', '\\r').replaceAll('\n', '\\n')}]]`,
+      );
+    }
+  }
+
+  /**
+   * Formats a Style node.
+   * Adds spacing around the 'style' keyword, optional StyleRef, and name.
+   *
+   * @param node The Style node to format.
+   */
+  private formatNodeAlias(node: ast.NodeAlias): void {
+    console.log(
+      `format${node.$type}() -- ${node.$type} ${isNamed(node) ? `"${node.name}"` : '(unnamed)'}`,
+    );
+
+    const formatter = this.getNodeFormatter(node);
+    console.log(`format${node.$type}() Formatting ${node.$type}: "${node.name}"`);
+    console.log(
+      `format${node.$type}() Before formatting: [[${(node.$cstNode?.text ?? '<CST node undefined>').replaceAll('\r', '\\r').replaceAll('\n', '\\n')}]]`,
+    );
+
+    // Format 'define' keyword and optional style reference
+    formatter.property('name').surround(Formatting.oneSpace());
+    formatter.keyword('node').append(Formatting.noSpace());
+
+    if (node.styleref) {
+      formatter.keyword('define').append(Formatting.noSpace());
+      formatter.keyword(':').surround(Formatting.noSpace());
+      formatter.property('styleref').append(Formatting.noSpace());
+    } else {
+      formatter.keyword('define').append(Formatting.oneSpace());
+    }
+    // Format style name and add newline
     if (node.$cstNode) {
       formatter.cst([node.$cstNode]).append(Formatting.newLine());
       console.log(
