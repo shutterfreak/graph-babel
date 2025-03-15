@@ -18,7 +18,7 @@ import {
   WorkspaceEdit,
 } from 'vscode-languageserver';
 
-import { isElement } from '../language/generated/ast.js';
+import { isElement, isNodeAlias } from '../language/generated/ast.js';
 import { range_toString, render_text } from './graph-lsp-util.js';
 
 export class GraphRenameProvider extends DefaultRenameProvider {
@@ -78,7 +78,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       `GraphRenameProvider.rename() found node of type '${node?.$type}' defined as:\n${render_text(node?.$cstNode?.text, `'${node?.$type}' text`, '\\n', node?.$cstNode?.range.start.line)}\n`,
     );
 
-    if (!node || !isElement(node)) {
+    if (!node || !(isElement(node) || isNodeAlias(node)) || !isNamed(node)) {
       return undefined;
     }
     // Generate the required text edits for renaming the element
@@ -168,7 +168,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       // We found a possible match of type Element (Graph, Node, Link) or Style
       matches.push(astNode);
 
-      if (!isElement(astNode)) {
+      if (!(isElement(astNode) || isNodeAlias(astNode))) {
         // rename not applicable
         console.log(' -- not in scope for renaming (skipped)');
         continue;
@@ -203,7 +203,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       `\n\nGraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'name' will be renamed to "${newName}"`,
     );
 
-    if (!isElement(node) || !isNamed(node)) {
+    if (!(isElement(node) || isNodeAlias(node)) || !isNamed(node)) {
       return undefined;
     }
 
@@ -290,6 +290,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
    */
   protected isKeyword(name: string): boolean {
     const keywords = new Set(['element', 'graph', 'link', 'node', 'style', 'to', 'with']);
+    // TODO refine the logic to avoid renaming to an existing NodeAlias
     return keywords.has(name);
   }
 }
