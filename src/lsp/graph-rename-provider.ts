@@ -23,7 +23,7 @@ import { isElement, isNodeAlias } from '../language/generated/ast.js';
 import { range_toString, render_text } from './graph-lsp-util.js';
 
 /**
- * Provides rename functionality with validation and diagnostics for the language.
+ * Custom rename provider with validation for Graph language.
  */
 export class GraphRenameProvider extends DefaultRenameProvider {
   private readonly connection: Connection | undefined;
@@ -34,11 +34,8 @@ export class GraphRenameProvider extends DefaultRenameProvider {
   }
 
   /**
-   * Determines if a rename operation is valid and returns the range of the identifier to rename.
-   * @param document - The Langium document where renaming is attempted.
-   * @param params - The position parameters of the rename request.
-   * @param cancelToken - Optional cancellation token.
-   * @returns The range of the name to be renamed, or `undefined` if renaming is not possible.
+   * Determines whether a rename is possible at the given position.
+   * @returns The range of the identifier to rename, or `undefined` if renaming is not allowed.
    */
   override async prepareRename(
     document: LangiumDocument,
@@ -76,11 +73,11 @@ export class GraphRenameProvider extends DefaultRenameProvider {
   }
 
   /**
-   * Performs the rename operation after validation.
+   * Performs the rename operation, ensuring validity before applying changes.
    * @param document - The Langium document.
    * @param params - The rename parameters including the new name.
    * @param cancelToken - Optional cancellation token.
-   * @returns A `WorkspaceEdit` if the rename is successful, otherwise `undefined`.
+   * @returns A `WorkspaceEdit` if rename is successful, otherwise `undefined`.
    */
   override async rename(
     document: LangiumDocument,
@@ -98,36 +95,30 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       return undefined;
     }
 
-    // Validate rename and generate diagnostics if necessary
-    const proceedWithRename = this.validateRename(document, node, params.newName);
-
-    if (!proceedWithRename) {
-      console.log(
-        `rename() - ERRORS occurred for file "${document.uri.toString()}" -- aborting rename`,
-      );
-      return undefined; // Abort rename if there are errors
-    } else {
-      console.log(`rename() - will create RenameEdit for file "${document.uri.toString()}"`);
+    if (!this.validateNewName(document, node, params.newName)) {
+      return undefined; // Abort if validation fails
     }
 
     return Promise.resolve(this.createRenameEdit(document, node, params.newName));
   }
 
   /**
-   * Validates whether the new name is acceptable, preventing conflicts and reserved keyword usage.
+   * Validates if the new name is allowed.
    * @param document - The Langium document.
    * @param node - The AST node being renamed.
    * @param newName - The proposed new name.
-   * @returns A list of diagnostics indicating issues with the rename.
+   * @returns `true` if renaming is allowed, `false` otherwise.
    */
-  private validateRename(document: LangiumDocument, node: AstNode, newName: string): boolean {
-    // Collect all existing IDs in the document
+  private validateNewName(document: LangiumDocument, node: AstNode, newName: string): boolean {
     const elementNames = new Set<string>();
     const aliasNames = new Set<string>();
 
     for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
-      if (isNamed(childNode) && childNode.name.length > 0) {
-        (isElement(childNode) ? elementNames : aliasNames).add(childNode.name);
+      if (isElement(childNode) && isNamed(childNode)) {
+        elementNames.add(childNode.name);
+      }
+      if (isNodeAlias(childNode) && isNamed(childNode)) {
+        aliasNames.add(childNode.name);
       }
     }
 
@@ -135,16 +126,16 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       return false;
     }
 
-    if (
-      (isElement(node) && elementNames.has(newName)) ||
-      (isNodeAlias(node) && aliasNames.has(newName))
-    ) {
-      this.connection?.window.showErrorMessage(`"${newName}" is already in use.`);
-      return false;
-    }
-
     if (this.isKeyword(newName)) {
       this.connection?.window.showErrorMessage(`"${newName}" is a reserved keyword.`);
+      return false;
+    }
+    if (isElement(node) && elementNames.has(newName)) {
+      this.connection?.window.showErrorMessage(`"${newName}" is already used by an Element.`);
+      return false;
+    }
+    if (isNodeAlias(node) && aliasNames.has(newName)) {
+      this.connection?.window.showErrorMessage(`"${newName}" is already used by a NodeAlias.`);
       return false;
     }
 
@@ -152,7 +143,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
   }
 
   /**
-   * Finds the declaration AST node corresponding to the rename request.
+   * Finds the declaration AST node at the given cursor position.
    */
 
   protected findDeclarationNode(
@@ -161,26 +152,17 @@ export class GraphRenameProvider extends DefaultRenameProvider {
   ): AstNode | undefined {
     const rootNode = document.parseResult.value;
 
-    // Ensure CST node exists
     if (!rootNode.$cstNode) {
-      console.log('GraphRenameProvider.findDeclarationNode() - No root CST node.');
       return undefined;
     }
 
-    // Find the AST node at the given cursor position
-    const declarationNode = this.findAstNodeAtPosition(rootNode.$cstNode, position);
-    console.log(
-      `GraphRenameProvider.findDeclarationNode() - will return node of type '${declarationNode?.$type}' defined as:\n${render_text(
-        declarationNode?.$cstNode?.text,
-        `declaration node type: ${declarationNode?.$type}`,
-        '\\n',
-        declarationNode?.$cstNode?.range.start.line,
-      )}\n\n\n`,
-    );
-
-    return declarationNode;
+    // Return the AST node at the given cursor position
+    return this.findAstNodeAtPosition(rootNode.$cstNode, position);
   }
 
+  /**
+   * Locates the closest AST node at a given position.
+   */
   protected findAstNodeAtPosition(rootCstNode: CstNode, position: Position): AstNode | undefined {
     let i = 0;
     const matches: AstNode[] = [];
@@ -265,60 +247,8 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     node: AstNode,
     newName: string,
   ): WorkspaceEdit | undefined {
-    console.log(
-      `\n\nGraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'name' will be renamed to "${newName}"`,
-    );
-
     if (!(isElement(node) || isNodeAlias(node)) || !isNamed(node)) {
       return undefined;
-    }
-
-    console.log(
-      `GraphRenameProvider.createRenameEdit() - node type: '${node.$type}' - property 'name' will be renamed from "${node.name}" to "${newName}"`,
-    );
-
-    // Collect all existing IDs in the document to avoid naming conflicts
-    const elementNames = new Set<string>();
-    const aliasNames = new Set<string>();
-
-    for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
-      if (isElement(childNode) && childNode.name != null && childNode.name.length > 0) {
-        elementNames.add(childNode.name);
-      }
-      if (isNodeAlias(childNode) && childNode.name.length > 0) {
-        aliasNames.add(childNode.name);
-      }
-    }
-
-    // Validate the new name to prevent conflicts with existing identifiers or keywords
-    // Handle NodeAlias and Elements differently
-    if (isElement(node)) {
-      if (elementNames.has(newName)) {
-        console.warn(
-          `GraphRenameProvider.createRenameEdit() - Error: An Element with name "${newName}" already exists.`,
-        );
-        return undefined;
-      }
-      // Optionally warn (or flag with a diagnostic) if newName is a reserved keyword or used by a NodeAlias:
-      if (this.isKeyword(newName) || aliasNames.has(newName)) {
-        console.warn(
-          `GraphRenameProvider.createRenameEdit() - Warning: "${newName}" is a reserved keyword or used by a NodeAlias. Consider choosing a different name.`,
-        );
-        // You might choose to allow the rename here and let a custom validator issue a warning.
-      }
-      console.log(
-        `GraphRenameProvider.createRenameEdit() - existing Element 'name' values: [${[...elementNames].join(', ')}] -- should not contain "${newName}"`,
-      );
-    } else if (isNodeAlias(node)) {
-      if (this.isKeyword(newName) || aliasNames.has(newName)) {
-        console.warn(
-          `GraphRenameProvider.createRenameEdit() - Error: "${newName}" is either a reserved keyword or already used by another NodeAlias.`,
-        );
-        return undefined;
-      }
-      console.log(
-        `GraphRenameProvider.createRenameEdit() - existing NodeAlias 'name' values: [${[...aliasNames].join(', ')}] -- should not contain "${newName}"`,
-      );
     }
 
     const edits: TextEdit[] = [];
@@ -327,52 +257,20 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'name');
     if (cstIdNode) {
       edits.push(TextEdit.replace(cstIdNode.range, newName));
-    } else {
-      console.warn("No CST node for 'name' property found. NOT YET IMPLEMENTED");
-    }
-
-    // Find all references
-    const refs = document.references;
-
-    console.log(`GraphRenameProvider.createRenameEdit() - Found ${refs.length} references:`);
-
-    for (const ref of refs) {
-      console.log(
-        `- Reference at ${inspect(ref.$refNode?.range)}: ${ref.$refText} ${
-          ref.$refNode
-            ? `Node type '${ref.$refNode.astNode.$type}', text: ${ref.$refNode.text}`
-            : 'Unresolved reference'
-        }`,
-      );
     }
 
     // Rename all references
     for (const ref of document.references) {
       if (ref.$refText === node.name && ref.$refNode) {
-        console.log(
-          `GraphRenameProvider.createRenameEdit() - Renaming reference '${ref.$refText}' at ${range_toString(ref.$refNode.range)}`,
-        );
-
         edits.push(TextEdit.replace(ref.$refNode.range, newName));
       }
     }
 
-    if (edits.length === 0) {
-      console.warn('No edits generated for rename.');
-      return undefined;
-    }
-
-    const changes = { changes: { [document.uri.toString()]: edits } };
-
-    console.log(
-      `GraphRenameProvider.createRenameEdit() - will return:\n${render_text(inspect(changes), 'changes')}\n`,
-    );
-
-    return changes;
+    return edits.length > 0 ? { changes: { [document.uri.toString()]: edits } } : undefined;
   }
 
   /**
-   * Checks if a given name is a reserved keyword in the language.
+   * Checks if a given name is a reserved keyword.
    */
   protected isKeyword(name: string): boolean {
     const keywords = new Set(['define', 'element', 'graph', 'link', 'node', 'style', 'to', 'with']);
