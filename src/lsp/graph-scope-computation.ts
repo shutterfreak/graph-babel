@@ -14,25 +14,26 @@ import { isNodeAlias, isStyle } from '../language/generated/ast.js';
 
 /**
  * Computes the scope for the Graph language, including file-global and local scopes.
- * Extends the default Langium scope computation to handle 'NodeAlias' nodes and
- * provide a file-global scope for cross-reference resolution.
+ *
+ * This class extends the default Langium scope computation to handle `NodeAlias` nodes
+ * and provides a file-global scope for cross-reference resolution. It separates
+ * document-level and style-specific scopes for more efficient lookups.
  */
 export class GraphScopeComputation extends DefaultScopeComputation {
-  //private elementScope: MultiMap<AstNode, AstNodeDescription> | undefined = undefined;
-  //private styleScope: MultiMap<AstNode, AstNodeDescription> | undefined = undefined;
   private documentScopes = new Map<string, MultiMap<AstNode, AstNodeDescription>>();
   private styleScopes = new Map<string, MultiMap<AstNode, AstNodeDescription>>();
 
-  /*** 
-  getElementScope(): MultiMap<AstNode, AstNodeDescription> | undefined {
-    return this.elementScope;
-  }
-
-  getStyleScope(): MultiMap<AstNode, AstNodeDescription> | undefined {
-    return this.styleScope;
-  }
-  ***/
-
+  /**
+   * Computes the local scopes for a given document.
+   *
+   * This method iterates through all nodes in the document, collecting named elements
+   * to build file-global scopes (document-level and style-specific). It then processes
+   * each node to compute local scopes based on container relationships.
+   *
+   * @param document The Langium document.
+   * @param cancelToken Optional cancellation token.
+   * @returns A promise that resolves to the precomputed scopes for the document.
+   */
   override async computeLocalScopes(
     document: LangiumDocument,
     cancelToken = Cancellation.CancellationToken.None,
@@ -48,27 +49,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
     this.documentScopes.set(documentUri, documentScope);
     this.styleScopes.set(documentUri, styleScope);
 
-    /***
-    if (!this.elementScope) {
-      this.elementScope = new MultiMap<AstNode, AstNodeDescription>();
-      this.styleScope = new MultiMap<AstNode, AstNodeDescription>();
-
-      for (const node of AstUtils.streamAllContents(rootNode)) {
-        await interruptAndCheck(cancelToken);
-
-        const name = this.nameProvider.getName(node) ?? '';
-        if (name.length > 0) {
-          const description = this.descriptions.createDescription(node, name, document);
-          if (isStyle(node)) {
-            this.styleScope.add(document.parseResult.value, description);
-          } else if (isElement(node) || isNodeAlias(node)) {
-            this.elementScope.add(document.parseResult.value, description);
-          }
-        }
-      }
-    }
-    ***/
-
+    // Build file-global scopes for document elements and styles
     for (const node of AstUtils.streamAllContents(rootNode)) {
       await interruptAndCheck(cancelToken);
 
@@ -84,12 +65,9 @@ export class GraphScopeComputation extends DefaultScopeComputation {
 
     document.precomputedScopes = scopes;
     document.precomputedScopes.addAll(document.parseResult.value, documentScope.values());
-    // Do NOT add styleScope to precomputedScopes here
+    // Style scope is not added to precomputedScopes here, as it's handled separately
 
-    //document.precomputedScopes.addAll(document.parseResult.value, elementScope.values());
-    //document.precomputedScopes.addAll(document.parseResult.value, styleScope.values()); // Add style scope as well
-
-    // Process each node to compute local scopes
+    // Process each node to compute local scopes based on containers
     for (const node of AstUtils.streamAllContents(rootNode)) {
       await interruptAndCheck(cancelToken);
       this.processNode(node, document, scopes);
@@ -98,10 +76,26 @@ export class GraphScopeComputation extends DefaultScopeComputation {
     return scopes;
   }
 
+  /**
+   * Retrieves the document-level scope for a given document URI.
+   *
+   * This scope contains descriptions of all named elements within the document.
+   *
+   * @param documentUri The URI of the document.
+   * @returns The document-level scope or undefined if not found.
+   */
   getDocumentScope(documentUri: string): MultiMap<AstNode, AstNodeDescription> | undefined {
     return this.documentScopes.get(documentUri);
   }
 
+  /**
+   * Retrieves the style-specific scope for a given document URI.
+   *
+   * This scope contains descriptions of all `Style` elements within the document.
+   *
+   * @param documentUri The URI of the document.
+   * @returns The style-specific scope or undefined if not found.
+   */
   getStyleScope(documentUri: string): MultiMap<AstNode, AstNodeDescription> | undefined {
     return this.styleScopes.get(documentUri);
   }
@@ -109,6 +103,9 @@ export class GraphScopeComputation extends DefaultScopeComputation {
   /**
    * Processes a single node during scope computation, adding it to the
    * appropriate local scope.
+   *
+   * This method handles adding named elements to their container's local scope
+   * and specifically adds `NodeAlias` nodes to the document-level scope.
    *
    * @param node The AST node to process.
    * @param document The Langium document.
@@ -127,7 +124,7 @@ export class GraphScopeComputation extends DefaultScopeComputation {
       scopes.add(container, this.descriptions.createDescription(node, name, document));
     }
 
-    // Handle KeywordAlias
+    // Handle NodeAlias: add it to the document-level scope
     if (isNodeAlias(node)) {
       scopes.add(
         document.parseResult.value,
