@@ -70,11 +70,13 @@ Style:
 
 StyleBlock:
     (
-        '{}'
-    ) | (
         '{'
-        ';'* items+=StyleDefinition?
-        (';'+ items+=StyleDefinition)* ';'*
+        ';'*
+        (
+            items+=StyleDefinition
+            (';'+ items+=StyleDefinition)* 
+            ';'*
+        )?
         '}'
     )
 ;
