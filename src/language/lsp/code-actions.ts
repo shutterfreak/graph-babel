@@ -11,29 +11,38 @@ import {
 import { CodeActionProvider } from 'langium/lsp';
 import { inspect } from 'util';
 import { CodeActionKind, Diagnostic } from 'vscode-languageserver';
-import { CodeActionParams } from 'vscode-languageserver-protocol';
+import { CodeActionParams, TextEdit } from 'vscode-languageserver-protocol';
 import { CodeAction, Command } from 'vscode-languageserver-types';
 
-import { isElement, isStyle, isWidthValue } from '../generated/ast.js';
-import { IssueCodes } from '../graph-validator.js';
+import * as ast from '../generated/ast.js';
+import { IssueCode } from '../graph-validator.js';
 import { LENGTH_UNITS } from '../model-helpers.js';
 
 /**
- * Provides code actions (quick fixes and refactorings) for the Graph language.
- * This class handles diagnostics reported by the validator and offers suggestions
- * to resolve common issues or perform automated refactorings.
+ * Provides code actions (quick fixes and fix-all actions) for the Graph language.
+ *
+ * This class implements the CodeActionProvider interface. It generates quick fixes based on
+ * diagnostics produced by the validator (such as duplicate names, invalid units, spurious semicolons,
+ * etc.) and also supports manually triggered source actions.
+ *
+ * The main method getCodeActions() gathers all diagnostics within the given range and delegates
+ * to helper methods to create CodeActions for each specific issue. In addition, a fix‑all action is
+ * provided (for example, to delete all spurious semicolons) by aggregating all diagnostics that
+ * share a given issue code.
+ *
+ * Note: Currently, the SourceFixAll code action is registered using CodeActionKind.QuickFix.
  */
 export class GraphCodeActionProvider implements CodeActionProvider {
   /**
-   * Provides code actions for the given document and range.
+   * Returns an array of CodeActions for the given document and range.
    *
-   * This method is the entry point for the code action provider. It analyzes the
-   * diagnostics reported for the given range and generates corresponding code actions.
-   * It also handles manually triggered source actions.
+   * This method examines the diagnostics provided in the CodeActionParams. For each diagnostic,
+   * it calls createCodeAction() to generate the corresponding quick fix(s). It also checks for
+   * manually triggered source actions and a "fix all" action for spurious semicolons.
    *
    * @param document The Langium document.
-   * @param params Parameters for the code action request, including diagnostics and context.
-   * @returns A promise that resolves to an array of code actions or commands.
+   * @param params The CodeActionParams containing the request range, context, and diagnostics.
+   * @returns A promise resolving to an array of CodeActions or Commands.
    */
   getCodeActions(
     document: LangiumDocument,
@@ -43,39 +52,53 @@ export class GraphCodeActionProvider implements CodeActionProvider {
 
     const result: CodeAction[] = [];
 
-    // Process diagnostics to generate quick fixes
+    // Process diagnostics to generate quick fixes.
     if (params.context.diagnostics.length > 0) {
       for (const diagnostic of params.context.diagnostics) {
         const codeActions = this.createCodeAction(diagnostic, document);
 
         if (Array.isArray(codeActions)) {
-          result.push(...codeActions); // Handle multiple actions for a single diagnostic
+          result.push(...codeActions); // Merge multiple actions for one diagnostic.
         } else if (codeActions) {
-          result.push(codeActions); // Handle single action for a single diagnostic
+          result.push(codeActions); // Add single action.
         }
       }
     }
 
-    // Handle manually triggered source actions (like rename name)
-    if (params.context.only && params.context.only.includes(CodeActionKind.Source)) {
-      console.log('getCodeActions() - Source actions requested!');
-      result.push(this.renameGraphElementName(document));
+    // Process manually triggered source actions.
+    if (params.context.only) {
+      if (params.context.only.includes(CodeActionKind.Source)) {
+        console.log('getCodeActions() - Source actions requested!');
+        result.push(this.renameGraphElementName(document));
+      }
     }
 
+    // Add a "fix all" action if spurious semicolon diagnostics exist.
+    const spuriousSemicolonDiagnostics =
+      document.diagnostics?.filter((d) => d.code === IssueCode.SpuriousSemicolonDelete) || [];
+    if (spuriousSemicolonDiagnostics.length > 0) {
+      const deleteAllSpuriousSemicolonsAction = this.deleteAllSpuriousSemicolons(
+        document,
+        spuriousSemicolonDiagnostics,
+      );
+      if (deleteAllSpuriousSemicolonsAction) result.push(deleteAllSpuriousSemicolonsAction);
+    }
+
+    // Debug: list all code actions found:
     console.log('getCodeActions() - Returning code actions:', inspect(result));
 
     return result;
   }
 
   /**
-   * Creates a code action or a list of code actions based on the given diagnostic.
+   * Creates a code action or an array of code actions based on the diagnostic code.
    *
-   * This method maps diagnostic codes (defined in the validator) to specific
-   * code action generators.
+   * This method maps the diagnostic.code produced by the validator to the corresponding
+   * code action generator function.
    *
    * @param diagnostic The diagnostic reported by the validator.
    * @param document The Langium document.
-   * @returns A single code action, an array of code actions, or undefined if no action is available.
+   * @returns A CodeAction, an array of CodeActions, or undefined if no action is applicable.
    */
   private createCodeAction(
     diagnostic: Diagnostic,
@@ -84,43 +107,36 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     switch (
       diagnostic.code // code as defined in 'graph-validator.ts' for each validation check
     ) {
-      case IssueCodes.NameDuplicate:
-      case IssueCodes.NameMissing:
+      case IssueCode.NameDuplicate:
+      case IssueCode.NameMissing:
         return this.generateNewName(diagnostic, document);
-      case IssueCodes.StyleSelfReference:
+      case IssueCode.StyleSelfReference:
         return this.removeStyleSelfReference(diagnostic, document);
-      case IssueCodes.LinkWidthUnitUnknown:
-      case IssueCodes.LinkWidthHasNoUnit:
-        return this.fixIncorrectWidthUnit(diagnostic, document); // Now supports multiple actions
-      /*
-      case "name_lowercase":
-        return this.makeUpperCase(diagnostic, document);
-      */
+      case IssueCode.LinkWidthUnitUnknown:
+      case IssueCode.LinkWidthHasNoUnit:
+        return this.fixIncorrectWidthUnit(diagnostic, document);
+      case IssueCode.SpuriousSemicolonDelete:
+        return this.deleteSpuriousSemicolons(diagnostic, document);
       default:
         return undefined;
     }
   }
 
-  // Define the code actions:
-
-  /*
-   * Code actions without triggering diagnostic code (Source Actions):
-   */
+  // --------------------------------------------------
+  // Source Code Actions (Manually Triggered)
+  // --------------------------------------------------
 
   /**
    * Provides a code action to rename a graph element.
    *
-   * This code action is triggered manually by the user (e.g., via a context menu)
-   * and allows renaming of a graph element. Currently, it's a placeholder and
-   * needs to be implemented to dynamically determine the element to rename and
-   * prompt the user for a new name.
+   * This source action is manually triggered (e.g., via a context menu) and is a placeholder.
+   * It currently uses a fixed range and new name, but you should implement dynamic resolution.
    *
    * @param document The Langium document.
-   * @returns A code action for renaming.
+   * @returns A CodeAction for renaming a graph element.
    */
   private renameGraphElementName(document: LangiumDocument): CodeAction {
-    console.log('renameGraphElementName() called!'); // Debugging output
-
+    console.log('renameGraphElementName() called!');
     return {
       title: 'Rename graph element name',
       kind: CodeActionKind.Source, // Marks it as a source action (refactoring)
@@ -132,7 +148,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
                 start: { line: 0, character: 0 }, // Placeholder range, should be dynamic
                 end: { line: 0, character: 7 }, // Replace with the actual 'name' range
               },
-              newText: 'new-name', // Placeholder, should prompt for user input
+              newText: 'new-name', // Placeholder, iteally prompt for user input.
             },
           ],
         },
@@ -140,20 +156,65 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     };
   }
 
-  /*
-   * Code actions triggered by diagnostic code (Quick Fixes):
+  /**
+   * Creates a "fix all" CodeAction to delete all spurious semicolons in the document.
+   *
+   * This action aggregates all diagnostics with IssueCode.SpuriousSemicolonDelete
+   * and generates a workspace edit that deletes the entire ranges.
+   *
+   * @param document The Langium document.
+   * @param diagnostics An array of diagnostics with spurious semicolon issues.
+   * @returns A CodeAction that removes all spurious semicolons in the document.
    */
+  private deleteAllSpuriousSemicolons(
+    document: LangiumDocument,
+    diagnostics: Diagnostic[],
+  ): CodeAction | undefined {
+    console.info(
+      `deleteAllSpuriousSemicolons() -- found ${diagnostics.length} diagnostics matching 'IssueCode.SpuriousSemicolonDelete'`,
+    );
+    if (diagnostics.length === 0) {
+      return undefined;
+    }
+
+    // Create one TextEdit per diagnostic.
+    const edits: TextEdit[] = diagnostics.map((diag) => ({
+      range: diag.range,
+      newText: '',
+    }));
+
+    // Combine all edits into a single workspace edit.
+    const workspaceEdit = {
+      changes: {
+        [document.textDocument.uri]: edits,
+      },
+    };
+
+    const action: CodeAction = {
+      title: 'Delete all spurious semicolons',
+      kind: CodeActionKind.QuickFix,
+      diagnostics,
+      isPreferred: true,
+      edit: workspaceEdit,
+    };
+
+    return action;
+  }
+
+  // --------------------------------------------------
+  // Quick Fixes Triggered by Diagnostics
+  // --------------------------------------------------
 
   /**
    * Generates a new, unique name for an element.
    *
    * This quick fix is triggered when a duplicate or missing name is detected.
-   * It generates a new name based on the element's type and ensures it doesn't
-   * conflict with existing names in the document.
+   * It traverses the AST to collect existing names and generates a new one based on
+   * the element's type.
    *
    * @param diagnostic The diagnostic reporting the name issue.
    * @param document The Langium document.
-   * @returns A code action to generate a new name.
+   * @returns A CodeAction to generate a new unique name.
    */
   private generateNewName(diagnostic: Diagnostic, document: LangiumDocument): CodeAction {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
@@ -179,16 +240,16 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     // Ensure that astNode is valid and has a type:
     if (!('$type' in astNode) || typeof astNode.$type !== 'string') {
       console.error(
-        "generateNewName() - astNode has no '$type' property or '$type' property is not string!\ncstNode:\n",
+        "generateNewName() - astNode has no '$type' property or '$type' is not string!\nCST Node:",
         inspect(astNode),
       );
       return undefined!;
     }
 
-    // Collect all existing IDs in the AST
+    // Collect existing names.
     for (const childNode of AstUtils.streamAllContents(rootNode)) {
       if (
-        (isElement(childNode) || isStyle(childNode)) &&
+        (ast.isElement(childNode) || ast.isStyle(childNode)) &&
         isNamed(childNode) &&
         childNode.name.length > 0
       ) {
@@ -232,12 +293,12 @@ export class GraphCodeActionProvider implements CodeActionProvider {
   /**
    * Removes a self-reference in a style definition.
    *
-   * This quick fix is triggered when a style is referencing itself. It removes
-   * the self-referential part of the style definition.
+   * This quick fix removes the self-referential part (typically the colon and style reference)
+   * from a Style node that incorrectly references itself.
    *
    * @param diagnostic The diagnostic reporting the self-reference.
    * @param document The Langium document.
-   * @returns A code action to remove the self-reference.
+   * @returns A CodeAction that removes the self-reference.
    */
   private removeStyleSelfReference(diagnostic: Diagnostic, document: LangiumDocument): CodeAction {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
@@ -260,7 +321,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     const astNode = cstNode.astNode;
 
     // Ensure the AST node is a Style instance and has a styleRef
-    if (!isStyle(astNode) || !astNode.styleref) {
+    if (!ast.isStyle(astNode) || !astNode.styleref) {
       console.error('removeStyleSelfReference() - Not a valid Style instance!');
       return undefined!;
     }
@@ -312,12 +373,12 @@ export class GraphCodeActionProvider implements CodeActionProvider {
   /**
    * Fixes an incorrect or missing unit for a width value.
    *
-   * This quick fix is triggered when a link width has an unknown unit or no unit
-   * at all. It provides multiple code actions, each suggesting a valid unit.
+   * This quick fix is triggered when a link width value has either no unit or an unknown unit.
+   * It suggests valid units from the allowed list.
    *
-   * @param diagnostic The diagnostic reporting the issue with the width unit.
+   * @param diagnostic The diagnostic reporting the width unit issue.
    * @param document The Langium document.
-   * @returns An array of code actions, each suggesting a valid unit.
+   * @returns An array of CodeActions, each suggesting a valid unit.
    */
   private fixIncorrectWidthUnit(diagnostic: Diagnostic, document: LangiumDocument): CodeAction[] {
     const offset = document.textDocument.offsetAt(diagnostic.range.start);
@@ -340,7 +401,7 @@ export class GraphCodeActionProvider implements CodeActionProvider {
     const astNode = cstNode.astNode;
 
     // Ensure the AST node is a WidthValue instance
-    if (!isWidthValue(astNode)) {
+    if (!ast.isWidthValue(astNode)) {
       console.error('fixIncorrectWidthUnit() - Not a valid WidthValue instance!');
       return [];
     }
@@ -408,5 +469,42 @@ export class GraphCodeActionProvider implements CodeActionProvider {
         },
       },
     }));
+  }
+
+  /**
+   * Creates CodeActions that delete spurious semicolons in a StyleBlock.
+   *
+   * The validator produces diagnostics whose ranges cover a contiguous group of
+   * spurious semicolon tokens that should be deleted. This method creates a single
+   * CodeAction with a workspace edit that removes (replaces with an empty string)
+   * all text in the diagnostic range.
+   *
+   * @param diagnostic The diagnostic that triggered this fix.
+   * @param document The Langium document.
+   * @returns An array containing one CodeAction to delete the spurious semicolons.
+   */
+  private deleteSpuriousSemicolons(
+    diagnostic: Diagnostic,
+    document: LangiumDocument,
+  ): CodeAction[] {
+    // Create a single TextEdit covering the entire diagnostic range.
+    // The diagnostic range already spans all extra semicolons to delete (while skipping comments).
+
+    // Create a single edit that removes everything in the diagnostic's range:
+    const edit: TextEdit = {
+      range: diagnostic.range,
+      newText: '', // Remove the semicolons.
+    };
+
+    // Create the code action:
+    const action: CodeAction = {
+      title: 'Delete spurious semicolons',
+      kind: CodeActionKind.QuickFix,
+      diagnostics: [diagnostic],
+      isPreferred: true,
+      edit: { changes: { [document.textDocument.uri]: [edit] } },
+    };
+
+    return [action];
   }
 }

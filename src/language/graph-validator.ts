@@ -2,35 +2,16 @@ import chalk from 'chalk';
 import {
   AstNode,
   AstUtils,
+  CstUtils,
   type ValidationAcceptor,
   type ValidationChecks,
+  isLeafCstNode,
   isNamed,
 } from 'langium';
 
-import {
-  Element,
-  Graph,
-  GraphAstType,
-  GraphTerminals,
-  HexColorDefinition,
-  Link,
-  Model,
-  NodeAlias,
-  OpacityStyleDefinition,
-  RgbColorDefinition,
-  ShapeStyleDefinition,
-  Style,
-  StyleDefinition,
-  TextColorDefinition,
-  WidthValue,
-  isElement,
-  isGraph,
-  isLink,
-  isModel,
-  isNode,
-  isStyle,
-} from './generated/ast.js';
+import * as ast from './generated/ast.js';
 import type { GraphServices } from './graph-module.js';
+import { isCommentCstNode } from './lsp/lsp-util.js';
 import {
   ARROWHEADS,
   LENGTH_UNITS,
@@ -41,17 +22,23 @@ import {
 } from './model-helpers.js';
 
 /**
- * Register custom validation checks.
+ * Registers custom validation checks for the Graph language.
+ *
+ * The checks are organized by AST node type. When the model is validated,
+ * the corresponding functions in GraphValidator will be executed.
+ *
+ * @param services The Graph language services.
  */
 export function registerValidationChecks(services: GraphServices) {
   const registry = services.validation.ValidationRegistry;
   const validator = services.validation.GraphValidator;
-  const checks: ValidationChecks<GraphAstType> = {
+  const checks: ValidationChecks<ast.GraphAstType> = {
     Model: [validator.checkUniqueElementNames, validator.checkStyles],
     Element: [validator.checkStyleRef],
     Link: [validator.checkLinkStyles],
     Style: [validator.checkStyleNames, validator.checkStyleSubstyles],
     NodeAlias: [validator.checkStyleRef],
+    StyleBlock: [validator.checkSpuriousSemicolons],
     StyleDefinition: [validator.checkStyleDefinitionTopics],
     HexColorDefinition: [validator.checkHexColorDefinitions],
     RgbColorDefinition: [validator.checkRgbColorDefinitions],
@@ -63,14 +50,16 @@ export function registerValidationChecks(services: GraphServices) {
   registry.register(checks, validator);
 }
 
-// The issue codes can help to select code actions for issues encountered while validating the document
-export const IssueCodes = {
+/**
+ * Issue codes for validation diagnostics.
+ */
+export const IssueCode = {
   NameMissing: 'name-missing',
   NameDuplicate: 'name-duplicate',
   SrcArrowheadEmpty: 'src-arrowhead-empty',
-  SrcArrowheadInvalid: 'src-arrowhead-empty',
+  SrcArrowheadInvalid: 'src-arrowhead-invalid',
   DstArrowheadEmpty: 'dst-arrowhead-empty',
-  DstArrowheadInvalid: 'dst-arrowhead-empty',
+  DstArrowheadInvalid: 'dst-arrowhead-invalid',
   SrcArrowheadRedefined: 'src-arrowhead-redefined',
   DstArrowheadRedefined: 'dst-arrowhead-redefined',
   LinkStyleInvalid: 'link-style-invalid',
@@ -78,7 +67,7 @@ export const IssueCodes = {
   StyleSelfReference: 'style-self-reference',
   StyleMultipleDefinitions: 'style-multiple-definitions',
   StyleDefinitionEmptyTopic: 'style-definition-empty-topic',
-  StyleDefinitionUnknownTopic: 'style-definition-missing-topic',
+  StyleDefinitionUnknownTopic: 'style-definition-unknown-topic',
   ShapeNameMissing: 'shape-name-missing',
   ShapeNameUnknown: 'shape-name-unknown',
   ColorNameUnknown: 'color-name-unknown',
@@ -92,45 +81,47 @@ export const IssueCodes = {
   OpacityValueInvalid: 'opacity-value-invalid',
   StyleRefNotFound: 'style-ref-not-found',
   StyleRefMissing: 'style-ref-missing',
+  SpuriousSemicolonDelete: 'styleblock-spurious-semicolon-delete',
 };
 
 /**
- * Implementation of custom validations.
+ * GraphValidator implements custom validation checks for the Graph language.
+ *
+ * Each method in this class performs a specific validation on AST or CST nodes.
+ * When a problem is found, the provided ValidationAcceptor is called to report
+ * an error or warning, along with the node, property, and issue code.
  */
 export class GraphValidator {
   /**
-   * Verify that Elements have unique names (all nodes and graphs, named edges)
-   * @param model
-   * @param accept
+   * Checks that all Elements (e.g. Nodes, Graphs, and named edges) have unique names.
+   *
+   * This function traverses the Model's AST, collecting names and reporting diagnostics
+   * for missing names and duplicate names.
+   *
+   * @param model The Model node.
+   * @param accept The validation acceptor callback.
    */
-  checkUniqueElementNames = (model: Model, accept: ValidationAcceptor): void => {
-    // Create a set of identifiers while traversing the AST
-    // const identifiers = new Set<string>();
-
+  checkUniqueElementNames = (model: ast.Model, accept: ValidationAcceptor): void => {
     // Map to store names and their corresponding AST nodes
-    const nameMap = new Map<string, Element[]>();
+    const nameMap = new Map<string, ast.Element[]>();
 
-    function traverseElement(element: Element): void {
+    function traverseElement(element: ast.Element): void {
       const preamble = `traverseElement(${element.$type} element (${element.name ?? '<no name>'}))`;
       console.log(chalk.white(`${preamble} - START`));
-      // Check for missing name
+
+      // Report error if a Node or Graph has an empty name.
       if (
-        (isNode(element) || isGraph(element)) &&
-        (!isNamed(element) || element.name.length == 0)
+        (ast.isNode(element) || ast.isGraph(element)) &&
+        (!isNamed(element) || element.name.length === 0)
       ) {
-        /*
-        console.error(
-          chalk.redBright(`${element.$type} must have a nonempty name [${element.$cstNode?.text}]`),
-        );
-        */
         accept('error', `${element.$type} must have a nonempty name [${element.$cstNode?.text}]`, {
           node: element,
           property: 'name',
-          code: IssueCodes.NameMissing,
+          code: IssueCode.NameMissing,
         });
       }
 
-      // Handle named elements
+      // Record the name for duplicate detection.
       if (isNamed(element) && element.name.length > 0) {
         // The element has a name (note: links have an optional name)
         const name = element.name;
@@ -140,15 +131,12 @@ export class GraphValidator {
         nameMap.get(name)?.push(element);
       }
 
-      // Recurse for Graph elements
-      if (isGraph(element)) {
-        // Recurse
+      // Recurse into Graph elements.
+      if (ast.isGraph(element)) {
         for (const e of element.elements) {
           traverseElement(e);
         }
       }
-
-      ///console.log(chalk.white(`${preamble} - END`));
     }
 
     console.log(chalk.whiteBright('checkUniqueElementNames() - START'));
@@ -157,133 +145,128 @@ export class GraphValidator {
     for (const element of model.elements) {
       traverseElement(element);
     }
-    // Check for duplicate names and report errors
+
+    // Report duplicate names.
     nameMap.forEach((elements, name) => {
       if (elements.length > 1) {
         elements.forEach((element) => {
           accept('error', `Duplicate name '${name}'`, {
             node: element,
             property: 'name',
-            code: IssueCodes.NameDuplicate,
+            code: IssueCode.NameDuplicate,
           });
         });
       }
     });
 
-    // Check Link references against duplicate names
+    // Validate link references against duplicate names.
     AstUtils.streamAllContents(model)
-      .filter(isLink)
-      .forEach((link: Link) => {
+      .filter(ast.isLink)
+      .forEach((link: ast.Link) => {
         link.src.forEach((ref) => {
-          if (nameMap.size > 0 && (nameMap.get(ref.$refText)?.length ?? 0) > 1) {
+          if ((nameMap.get(ref.$refText)?.length ?? 0) > 1) {
             accept('error', `Reference to duplicate name '${ref.$refText}' in src`, {
               node: link,
               property: 'src',
-              code: IssueCodes.NameDuplicate,
+              code: IssueCode.NameDuplicate,
             });
           }
         });
         link.dst.forEach((ref) => {
-          if (nameMap.size > 0 && (nameMap.get(ref.$refText)?.length ?? 0) > 1) {
+          if ((nameMap.get(ref.$refText)?.length ?? 0) > 1) {
             accept('error', `Reference to duplicate name '${ref.$refText}' in dst`, {
               node: link,
               property: 'dst',
-              code: IssueCodes.NameDuplicate,
+              code: IssueCode.NameDuplicate,
             });
           }
         });
       });
-
-    ///console.log(chalk.whiteBright('checkUniqueElementNames() - END'));
   };
   /**
-   * Check that the Element and NodeAlias styleref resolves to a valid Style.
-   * @param node
-   * @param accept
+   * Validates that the style reference (styleref) on an Element or NodeAlias resolves to a valid Style.
+   *
+   * This check ensures that a style reference is not empty, is resolvable, and that the referenced
+   * node is of type Style.
+   *
+   * @param node The Element or NodeAlias node.
+   * @param accept The validation acceptor callback.
    */
-  checkStyleRef = (node: Element | NodeAlias, accept: ValidationAcceptor) => {
+  checkStyleRef = (node: ast.Element | ast.NodeAlias, accept: ValidationAcceptor): void => {
     console.log(
       `checkStyleRef() called for ${node.$type}${isNamed(node) ? ` "${node.name}"` : '(unnamed)'} - Style reference '${node.styleref?.$refText}' (${node.styleref?.ref?.$cstNode?.astNode.$type ?? '<undefined>'})`,
     );
     if (node.styleref) {
-      if (node.styleref.$refText.length == 0) {
-        accept('error', `Style reference missing after the ':' token.`, {
-          node: node,
+      if (node.styleref.$refText.length === 0) {
+        accept('error', 'Style reference missing after the ":" token.', {
+          node,
           property: 'styleref',
-          code: IssueCodes.StyleRefMissing,
+          code: IssueCode.StyleRefMissing,
         });
       } else if (!node.styleref.ref) {
         accept('error', `Style reference '${node.styleref.$refText}' not found.`, {
-          node: node,
+          node,
           property: 'styleref',
-          code: IssueCodes.StyleRefNotFound,
+          code: IssueCode.StyleRefNotFound,
         });
-      } else if (!isStyle(node.styleref.ref.$cstNode?.astNode)) {
+      } else if (!ast.isStyle(node.styleref.ref.$cstNode?.astNode)) {
         accept(
           'error',
-          `Style reference '${node.styleref.$refText}' not of type Style (found ${node.styleref.ref.$cstNode?.astNode.$type ?? '<undefined>'}).`,
+          `Style reference '${node.styleref.$refText}' is not a valid Style (found ${node.styleref.ref.$cstNode?.astNode.$type ?? '<undefined>'}).`,
           {
-            node: node,
+            node,
             property: 'styleref',
-            code: IssueCodes.StyleRefNotFound,
+            code: IssueCode.StyleRefNotFound,
           },
         );
       }
     }
   };
   /**
-   * Check the Style nodes through the entire Model hierarchy:
-   *  - Report if multiple Style defintions share the same name at the same hierarchy level
-   * TODO:
-   *  - Report duplicate style redefinitions (requires comparing the StyleItem entries in each Style)
+   * Validates that the Link node's arrowhead and link style definitions are correct.
    *
-   * @param model
-   * @param accept
+   * This check verifies that the source and destination arrowhead definitions are not empty,
+   * are recognized, and that there are no conflicting arrowhead definitions in the link style.
+   *
+   * @param link The Link node.
+   * @param accept The validation acceptor callback.
    */
-  checkLinkStyles = (link: Link, accept: ValidationAcceptor): void => {
-    // Source arrowhead:
+  checkLinkStyles = (link: ast.Link, accept: ValidationAcceptor): void => {
+    // Validate source arrowhead.
     if (link.src_arrowhead !== undefined) {
       if (link.src_arrowhead.length === 0) {
-        accept(
-          'error',
-          'Expecting a source arrowhead style definition after the colon - it cannot be empty.',
-          {
-            node: link,
-            property: 'src_arrowhead',
-            code: IssueCodes.SrcArrowheadEmpty,
-          },
-        );
-      } else if (!ARROWHEADS.includes(link.src_arrowhead)) {
-        accept('error', `Unknown source arrowhead style definition: '${link.src_arrowhead}'`, {
+        accept('error', 'Source arrowhead style definition cannot be empty.', {
           node: link,
           property: 'src_arrowhead',
-          code: IssueCodes.SrcArrowheadInvalid,
+          code: IssueCode.SrcArrowheadEmpty,
+        });
+      } else if (!ARROWHEADS.includes(link.src_arrowhead)) {
+        accept('error', `Unknown source arrowhead style: '${link.src_arrowhead}'`, {
+          node: link,
+          property: 'src_arrowhead',
+          code: IssueCode.SrcArrowheadInvalid,
         });
       }
     }
-    // Destination arrowhead:
+    // Validate destination arrowhead.
     if (link.dst_arrowhead !== undefined) {
       if (link.dst_arrowhead.length === 0) {
-        accept(
-          'error',
-          'Expecting a destination arrowhead style definition after the colon - it cannot be empty.',
-          {
-            node: link,
-            property: 'dst_arrowhead',
-            code: IssueCodes.DstArrowheadEmpty,
-          },
-        );
-      } else if (!ARROWHEADS.includes(link.dst_arrowhead)) {
-        accept('error', `Unknown destination arrowhead style definition: '${link.dst_arrowhead}'`, {
+        accept('error', 'Destination arrowhead style definition cannot be empty.', {
           node: link,
           property: 'dst_arrowhead',
-          code: IssueCodes.DstArrowheadInvalid,
+          code: IssueCode.DstArrowheadEmpty,
+        });
+      } else if (!ARROWHEADS.includes(link.dst_arrowhead)) {
+        accept('error', `Unknown destination arrowhead style: '${link.dst_arrowhead}'`, {
+          node: link,
+          property: 'dst_arrowhead',
+          code: IssueCode.DstArrowheadInvalid,
         });
       }
     }
     // Link style (already captured by grammar) - ensure there are no arrowhead redefinitions in link style:
     if (link.link !== undefined) {
-      const match = GraphTerminals.LINK_TYPE.exec(link.link);
+      const match = ast.GraphTerminals.LINK_TYPE.exec(link.link);
       if (match) {
         // ESLint Bug: match[i] can be undefined!
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -295,22 +278,22 @@ export class GraphValidator {
         if (link.src_arrowhead !== undefined && src_head.length > 0) {
           accept(
             'error',
-            `Redefinition of source arrowhead style definition: ':${link.src_arrowhead}' and '${src_head}'`,
+            `Redefinition of source arrowhead: ':${link.src_arrowhead}' conflicts with '${src_head}'`,
             {
               node: link,
               property: 'link',
-              code: IssueCodes.SrcArrowheadRedefined,
+              code: IssueCode.SrcArrowheadRedefined,
             },
           );
         }
         if (link.dst_arrowhead !== undefined && dst_head.length > 0) {
           accept(
             'error',
-            `Redefinition of destination arrowhead style definition: ':${link.dst_arrowhead}' and '${dst_head}'`,
+            `Redefinition of destination arrowhead: ':${link.dst_arrowhead}' conflicts with '${dst_head}'`,
             {
               node: link,
               property: 'link',
-              code: IssueCodes.DstArrowheadRedefined,
+              code: IssueCode.DstArrowheadRedefined,
             },
           );
         }
@@ -318,374 +301,508 @@ export class GraphValidator {
         accept('error', `Invalid link style definition: ':${link.link}'`, {
           node: link,
           property: 'link',
-          code: IssueCodes.LinkStyleInvalid,
+          code: IssueCode.LinkStyleInvalid,
         });
       }
     }
   };
-  checkStyles = (model: Model, accept: ValidationAcceptor): void => {
+  /**
+   * Validates the order and uniqueness of Style definitions within the model.
+   *
+   * Checks that all Style definitions appear before any Element nodes and that no
+   * duplicate style names exist at the same hierarchy level.
+   *
+   * @param model The Model node.
+   * @param accept The validation acceptor callback.
+   */
+  checkStyles = (model: ast.Model, accept: ValidationAcceptor): void => {
     console.info(chalk.cyanBright('checkStyles(model)'));
 
-    // Check that style definitions appear before Element definitions
+    // Ensure styles are defined before elements.
     check_styles_defined_before_elements(model, accept);
 
-    // Traverse the model top-down) and store the graph nodes and their levels:
+    // Traverse the model and collect style definitions along with their container and level.
     const style_dict: _find_style_dict[] = find_styles(model, 0, 0, accept);
-    /*
-    for (const item of style_dict) { // DEBUG LOG
-      console.info(
-        chalk.cyan(
-          `checkStyles(model): ${item.containerID} - ${item.level} : Style '${item.style.name}' : [ ${StyleDefinition_toString(item.style.definition.items)} ]`,
-        ),
-      );
-    }
-    */
 
-    // Check style_dict at all (container_name, level) for duplicate style declarations:
-
-    // Iterate over all containers (Model + Graph)
-
-    const d: Record<string, Record<string, Style[]>> = {};
-
+    // Group style definitions by container and check for duplicates.
+    const d: Record<string, Record<string, ast.Style[]>> = {};
     for (const item of style_dict) {
       if (!(item.containerID in d)) {
-        // Initialize:
         d[item.containerID] = {};
       }
       if (!(item.style.name in d[item.containerID])) {
         d[item.containerID][item.style.name] = [];
       }
-      // Push to array:
       d[item.containerID][item.style.name].push(item.style);
     }
 
-    // Now compute counts per node:
+    // Report duplicate style names.
     for (const container_id in d) {
       // Count occurrences of style name
       for (const style_name in d[container_id]) {
         if (d[container_id][style_name].length > 1) {
           // Multiple Style definitions with same name: issue warning
-          for (const duplicate_style_definition of d[container_id][style_name]) {
-            /*
-            console.warn(
-              chalk.red(
-                `Error: Multiple style definitions with name '${style_name}' at the same level should be merged. Found: ${StyleDefinition_toString(duplicate_style_definition.definition.items)}`,
-              ),
-            );
-            */
+          d[container_id][style_name].forEach((duplicateStyleDefinition) => {
             accept(
               'error',
               `Found multiple style definitions with the same name '${style_name}' at the same level.`,
               {
-                node: duplicate_style_definition,
+                node: duplicateStyleDefinition,
                 property: 'name',
-                code: IssueCodes.StyleMultipleDefinitions,
+                code: IssueCode.StyleMultipleDefinitions,
               },
             );
-          }
+          });
         }
       }
     }
   };
-  checkStyleNames = (style: Style, accept: ValidationAcceptor) => {
-    if (!isNamed(style) || style.name.length == 0) {
-      /*
-      console.error(
-        chalk.redBright(`ERROR: checkStyleNames() - style has no name: [${style.$cstNode?.text}]`),
-      );
-      */
+  /**
+   * Validates that a Style node has a nonempty name.
+   *
+   * @param style The Style node.
+   * @param accept The validation acceptor callback.
+   */
+  checkStyleNames = (style: ast.Style, accept: ValidationAcceptor): void => {
+    if (!isNamed(style) || style.name.length === 0) {
       accept('error', 'A style must have a nonempty name.', {
         node: style,
         property: 'name',
-        code: IssueCodes.NameMissing,
+        code: IssueCode.NameMissing,
       });
     }
   };
-  checkStyleDefinitionTopics = (shape_definition: StyleDefinition, accept: ValidationAcceptor) => {
-    const topic = shape_definition.topic;
-    if (topic.length == 0) {
-      accept('error', `Style topic missing.`, {
-        node: shape_definition,
+  /**
+   * Validates that a StyleDefinition node has a valid topic.
+   *
+   * Reports an error if the topic is missing or not recognized.
+   *
+   * @param styleDefinition The StyleDefinition node.
+   * @param accept The validation acceptor callback.
+   */
+  checkStyleDefinitionTopics = (
+    styleDefinition: ast.StyleDefinition,
+    accept: ValidationAcceptor,
+  ): void => {
+    const topic = styleDefinition.topic;
+    if (topic.length === 0) {
+      accept('error', 'Style topic is missing.', {
+        node: styleDefinition,
         property: 'topic',
-        code: IssueCodes.StyleDefinitionEmptyTopic,
+        code: IssueCode.StyleDefinitionEmptyTopic,
       });
     } else if (!STYLE_TOPICS.includes(topic)) {
       accept('error', `The style topic '${topic}' is not recognized.`, {
-        node: shape_definition,
+        node: styleDefinition,
         property: 'topic',
-        code: IssueCodes.StyleDefinitionUnknownTopic,
+        code: IssueCode.StyleDefinitionUnknownTopic,
       });
     }
   };
   /**
-   * Verify that the shape names provided are valid (exhaustive list defined in NAMED_SHAPES)
-   * @param shape_definition
-   * @param accept
+   * Validates that a ShapeStyleDefinition node specifies a valid shape name.
+   *
+   * @param shapeDefinition The ShapeStyleDefinition node.
+   * @param accept The validation acceptor callback.
    */
   checkShapeStyleDefinitions = (
-    shape_definition: ShapeStyleDefinition,
+    shapeDefinition: ast.ShapeStyleDefinition,
     accept: ValidationAcceptor,
-  ) => {
-    const value = shape_definition.value.toLowerCase();
-    if (value.length == 0) {
-      accept('error', `Shape name missing.`, {
-        node: shape_definition,
+  ): void => {
+    const value = shapeDefinition.value.toLowerCase();
+    if (value.length === 0) {
+      accept('error', 'Shape name is missing.', {
+        node: shapeDefinition,
         property: 'value',
-        code: IssueCodes.ShapeNameMissing,
+        code: IssueCode.ShapeNameMissing,
       });
     } else if (!NAMED_SHAPES.includes(value)) {
-      accept('error', `The shape '${shape_definition.value}' is not recognized.`, {
-        node: shape_definition,
+      accept('error', `The shape '${shapeDefinition.value}' is not recognized.`, {
+        node: shapeDefinition,
         property: 'value',
-        code: IssueCodes.ShapeNameUnknown,
+        code: IssueCode.ShapeNameUnknown,
       });
     }
   };
-  checkStyleSubstyles = (style: Style, accept: ValidationAcceptor) => {
-    if (isNamed(style) && style.name.length > 0 && style.name == style.styleref?.$refText) {
+  /**
+   * Validates that a Style node does not reference itself.
+   *
+   * @param style The Style node.
+   * @param accept The validation acceptor callback.
+   */
+  checkStyleSubstyles = (style: ast.Style, accept: ValidationAcceptor): void => {
+    if (isNamed(style) && style.name.length > 0 && style.name === style.styleref?.$refText) {
       accept(
         'error',
-        `Style '${style.name}' cannot refer to itself. Please remove ":${style.styleref.$refText}"`,
+        `Style '${style.name}' cannot reference itself. Please remove ":${style.styleref.$refText}"`,
         {
           node: style,
           property: 'styleref',
-          code: IssueCodes.StyleSelfReference,
+          code: IssueCode.StyleSelfReference,
         },
       );
     }
   };
   /**
-   * Check that the named colors provided are valid (exhaustive list defined in NAMED_COLORS)
-   * @param color_definition
-   * @param accept
+   * Validates that the named color in a TextColorDefinition is a valid CSS color.
+   *
+   * @param colorDefinition The TextColorDefinition node.
+   * @param accept The validation acceptor callback.
    */
   checkTextColorDefinitions = (
-    color_definition: TextColorDefinition,
+    colorDefinition: ast.TextColorDefinition,
     accept: ValidationAcceptor,
-  ) => {
-    const value = color_definition.color_name.toLowerCase();
+  ): void => {
+    const value = colorDefinition.color_name.toLowerCase();
     if (!NAMED_COLORS.includes(value)) {
       accept(
         'error',
-        `The color '${color_definition.color_name}' is not defined. Please use a CSS named color.`,
+        `The color '${colorDefinition.color_name}' is not defined. Please use a valid CSS color name.`,
         {
-          node: color_definition,
+          node: colorDefinition,
           property: 'color_name',
-          code: IssueCodes.ColorNameUnknown,
+          code: IssueCode.ColorNameUnknown,
         },
       );
     }
   };
   /**
-   * Check that the hexadecimal color definitions provided are valid (3 or 6 hexadecimal characters)
-   * @param hex_color_definition
-   * @param accept
+   * Validates that the hexadecimal color code in a HexColorDefinition is valid.
+   *
+   * @param hexColorDefinition The HexColorDefinition node.
+   * @param accept The validation acceptor callback.
    */
   checkHexColorDefinitions = (
-    hex_color_definition: HexColorDefinition,
+    hexColorDefinition: ast.HexColorDefinition,
     accept: ValidationAcceptor,
   ): void => {
-    const code_length = hex_color_definition.hex_color.length;
-    /*
-    console.info(
-      chalk.cyanBright(
-        `checkHexColorDefinitions(${hex_color_definition.$cstNode?.text}): hex_color='${hex_color_definition.hex_color}' (length=${code_length})}`,
-      ),
-    );
-    */
-    if (![4, 7].includes(code_length)) {
-      /*
-      console.warn(
-        chalk.red(
-          `Error: invalid hexadecimal color code '${hex_color_definition.hex_color}' (expecting '#' plus 3 or 6 hexadecimal digits, found ${code_length - 1}).`,
-        ),
-      );
-      */
+    const codeLength = hexColorDefinition.hex_color.length;
+    if (![4, 7].includes(codeLength)) {
       accept(
         'error',
-        `Error: invalid hexadecimal color code '${hex_color_definition.hex_color}' (expecting '#' plus 3 or 6 hexadecimal digits, found ${code_length - 1}).`,
+        `Invalid hexadecimal color code '${hexColorDefinition.hex_color}' (expected '#' plus 3 or 6 hex digits, found ${codeLength - 1}).`,
         {
-          node: hex_color_definition,
+          node: hexColorDefinition,
           property: 'hex_color',
-          code: IssueCodes.HexColorInvalid,
+          code: IssueCode.HexColorInvalid,
         },
       );
     }
   };
   /**
-   * Check that the hexadecimal color definitions provided are valid (integer values in range 0-255)
-   * @param rgb_color_definition
-   * @param accept
+   * Validates that the RGB color values in a RgbColorDefinition are integers within 0–255.
+   *
+   * @param rgbColorDefinition The RgbColorDefinition node.
+   * @param accept The validation acceptor callback.
    */
   checkRgbColorDefinitions = (
-    rgb_color_definition: RgbColorDefinition,
+    rgbColorDefinition: ast.RgbColorDefinition,
     accept: ValidationAcceptor,
   ): void => {
-    // NOTE:; code duplication to circumvent access problems to 'property: "red" | "green" | "blue"' as those aren't strings but types.
+    enum ColorChannel {
+      Red = 'red',
+      Green = 'green',
+      Blue = 'blue',
+    }
 
-    // Check red:
-    const red = rgb_color_definition.red;
-    if (!Number.isInteger(red)) {
-      accept('error', `RGB color value for red is not an integer: '${red}'`, {
-        node: rgb_color_definition,
-        property: 'red',
-        code: IssueCodes.RgbChannelValueInvalid,
-      });
-    } else {
-      if (red < 0 || red > 255) {
+    const checkChannel = (channel: number, channelName: ColorChannel) => {
+      if (!Number.isInteger(channel)) {
+        accept('error', `RGB channel value for ${channelName} is not an integer: '${channel}'`, {
+          node: rgbColorDefinition,
+          property: channelName,
+          code: IssueCode.RgbChannelValueInvalid,
+        });
+      } else if (channel < 0 || channel > 255) {
         accept(
           'error',
-          `RGB color value for red out of range: '${red}' (expecting an integer value (0 ≤ red ≤ 255)`,
+          `RGB channel value for ${channelName} out of range (0 - 255): '${channel}'`,
           {
-            node: rgb_color_definition,
-            property: 'red',
-            code: IssueCodes.RgbChannelValueOutOfRange,
+            node: rgbColorDefinition,
+            property: channelName,
+            code: IssueCode.RgbChannelValueOutOfRange,
           },
         );
       }
-    }
+    };
 
-    // Check green:
-    const green = rgb_color_definition.green;
-    if (!Number.isInteger(green)) {
-      accept('error', `RGB color value for green is not an integer: '${green}'`, {
-        node: rgb_color_definition,
-        property: 'green',
-        code: IssueCodes.RgbChannelValueInvalid,
-      });
-    } else {
-      if (green < 0 || green > 255) {
-        accept(
-          'error',
-          `RGB color value for green out of range: '${green}' (expecting an integer value (0 ≤ green ≤ 255)`,
-          {
-            node: rgb_color_definition,
-            property: 'green',
-            code: IssueCodes.RgbChannelValueOutOfRange,
-          },
-        );
-      }
-    }
-
-    // Check blue:
-    const blue = rgb_color_definition.blue;
-    if (!Number.isInteger(blue)) {
-      accept('error', `RGB color value for blue is not an integer: '${blue}'`, {
-        node: rgb_color_definition,
-        property: 'blue',
-        code: IssueCodes.RgbChannelValueInvalid,
-      });
-    } else {
-      if (blue < 0 || blue > 255) {
-        accept(
-          'error',
-          `RGB color value for blue out of range: '${blue}' (expecting an integer value (0 ≤ blue ≤ 255)`,
-          {
-            node: rgb_color_definition,
-            property: 'blue',
-            code: IssueCodes.RgbChannelValueOutOfRange,
-          },
-        );
-      }
-    }
+    checkChannel(rgbColorDefinition.red, ColorChannel.Red);
+    checkChannel(rgbColorDefinition.green, ColorChannel.Green);
+    checkChannel(rgbColorDefinition.blue, ColorChannel.Blue);
   };
   /**
-   * Check that the line style definitions are valid (number + valid unit)
-   * @param width_definition
-   * @param accept
+   * Validates that the WidthValue node has a nonnegative number and a valid unit.
+   *
+   * @param widthValue The WidthValue node.
+   * @param accept The validation acceptor callback.
    */
-  checkWidthDefinitions = (width_value: WidthValue, accept: ValidationAcceptor): void => {
-    if (width_value.value < 0) {
-      console.error(chalk.red(`Width has invalid numeric value: '${width_value.value}'.`));
-      accept('error', `Width has invalid numeric value: '${width_value.value}'.`, {
-        node: width_value,
+  checkWidthDefinitions = (widthValue: ast.WidthValue, accept: ValidationAcceptor): void => {
+    if (widthValue.value < 0) {
+      accept('error', `Width value '${widthValue.value}' is invalid.`, {
+        node: widthValue,
         property: 'value',
-        code: IssueCodes.LinkWidthValueInvalid,
+        code: IssueCode.LinkWidthValueInvalid,
       });
     }
-    if (!('unit' in width_value) || width_value.unit?.length == 0) {
+    if (!('unit' in widthValue) || widthValue.unit?.length === 0) {
       accept(
         'warning',
         `Width has no unit. The default unit will be used in conversions. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
         {
-          node: width_value,
+          node: widthValue,
           property: undefined, // there is no "unit"
-          code: IssueCodes.LinkWidthHasNoUnit,
+          code: IssueCode.LinkWidthHasNoUnit,
         },
       );
-    } else {
-      if ((width_value.unit?.length ?? 0) > 0 && !LENGTH_UNITS.includes(width_value.unit ?? '')) {
-        /*
-        console.error(
-          `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
-        );
-        */
-        accept(
-          'error',
-          `Width has invalid unit: '${width_value.unit}'. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
-          {
-            node: width_value,
-            property: 'unit',
-            code: IssueCodes.LinkWidthUnitUnknown,
-          },
-        );
-      }
+    } else if (!LENGTH_UNITS.includes(widthValue.unit ?? '')) {
+      accept(
+        'error',
+        `Invalid width unit '${widthValue.unit}'. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
+        {
+          node: widthValue,
+          property: 'unit',
+          code: IssueCode.LinkWidthUnitUnknown,
+        },
+      );
     }
   };
   /**
-   * Check that the opacity / alpha style definitions are valid (number in range 0-1 or integer percentage in range 0%-100%)
-   * @param opacity_style_item
-   * @param accept
+   * Validates that the opacity in an OpacityStyleDefinition is within the expected range.
+   * For percentage values, it must be an integer between 0 and 100; for decimal values,
+   * it must be between 0.0 and 1.0.
+   *
+   * @param opacityStyleDefinition The OpacityStyleDefinition node.
+   * @param accept The validation acceptor callback.
    */
   checkOpacityStyleDefinition = (
-    opacity_style_item: OpacityStyleDefinition,
+    opacityStyleDefinition: ast.OpacityStyleDefinition,
     accept: ValidationAcceptor,
   ): void => {
-    const value = opacity_style_item.value;
+    const value = opacityStyleDefinition.value;
     const opacity: number = value.opacity;
     if (value.isPct === true) {
       // Opacity as integer percentage value (0--100)
       if (Number.isInteger(opacity)) {
         if (opacity < 0 || opacity > 100) {
-          // Out of bounds
-          ///console.error(`Link opacity value out of range (0% - 100%): found '${opacity}%'`);
-          accept('error', `Link opacity value out of range (0% - 100%): found '${opacity}%'`, {
-            node: opacity_style_item,
+          accept('error', `Opacity percentage out of range (0% - 100%): '${opacity}%'`, {
+            node: opacityStyleDefinition,
             property: 'value',
-            code: IssueCodes.OpacityValueOutOfRange,
+            code: IssueCode.OpacityValueOutOfRange,
           });
         }
       } else {
-        ///console.error(`Expecting integer percentage value: found '${opacity}%'`);
-        accept('error', `Expecting integer percentage value: found '${opacity}%'`, {
-          node: opacity_style_item,
+        accept('error', `Expected integer percentage value for opacity, found '${opacity}%'`, {
+          node: opacityStyleDefinition,
           property: 'value',
-          code: IssueCodes.OpacityValueInvalid,
+          code: IssueCode.OpacityValueInvalid,
         });
       }
     } else {
       // Opacity as float value (0--1)
       if (opacity < 0.0 || opacity > 1.0) {
-        // Out of bounds (one)
-        ///console.error(`Link opacity value out of range (0...1): found '${opacity}'`);
-        accept('error', `Link opacity value out of range (0...1): found '${opacity}'`, {
-          node: opacity_style_item,
+        accept('error', `Opacity value out of range (0.0 - 1.0): '${opacity}'`, {
+          node: opacityStyleDefinition,
           property: 'value',
-          code: IssueCodes.OpacityValueOutOfRange,
+          code: IssueCode.OpacityValueOutOfRange,
         });
+      }
+    }
+  };
+  /**
+   * Validates spurious semicolons in a StyleBlock.
+   *
+   * This function examines the direct child CST nodes of a StyleBlock and reports diagnostics for:
+   * - Leading semicolons (before the first StyleDefinition).
+   * - Redundant semicolons between StyleDefinition nodes.
+   * - Trailing semicolons (after the last StyleDefinition).
+   *
+   * The diagnostic range is computed by grouping adjacent semicolon tokens (ignoring hidden comment nodes).
+   *
+   * @param styleBlock The StyleBlock node to validate.
+   * @param accept The validation acceptor callback.
+   */
+  checkSpuriousSemicolons = (styleBlock: ast.StyleBlock, accept: ValidationAcceptor): void => {
+    const cstNode = styleBlock.$cstNode;
+    if (!cstNode) {
+      return;
+    }
+
+    // Define an enum to classify direct child CST nodes.
+    enum NodeType {
+      Other = 0,
+      Semi = 1,
+      Comment = 2,
+      StyleDefinition = 3,
+    }
+    // Process only the direct child nodes of the StyleBlock.
+    const directChildren = CstUtils.streamCst(cstNode)
+      .filter((child) => CstUtils.isChildNode(child, cstNode))
+      .map((node) => {
+        // For leaf nodes, if it’s a comment, mark it as Comment;
+        // if its text is ';', mark as Semi; otherwise Other.
+        // For non-leaf nodes, if the AST node is a StyleDefinition, mark it accordingly.
+        const nodeType = isLeafCstNode(node)
+          ? isCommentCstNode(node)
+            ? NodeType.Comment
+            : node.text === ';'
+              ? NodeType.Semi
+              : NodeType.Other
+          : ast.isStyleDefinition(node.astNode)
+            ? NodeType.StyleDefinition
+            : NodeType.Other;
+        return {
+          cstNode: node,
+          nodeType,
+        };
+      })
+      .filter((item) => item.nodeType !== NodeType.Other)
+      .toArray();
+
+    // Extract indexes of semicolon and StyleDefinition nodes.
+    const semis: number[] = [];
+    const defs: number[] = [];
+    directChildren.forEach((child, index) => {
+      if (child.nodeType === NodeType.Semi) {
+        semis.push(index);
+      } else if (child.nodeType === NodeType.StyleDefinition) {
+        defs.push(index);
+      }
+    });
+
+    if (semis.length === 0) {
+      // Nothing to do
+      return;
+    }
+
+    // Case 1: For 0 or 1 StyleDefinition, all semicolons should be deleted.
+    if (defs.length <= 1) {
+      // Merge ranges of consecutive semicolon nodes into one
+      groupAdjacentArrayIndexes(semis).forEach(([start, end]) => {
+        accept('warning', 'Spurious semicolon(s) in empty StyleBlock.', {
+          node: styleBlock,
+          code: IssueCode.SpuriousSemicolonDelete,
+          range: {
+            start: directChildren[start].cstNode.range.start,
+            end: directChildren[end].cstNode.range.end,
+          },
+        });
+      });
+    } else {
+      // Case 2: For multiple StyleDefinition nodes, check semicolons before, between, and after definitions.
+      const firstDefIndex = defs[0];
+      const lastDefIndex = defs[defs.length - 1];
+
+      // Semicolons before first and after last StyleDefinition nodes
+      groupAdjacentArrayIndexes(semis.filter((i) => i < firstDefIndex || i > lastDefIndex)).forEach(
+        ([start, end]) => {
+          accept(
+            'warning',
+            `Spurious semicolon(s) ${end < firstDefIndex ? 'before first' : 'after last'} StyleDefinition.`,
+            {
+              node: styleBlock,
+              code: IssueCode.SpuriousSemicolonDelete,
+              range: {
+                start: directChildren[start].cstNode.range.start,
+                end: directChildren[end].cstNode.range.end,
+              },
+            },
+          );
+        },
+      );
+
+      // Semicolons between adjacent StyleDefinitions: keep the first, delete extras.
+      for (let j = 0; j < defs.length - 1; j++) {
+        const semisBetween = semis.filter((i) => i > defs[j] && i < defs[j + 1]);
+        // Keep the first semicolon; the rest are redundant.
+        const redundant = semisBetween.slice(1);
+        if (redundant.length > 0) {
+          groupAdjacentArrayIndexes(redundant).forEach(([start, end]) => {
+            accept('warning', 'Excess semicolons between Style Definitions.', {
+              node: styleBlock,
+              code: IssueCode.SpuriousSemicolonDelete,
+              range: {
+                start: directChildren[start].cstNode.range.start,
+                end: directChildren[end].cstNode.range.end,
+              },
+            });
+          });
+        }
       }
     }
   };
 }
 
+/**
+ * Groups adjacent integer values in a sorted array into ranges.
+ *
+ * This function takes a sorted array of integers and identifies sequences of
+ * consecutive numbers. It then represents these sequences as pairs of the
+ * starting and ending values of the range.
+ *
+ * @param arr A sorted array of integers.
+ * @returns An array of number pairs, where each pair represents a range of
+ * adjacent integers. The first element of the pair is the start of the
+ * range, and the second element is the end. Returns an empty array if
+ * the input array is empty.
+ *
+ * @example
+ * ```typescript
+ * const indices = [0, 1, 3, 5, 6, 9];
+ * const groupedRanges = groupAdjacentArrayIndexes(indices);
+ * console.log(groupedRanges); // Output: [ [ 0, 1 ], [ 3, 3 ], [ 5, 6 ], [ 9, 9 ] ]
+ * ```
+ *
+ * @example
+ * ```typescript
+ * const indices2 = [1, 2, 3, 7, 8, 9];
+ * const groupedRanges2 = groupAdjacentArrayIndexes(indices2);
+ * console.log(groupedRanges2); // Output: [ [ 1, 3 ], [ 7, 9 ] ]
+ * ```
+ *
+ * @example
+ * ```typescript
+ * const indices3 = [4];
+ * const groupedRanges3 = groupAdjacentArrayIndexes(indices3);
+ * console.log(groupedRanges3); // Output: [ [ 4, 4 ] ]
+ * ```
+ *
+ * @example
+ * ```typescript
+ * const indices4: number[] = [];
+ * const groupedRanges4 = groupAdjacentArrayIndexes(indices4);
+ * console.log(groupedRanges4); // Output: []
+ * ```
+ */
+function groupAdjacentArrayIndexes(arr: number[]): number[][] {
+  if (arr.length === 0) {
+    return [];
+  }
+
+  const result = arr.reduce((acc: number[][], currentValue, index) => {
+    if (index === 0) {
+      acc.push([currentValue, currentValue]);
+    } else {
+      const lastGroup = acc[acc.length - 1];
+      if (currentValue === lastGroup[1] + 1) {
+        lastGroup[1] = currentValue;
+      } else {
+        acc.push([currentValue, currentValue]);
+      }
+    }
+    return acc;
+  }, []);
+  console.log(`groupAdjacentArrayIndexes( ${JSON.stringify(arr)} ) : ${JSON.stringify(result)}`);
+
+  return result;
+}
+
 interface _find_style_dict {
   level: number;
   containerID: string;
-  style: Style;
+  style: ast.Style;
 }
 
 function find_styles(
-  container: Model | Graph,
+  container: ast.Model | ast.Graph,
   level: number,
   seq: number,
   accept: ValidationAcceptor,
@@ -697,12 +814,12 @@ function find_styles(
     // Add the style:
     style_dict.push({
       level,
-      containerID: `${seq}::` + (isModel(container) === true ? '' : container.name),
+      containerID: `${seq}::` + (ast.isModel(container) === true ? '' : container.name),
       style,
     });
   }
   // Traverse the graph elements recursively for styles:
-  for (const graph of container.elements.filter((e) => e.$type === Graph)) {
+  for (const graph of container.elements.filter((e) => ast.isGraph(e))) {
     style_dict.push(...find_styles(graph, level + 1, seq + 1, accept));
   }
   return style_dict;
@@ -717,14 +834,14 @@ function check_styles_defined_before_elements(
   let elementCount = 0; ///, styleCount = 0;
   for (const childNode of AstUtils.streamContents(node)) {
     // Check that all Style nodes appear before Element nodes
-    if (isElement(childNode)) {
+    if (ast.isElement(childNode)) {
       elementCount++;
       /***
        console.debug(
         `${'  '.repeat(level)}check_styles_defined_before_elements(${node.$type}) [elements: ${elementCount}, styles: ${styleCount}] - process Element node #${elementCount} of type '${childNode.$type}' ${childNode.name === undefined ? '' : ` with name '${childNode.name}'`}`,
       );
       ***/
-      if (isGraph(childNode)) {
+      if (ast.isGraph(childNode)) {
         // recurse
         /***
         console.debug(
@@ -738,7 +855,7 @@ function check_styles_defined_before_elements(
         );
         ***/
       }
-    } else if (isStyle(childNode)) {
+    } else if (ast.isStyle(childNode)) {
       /***
       styleCount++;
       console.debug(
@@ -756,7 +873,7 @@ function check_styles_defined_before_elements(
         ***/
         accept('error', 'Style definitions must appear before any graph elements.', {
           node: childNode,
-          code: IssueCodes.StyleAfterElement,
+          code: IssueCode.StyleAfterElement,
         });
       }
     }
