@@ -1,5 +1,44 @@
 // import { Position as vscodePosition, Range as vscodeRange } from 'vscode';
+import { AstUtils, CstNode, isCompositeCstNode, isLeafCstNode } from 'langium';
+import { rangeToString } from 'langium/test';
 import { Position, Range } from 'vscode-languageserver';
+
+/**
+ * Checks if a given CST node represents a comment.
+ * It verifies if the node is a hidden leaf node with a token type name of
+ * 'ML_COMMENT' or 'SL_COMMENT'.
+ *
+ * @param cstNode The CST node to check.
+ * @returns True if the node represents a comment, false otherwise.
+ */
+export function isCommentCstNode(cstNode: CstNode): boolean {
+  return (
+    isLeafCstNode(cstNode) &&
+    cstNode.hidden &&
+    ['ML_COMMENT', 'SL_COMMENT'].includes(cstNode.tokenType.name)
+  );
+}
+
+/**
+ * Generates a string containing detailed information about a CST node.
+ * This is useful for debugging and logging purposes.
+ *
+ * @param cstNode The CST node to get information about.
+ * @param context An optional string providing context or a description for the node.
+ * Defaults to 'CstNode'.
+ * @returns A string containing information about the CST node.
+ */
+export function getCstNodeInfo(cstNode: CstNode, context: string = 'CstNode'): string {
+  const path = AstUtils.getDocument(cstNode.astNode).uri.path;
+
+  const nodeTypeInfo = isLeafCstNode(cstNode)
+    ? `${cstNode.hidden ? 'HIDDEN ' : ''}Leaf CST Node: "${cstNode.tokenType.name}"`
+    : isCompositeCstNode(cstNode)
+      ? `${cstNode.hidden ? 'HIDDEN ' : ''}Composite CST Node: ${cstNode.astNode.$type}`
+      : `Other ${cstNode.hidden ? 'HIDDEN ' : ''}CST Node: grammar source "${cstNode.grammarSource?.$type}"`;
+
+  return `${context} (${path}) - ${rangeToString(cstNode.range)}: ${JSON.stringify(cstNode.text)} - ${nodeTypeInfo}`;
+}
 
 /**
  * Converts a Position object to a human-readable string.
