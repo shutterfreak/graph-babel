@@ -16,7 +16,7 @@ import {
   NodeFormatter,
 } from 'langium/lsp';
 import { rangeToString } from 'langium/test';
-import type { Range, TextEdit } from 'vscode-languageserver-protocol';
+import type { TextEdit } from 'vscode-languageserver-protocol';
 
 import * as ast from '../generated/ast.js';
 import { groupAdjacentArrayIndexes, isCommentCstNode } from '../graph-util.js';
@@ -744,13 +744,37 @@ export class GraphFormatter extends AbstractFormatter {
     );
   }
 
+  /**
+   * Overrides the default behavior for creating hidden text edits.
+   * This method is invoked when formatting hidden CST nodes (e.g. comment tokens)
+   * that appear immediately after an opening brace '{'.
+   *
+   * For both single-line (SL_COMMENT) and multi-line (ML_COMMENT) comments, we:
+   * 1. Compute the whitespace region (startRange) immediately preceding the comment.
+   * 2. Determine the current indentation and the expected indentation.
+   * 3. If an adjustment is needed (i.e. the expected indent differs from the current indent),
+   *    then we generate a TextEdit that replaces the whitespace before the comment.
+   *
+   * For SL_COMMENT tokens, the adjustment is applied directly.
+   *
+   * For ML_COMMENT tokens, we split the comment text into lines, remove any existing
+   * leading/trailing whitespace from each line, and prepend the expected indent to each.
+   * We then return an edit (or two edits if there is non-empty whitespace before the comment)
+   * that replaces the original ML_COMMENT text with the reindented version.
+   *
+   * @param previous The CST node immediately preceding the hidden node.
+   * @param hidden The hidden CST node (expected to be a comment node).
+   * @param formatting The formatting action (if any) that was determined.
+   * @param context The formatting context.
+   * @returns An array of TextEdits to adjust the whitespace preceding and/or within the comment.
+   */
   protected override createHiddenTextEdits(
     previous: CstNode | undefined,
     hidden: CstNode,
     formatting: FormattingAction | undefined,
     context: FormattingContext,
   ): TextEdit[] {
-    // Only handle comment tokens (SL or ML comments) immediately following an opening brace.
+    // Only customize if the hidden token is a comment and the previous token is '{'
     if (
       isLeafCstNode(hidden) &&
       isCommentCstNode(hidden) &&
@@ -760,74 +784,80 @@ export class GraphFormatter extends AbstractFormatter {
     ) {
       const doc = context.document;
       const startLine = hidden.range.start.line;
+      // Compute the whitespace range (startRange) preceding the comment.
+      // If the previous token ends on the same line as the comment, use that gap.
+      // Otherwise, use the entire whitespace from the beginning of the line.
+      const startRange =
+        previous.range.end.line === hidden.range.start.line
+          ? { start: previous.range.end, end: hidden.range.start }
+          : { start: { line: startLine, character: 0 }, end: hidden.range.start };
 
-      // Determine if the comment is on the same line as the '{' token.
-      const onSameLine = previous.range.end.line === hidden.range.start.line;
-
-      // Compute the range that currently holds the white space before the comment.
-      // If onSameLine, the range is from the end of the previous token to the start of the hidden token.
-      // Otherwise, it is the white space at the beginning of the line of the comment.
-      const startRange: Range = onSameLine
-        ? { start: previous.range.end, end: hidden.range.start }
-        : { start: { line: startLine, character: 0 }, end: hidden.range.start };
-
-      console.log(
-        `createHiddenTextEdits(hidden: ${rangeToString(hidden.range)}, previous: ${rangeToString(previous.range)}) -- ${onSameLine ? 'same line' : 'different lines'} -- startRange: ${rangeToString(startRange)}`,
-      );
-
-      // Read the white space currently in that range.
-      const hiddenStartText = doc.getText(startRange);
+      // Retrieve the current whitespace text in startRange.
+      const currentWs = doc.getText(startRange);
+      // Compute the expected indentation (number of indent characters)
       const move = this.findFittingMove(startRange, formatting?.moves ?? [], context);
-      const hiddenStartChar = this.getExistingIndentationCharacterCount(hiddenStartText, context);
-      const expectedStartChar = this.getIndentationCharacterCount(context, move);
-      const characterIncrease = expectedStartChar - hiddenStartChar;
+      const currentIndent = this.getExistingIndentationCharacterCount(currentWs, context);
+      const expectedIndent = this.getIndentationCharacterCount(context, move);
+      const characterDiff = expectedIndent - currentIndent;
+      const indentChar = context.options.insertSpaces ? ' ' : '\t';
 
       console.log(`createHiddenTextEdits: startRange = ${rangeToString(startRange)}`);
-      console.log(`createHiddenTextEdits: hiddenStartText = "${hiddenStartText}"`);
-      console.log(`createHiddenTextEdits: hiddenStartChar = ${hiddenStartChar}`);
-      console.log(`createHiddenTextEdits: expectedStartChar = ${expectedStartChar}`);
-      console.log(`createHiddenTextEdits: characterIncrease = ${characterIncrease}`);
+      console.log(
+        `createHiddenTextEdits: current white space="${currentWs}" (indent=${currentIndent})`,
+      );
+      console.log(`createHiddenTextEdits: expected indent=${expectedIndent}`);
+      console.log(`createHiddenTextEdits: characterDiff=${characterDiff}`);
 
-      // Determine the new white space to insert.
-      const indentChar = context.options.insertSpaces ? ' ' : '\t';
-      let newText: string;
-      if (characterIncrease > 0) {
-        // Need to add extra indent characters.
-        // If on the same line, we want to force a newline followed by indent;
-        // if already on a new line, we simply replace the existing whitespace.
-        newText = onSameLine
-          ? '\n' + indentChar.repeat(expectedStartChar)
-          : indentChar.repeat(expectedStartChar);
-        console.log(`createHiddenTextEdits: Adding ${characterIncrease} indent character(s).`);
-      } else if (characterIncrease < 0) {
-        // Too many spaces – replace with exactly the expected indent.
-        newText = onSameLine
-          ? '\n' + indentChar.repeat(expectedStartChar)
-          : indentChar.repeat(expectedStartChar);
+      // If no adjustment is needed, return no edits.
+      if (characterDiff === 0) {
         console.log(
-          `createHiddenTextEdits: Removing extra whitespace; setting indent to ${expectedStartChar} characters.`,
-        );
-      } else {
-        console.log(
-          `createHiddenTextEdits: No change needed (characterIncrease = ${characterIncrease}).`,
+          `createHiddenTextEdits: No indent adjustment needed (characterDiff=${characterDiff}).`,
         );
         return [];
       }
 
-      console.log(
-        `createHiddenTextEdits: Replacing whitespace ${rangeToString(startRange)} with ${JSON.stringify(newText)} for comment "${hidden.text}"`,
-      );
+      // For SL_COMMENT, replace the whitespace before the comment with the expected indent.
+      if (hidden.tokenType.name === 'SL_COMMENT') {
+        // If startRange is non-empty, we replace it.
+        const newWs = indentChar.repeat(expectedIndent);
+        console.log(`createHiddenTextEdits: SL_COMMENT new white space: ${JSON.stringify(newWs)}`);
+        return [{ range: startRange, newText: newWs }];
+      }
 
-      const edit: TextEdit = {
-        range: startRange,
-        newText,
-      };
-      return [edit];
+      // For ML_COMMENT, reindent the comment’s content.
+      if (hidden.tokenType.name === 'ML_COMMENT') {
+        // Split the comment text into lines.
+        const lines = hidden.text.split('\n');
+        // Process each line: trim existing leading/trailing whitespace, then prepend the expected indent.
+        const reindentedLines = lines.map(
+          (line) => indentChar.repeat(expectedIndent) + line.trim(),
+        );
+        const newText = reindentedLines.join('\n');
+
+        console.log(`createHiddenTextEdits: ML_COMMENT reindented as: ${JSON.stringify(newText)}`);
+
+        // If the whitespace before the comment (startRange) is empty, only replace the comment text.
+        if (
+          startRange.start.line === startRange.end.line &&
+          startRange.start.character === startRange.end.character
+        ) {
+          return [{ range: hidden.range, newText }];
+        } else {
+          // Otherwise, first remove the original whitespace before the comment (if any),
+          // then replace the comment text with the reindented text.
+          return [
+            {
+              range: startRange,
+              newText: '', // We already indented all lines of the ML_COMMENT
+            },
+            { range: hidden.range, newText },
+          ];
+        }
+      }
     }
 
-    console.log(
-      `createHiddenTextEdits("${hidden.text}") -- Not a SL_COMMENT after '{', delegating to default implementation.`,
-    );
+    // For all other cases, delegate to the superclass implementation.
+    console.log(`createHiddenTextEdits("${hidden.text}") -- delegating to default implementation.`);
     return super.createHiddenTextEdits(previous, hidden, formatting, context);
   }
 }
