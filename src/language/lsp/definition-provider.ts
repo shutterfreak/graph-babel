@@ -13,7 +13,7 @@ import { inspect } from 'util';
 import { CancellationToken, DefinitionParams, LocationLink } from 'vscode-languageserver';
 
 import { isElement, isStyle } from '../generated/ast.js';
-import { render_text } from './lsp-util.js';
+import { render_text } from '../graph-util.js';
 
 /**
  * Custom DefinitionProvider for the Graph language, handling hierarchical Style scopes and document-level Element scopes.

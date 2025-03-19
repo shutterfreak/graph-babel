@@ -7,6 +7,7 @@ import {
   isNamed,
 } from 'langium';
 import { DefaultRenameProvider, LangiumServices } from 'langium/lsp';
+import { rangeToString } from 'langium/test';
 import { inspect } from 'node:util';
 import {
   CancellationToken,
@@ -20,7 +21,7 @@ import {
 } from 'vscode-languageserver';
 
 import { isElement, isNodeAlias } from '../generated/ast.js';
-import { range_toString, render_text } from './lsp-util.js';
+import { render_text } from '../graph-util.js';
 
 /**
  * Custom rename provider with validation for Graph language.
@@ -58,7 +59,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
 
     const cstIdNode = GrammarUtils.findNodeForProperty(node.$cstNode, 'name');
     console.log(
-      `GraphRenameProvider.prepareRename() found CST node with property "name" at range: (${range_toString(cstIdNode?.range)}) : [${cstIdNode?.text}]\n`,
+      `GraphRenameProvider.prepareRename() found CST node with property "name" at range: (${cstIdNode?.range ? rangeToString(cstIdNode.range) : '?'}) : [${cstIdNode?.text}]\n`,
     );
     console.log(
       render_text(
@@ -201,7 +202,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
           astNode.$containerProperty ?? '<unknown container property>'
         }) - cstNode <${astNode.$cstNode.grammarSource?.$type ?? 'undefined'}: ${
           astNode.$cstNode.grammarSource?.$containerProperty ?? '<container property not set>'
-        }> @ (${range_toString(astNode.$cstNode.range)}) -- length = ${astNode.$cstNode.length}`,
+        }> @ (${rangeToString(astNode.$cstNode.range)}) -- length = ${astNode.$cstNode.length}`,
       );
       console.log(
         astNode.$cstNode.text

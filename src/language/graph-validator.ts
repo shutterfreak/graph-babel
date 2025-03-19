@@ -9,10 +9,9 @@ import {
   isNamed,
 } from 'langium';
 
-import { groupAdjacentArrayIndexes } from '../cli/cli-util.js';
 import * as ast from './generated/ast.js';
 import type { GraphServices } from './graph-module.js';
-import { isCommentCstNode } from './lsp/lsp-util.js';
+import { groupAdjacentArrayIndexes, isCommentCstNode } from './graph-util.js';
 import {
   ARROWHEADS,
   LENGTH_UNITS,

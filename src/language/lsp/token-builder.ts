@@ -11,7 +11,7 @@ import {
 } from 'langium';
 import { inspect } from 'util';
 
-import { render_text } from './lsp-util.js';
+import { render_text } from '../graph-util.js';
 
 /**
  * GraphTokenBuilder extends the DefaultTokenBuilder to customize token creation for the Graph language.

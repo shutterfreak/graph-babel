@@ -10,7 +10,7 @@ import {
 } from 'langium';
 
 import { isGraph, isLink, isNode, isNodeAlias, isStyle } from '../generated/ast.js';
-import { path_get_file } from './lsp-util.js';
+import { path_get_file } from '../graph-util.js';
 
 /**
  * GraphScopeProvider restricts reference resolution to definitions declared within the same file.
@@ -51,8 +51,9 @@ export class GraphScopeProvider extends DefaultScopeProvider {
     const documentUri = document.uri.toString();
 
     // Log the current file being processed
-    console.log(`getScope(${path_get_file(documentUri)})`);
+    console.log(`getScope(${path_get_file(documentUri)}) - property "${context.property}"`);
     // Log all precomputed scope entries for debugging purposes
+    /*
     precomputed
       ?.get(document.parseResult.value)
       .forEach((ref, index) =>
@@ -69,13 +70,14 @@ export class GraphScopeProvider extends DefaultScopeProvider {
           : '<no referenced document path found>'
       }"`,
     );
+    */
 
     if (precomputed) {
       const allDescriptions = precomputed.get(document.parseResult.value);
 
       // Handling style references: only Style nodes declared in the same file should be considered.
       if (context.property === 'styleref') {
-        console.log('Filtering for styleref (restricting to current file)');
+        // console.log('Filtering for styleref (restricting to current file)');
 
         const styleScope = stream(allDescriptions)
           .filter(
@@ -94,7 +96,7 @@ export class GraphScopeProvider extends DefaultScopeProvider {
       } else if (context.property === 'src' || context.property === 'dst') {
         // For link source and destination references, restrict resolution to Node nodes.
         if (isLink(context.container)) {
-          console.log(`Filtering for ${context.property} (restricting to current file)`);
+          // console.log(`Filtering for ${context.property} (restricting to current file)`);
           const nodeScope = stream(allDescriptions)
             .filter(
               (desc) =>
@@ -147,7 +149,7 @@ export class GraphScopeProvider extends DefaultScopeProvider {
 
     // For reference properties that do not have special filtering,
     // fall back to the default local scope provided by the parent class.
-    console.log(`getScope() -- NOT a 'special' node type -- apply DEFAULT scoping`);
+    // console.log(`getScope() -- NOT a 'special' node type -- apply DEFAULT scoping`);
     const localScope = super.getScope(context);
     let combinedScope = localScope;
 
@@ -159,13 +161,14 @@ export class GraphScopeProvider extends DefaultScopeProvider {
     }
 
     // Final debug log: list all elements in the computed scope.
+    /*
     console.log(`Final scope for property "${context.property}" in ${path_get_file(documentUri)}:`);
     combinedScope.getAllElements().forEach((element) => {
       console.log(
         `  - Name: ${element.name}, Type: ${element.type}, File: ${path_get_file(element.documentUri.toString())}`,
       );
     });
-
+    */
     return combinedScope;
   }
 }
