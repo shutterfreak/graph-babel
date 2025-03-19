@@ -20,6 +20,7 @@ import type { TextEdit } from 'vscode-languageserver-protocol';
 
 import * as ast from '../generated/ast.js';
 import { groupAdjacentArrayIndexes, isCommentCstNode } from '../graph-util.js';
+import { previousSiblingHasBlock } from '../model-helpers.js';
 
 /**
  * GraphFormatter provides custom formatting for the Graph language.
@@ -260,7 +261,7 @@ export class GraphFormatter extends AbstractFormatter {
       formatter.keyword('define'),
       FormatVerb.Prepend,
       FormatActionType.NewLines,
-      node.definition ? 2 : 1,
+      node.definition || previousSiblingHasBlock(node) ? 2 : 1,
     );
 
     this.doFmt(
@@ -343,6 +344,18 @@ export class GraphFormatter extends AbstractFormatter {
       `formatNode() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
+    if (previousSiblingHasBlock(node)) {
+      // Prepend extra newline
+      this.doFmt(
+        this.formatNode.name,
+        node.alias ? "property('alias')" : "keyword('node')",
+        node.alias ? formatter.property('alias') : formatter.keyword('node'),
+        FormatVerb.Prepend,
+        FormatActionType.NewLines,
+        2,
+      );
+    }
+
     this.doFmt(
       this.formatNode.name,
       node.alias ? "property('alias')" : "keyword('node')",
@@ -382,6 +395,18 @@ export class GraphFormatter extends AbstractFormatter {
     this.log(
       `formatLink() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
+
+    if (previousSiblingHasBlock(node)) {
+      // Prepend extra newline
+      this.doFmt(
+        this.formatNode.name,
+        "keyword('node')",
+        formatter.keyword('link'),
+        FormatVerb.Prepend,
+        FormatActionType.NewLines,
+        2,
+      );
+    }
 
     this.doFmt(
       this.formatLink.name,
@@ -454,10 +479,7 @@ export class GraphFormatter extends AbstractFormatter {
       `formatStyle() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
-    // formatter.keyword('style').append(Formatting.noSpace());
-
     // Prepend newline if not first
-
     this.doFmt(
       this.formatStyle.name,
       "keyword('style')",
@@ -681,16 +703,6 @@ export class GraphFormatter extends AbstractFormatter {
     );
 
     // Each StyleDefinition starts on a new line and is indented.
-
-    /*
-    this.doFmt(
-      this.formatStyleDefinition.name,
-      "property('topic')",
-      formatter.property('topic'),
-      FormatVerb.Prepend,
-      FormatActionType.Indent,
-    );
-    */
 
     this.doFmt(
       this.formatStyleDefinition.name,

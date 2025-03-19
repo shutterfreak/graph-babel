@@ -2,26 +2,7 @@ import chalk from 'chalk';
 import { AstNode } from 'langium';
 
 // import { inspect } from "util";
-import {
-  ColorDefinition,
-  ColorStyleDefinition,
-  Element,
-  Label,
-  StringLabel,
-  StyleDefinition,
-  isColorDefinition,
-  isColorStyleDefinition,
-  isGraph,
-  isHexColorDefinition,
-  isLabelStyleDefinition,
-  isLineStyleDefinition,
-  isModel,
-  isOpacityStyleDefinition,
-  isResetStyleDefinition,
-  isRgbColorDefinition,
-  isShapeStyleDefinition,
-  isTextColorDefinition,
-} from './generated/ast.js';
+import * as ast from './generated/ast.js';
 
 export const NAMED_COLORS_AND_HEX_DEFINITIONS: { [key: string]: string } = {
   aliceblue: '#f0f8ff',
@@ -398,11 +379,11 @@ export const ARROWHEADS: string[] = [
  * @param label the Label item to fetch the label text from
  * @returns the label text
  */
-export function Label_get_label(label: Label | undefined): string {
+export function Label_get_label(label: ast.Label | undefined): string {
   if (!label) {
     return '';
   }
-  if (label.$type === StringLabel) {
+  if (ast.isStringLabel(label)) {
     return label.label_string;
   } else {
     // (label.$type === BracketedLabel)
@@ -418,10 +399,10 @@ export function Label_get_label(label: Label | undefined): string {
  * The styles adhere to CSS logic: top-down inheritance, and selective overruling of style items at lower levels.
  * Style items at a given nesting level inherit style definitions from previous levels.
  * A 'Reset' token allows selective resetting of parts or all style elements defined in parent styles.
- * @param {Element} element - The element that may have to be styled
- * @returns {StyleDefinition[] | undefined} The array of unique style items applicable to the element, or undefined if element not defined or style not provided
+ * @param {ast.Element} element - The element that may have to be styled
+ * @returns {ast.StyleDefinition[] | undefined} The array of unique style items applicable to the element, or undefined if element not defined or style not provided
  */
-export function Element_get_style_items(element: Element): StyleDefinition[] | undefined {
+export function Element_get_style_items(element: ast.Element): ast.StyleDefinition[] | undefined {
   console.info(
     chalk.gray(
       `Element_get_style_items(type = ${element.$type}) - [${element.$cstNode?.text.replaceAll('\n', '\\n')}]`,
@@ -499,8 +480,8 @@ function generate_style_definition_stack(
   style_name: string,
   ancestry: AstNode[],
   level: number = 0,
-  stack: StyleDefinition[][] = [],
-): StyleDefinition[][] {
+  stack: ast.StyleDefinition[][] = [],
+): ast.StyleDefinition[][] {
   const style_definition_stack = stack;
   console.info(
     chalk.yellowBright(
@@ -509,7 +490,7 @@ function generate_style_definition_stack(
   );
 
   for (const ancestor of ancestry) {
-    if (isModel(ancestor) || isGraph(ancestor)) {
+    if (ast.isModel(ancestor) || ast.isGraph(ancestor)) {
       // Useless check (required for linter)
       for (const s of ancestor.styles) {
         if (s.name === style_name) {
@@ -552,17 +533,17 @@ function generate_style_definition_stack(
  * subsequently be processed linearly to compute the resulting style definition.
  */
 function flatten_style_definition_stack(
-  style_definition_stack: StyleDefinition[][],
-): StyleDefinition[] {
+  style_definition_stack: ast.StyleDefinition[][],
+): ast.StyleDefinition[] {
   return style_definition_stack.reverse().flat(1);
 }
 
 function generate_filtered_style_definition(
   ancestry: AstNode[],
   style_ref_text: string,
-  flattened_style_items: StyleDefinition[],
-): StyleDefinition[] {
-  const filtered_style_definitions: StyleDefinition[] = [];
+  flattened_style_items: ast.StyleDefinition[],
+): ast.StyleDefinition[] {
+  const filtered_style_definitions: ast.StyleDefinition[] = [];
 
   const topicIndexMap = new Map<string, number>();
 
@@ -578,7 +559,7 @@ function generate_filtered_style_definition(
           */
   for (const d of flattened_style_items) {
     // First check reset topic:
-    if (isResetStyleDefinition(d)) {
+    if (ast.isResetStyleDefinition(d)) {
       // Check which topics must be reset
       if (['All', '*'].includes(d.value)) {
         // Reset entire style definition:
@@ -616,7 +597,7 @@ function generate_filtered_style_definition(
  * @param d the style definition as an array of StyleDefinition items
  * @returns an unparsed, unprocessed (at least for now) string representation of the style definition
  */
-export function StyleDefinition_toString(d: StyleDefinition[]): string {
+export function StyleDefinition_toString(d: ast.StyleDefinition[]): string {
   console.warn(
     chalk.yellowBright(
       `[WARN] StyleDefinition_toString(topics: ${d.map((sd) => sd.topic).join(', ')}) - values NOT YET PARSED (falling back to '$CstNode.text')`,
@@ -631,12 +612,12 @@ export function StyleDefinition_toString(d: StyleDefinition[]): string {
  * @returns the last matching StyleItem
  */
 export function StyleDefinitions_get_shape(
-  items: StyleDefinition[] | undefined,
+  items: ast.StyleDefinition[] | undefined,
 ): string | undefined {
   if (items === undefined) {
     return undefined;
   }
-  return items.findLast((def) => isShapeStyleDefinition(def))?.value;
+  return items.findLast((def) => ast.isShapeStyleDefinition(def))?.value;
 }
 
 /**
@@ -645,13 +626,13 @@ export function StyleDefinitions_get_shape(
  * @returns the string representation of the label as found in the last matching StyleItem
  */
 export function StyleDefinitions_get_label(
-  items: StyleDefinition[] | undefined,
+  items: ast.StyleDefinition[] | undefined,
 ): string | undefined {
   if (items === undefined) {
     return undefined;
   }
   return items
-    .filter((def) => isLabelStyleDefinition(def))
+    .filter((def) => ast.isLabelStyleDefinition(def))
     .findLast((def) => def.topic == 'LabelText')?.value;
 }
 
@@ -662,14 +643,14 @@ export function StyleDefinitions_get_label(
  * @returns the last matching StyleItem
  */
 export function StyleDefinitions_get_color_value(
-  items: StyleDefinition[] | undefined,
+  items: ast.StyleDefinition[] | undefined,
   matching_tokens: string[],
-): ColorStyleDefinition | undefined {
+): ast.ColorStyleDefinition | undefined {
   if (items === undefined) {
     return undefined;
   }
   return items
-    .filter((def) => isColorStyleDefinition(def))
+    .filter((def) => ast.isColorStyleDefinition(def))
     .findLast((def) => matching_tokens.includes(def.topic)); //?.value;
 }
 
@@ -680,13 +661,13 @@ export function StyleDefinitions_get_color_value(
  * @returns the color as hex color code (or undefined)
  */
 export function StyleDefinitions_get_color_value_as_hex(
-  items: StyleDefinition[] | undefined,
+  items: ast.StyleDefinition[] | undefined,
   matching_tokens: string[],
 ) {
   if (items === undefined) {
     return undefined;
   }
-  const color_item: ColorStyleDefinition | undefined = StyleDefinitions_get_color_value(
+  const color_item: ast.ColorStyleDefinition | undefined = StyleDefinitions_get_color_value(
     items,
     matching_tokens,
   );
@@ -704,14 +685,14 @@ export function StyleDefinitions_get_color_value_as_hex(
  * @returns the last matching StyleItem
  */
 export function StyleDefinitions_get_line_width_value(
-  items: StyleDefinition[] | undefined,
+  items: ast.StyleDefinition[] | undefined,
   matching_tokens: string[],
-): StyleDefinition | undefined {
+): ast.StyleDefinition | undefined {
   if (items === undefined) {
     return undefined;
   }
   return items
-    .filter((def) => isLineStyleDefinition(def))
+    .filter((def) => ast.isLineStyleDefinition(def))
     .findLast((def) => matching_tokens.includes(def.topic)); //?.value;
 }
 
@@ -722,23 +703,23 @@ export function StyleDefinitions_get_line_width_value(
  * @returns the last matching StyleItem
  */
 export function StyleDefinitions_get_opacity_value(
-  items: StyleDefinition[] | undefined,
+  items: ast.StyleDefinition[] | undefined,
   matching_tokens: string[],
-): StyleDefinition | undefined {
+): ast.StyleDefinition | undefined {
   if (items === undefined) {
     return undefined;
   }
   return items
-    .filter((def) => isOpacityStyleDefinition(def))
+    .filter((def) => ast.isOpacityStyleDefinition(def))
     .findLast((def) => matching_tokens.includes(def.topic)); //?.value;
 }
 
-export function ColorDefinition_toString(d: ColorDefinition) {
-  if (isColorDefinition(d)) {
+export function ColorDefinition_toString(d: ast.ColorDefinition) {
+  if (ast.isColorDefinition(d)) {
     const color = d.color;
-    if (isRgbColorDefinition(color)) {
+    if (ast.isRgbColorDefinition(color)) {
       return `rgb(${color.red},${color.green},${color.blue})`;
-    } else if (isHexColorDefinition(color)) {
+    } else if (ast.isHexColorDefinition(color)) {
       return color.hex_color;
     }
     return color.color_name;
@@ -755,15 +736,15 @@ function rgb_to_hex(r: number, g: number, b: number) {
   return '#' + color_component_to_hex(r) + color_component_to_hex(g) + color_component_to_hex(b);
 }
 
-export function ColorDefinition_to_hex_color(d: ColorDefinition) {
-  if (isColorDefinition(d)) {
+export function ColorDefinition_to_hex_color(d: ast.ColorDefinition) {
+  if (ast.isColorDefinition(d)) {
     const color = d.color;
-    if (isRgbColorDefinition(color)) {
+    if (ast.isRgbColorDefinition(color)) {
       return rgb_to_hex(color.red, color.green, color.blue);
       // `rgb(${color.red},${color.green},${color.blue})`;
-    } else if (isHexColorDefinition(color)) {
+    } else if (ast.isHexColorDefinition(color)) {
       return color.hex_color;
-    } else if (isTextColorDefinition(color)) {
+    } else if (ast.isTextColorDefinition(color)) {
       // Named color
       return color_name_to_hex(color.color_name);
     }
@@ -771,7 +752,7 @@ export function ColorDefinition_to_hex_color(d: ColorDefinition) {
   return undefined;
 }
 
-function Element_get_ancestry(element: Element): AstNode[] {
+function Element_get_ancestry(element: ast.Element): AstNode[] {
   const ancestry: AstNode[] = [];
   let container: AstNode = element;
   while (container.$container) {
@@ -779,4 +760,35 @@ function Element_get_ancestry(element: Element): AstNode[] {
     container = container.$container;
   }
   return ancestry;
+}
+
+/**
+ * Determines whether the current AST node should have an extra newline
+ * prepended based on the type of its immediate previous CST sibling.
+ * An extra newline is added if the previous sibling’s AST node is either
+ * a Style or a Graph.
+ *
+ * @param node The AST node for which to check the preceding sibling.
+ * @returns True if an extra newline should be prepended; false otherwise.
+ */
+export function previousSiblingHasBlock(node: AstNode): boolean {
+  // Retrieve the CST node associated with the AST node.
+  const cstNode = node.$cstNode;
+  if (!cstNode || !cstNode.container) {
+    return false;
+  }
+
+  // Get all siblings of this CST node.
+  const siblings = cstNode.container.content;
+  const index = siblings.indexOf(cstNode);
+  if (index <= 0) {
+    // No previous sibling exists.
+    return false;
+  }
+
+  // Retrieve the immediate previous sibling.
+  const previousSibling = siblings[index - 1];
+
+  // Check if the previous sibling's AST node is of type Style or Graph.
+  return ast.isStyle(previousSibling.astNode) || ast.isGraph(previousSibling.astNode);
 }
