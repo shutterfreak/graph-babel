@@ -9,6 +9,7 @@ import {
   isNamed,
 } from 'langium';
 
+import { groupAdjacentArrayIndexes } from '../cli/cli-util.js';
 import * as ast from './generated/ast.js';
 import type { GraphServices } from './graph-module.js';
 import { isCommentCstNode } from './lsp/lsp-util.js';
@@ -24,8 +25,9 @@ import {
 /**
  * Registers custom validation checks for the Graph language.
  *
- * The checks are organized by AST node type. When the model is validated,
- * the corresponding functions in GraphValidator will be executed.
+ * This function registers a collection of validation checks on the Graph AST.
+ * Each check is associated with one or more AST node types. The registered checks
+ * will be executed during document validation.
  *
  * @param services The Graph language services.
  */
@@ -51,7 +53,8 @@ export function registerValidationChecks(services: GraphServices) {
 }
 
 /**
- * Issue codes for validation diagnostics.
+ * Issue codes are used to classify validation problems.
+ * They help to link diagnostics with potential code actions.
  */
 export const IssueCode = {
   NameMissing: 'name-missing',
@@ -87,19 +90,26 @@ export const IssueCode = {
 /**
  * GraphValidator implements custom validation checks for the Graph language.
  *
- * Each method in this class performs a specific validation on AST or CST nodes.
- * When a problem is found, the provided ValidationAcceptor is called to report
- * an error or warning, along with the node, property, and issue code.
+ * This class contains methods to validate various aspects of a Graph document.
+ * The validations cover:
+ *
+ * - Uniqueness of element names across nodes and graphs.
+ * - Correctness of style references.
+ * - Validity of link style definitions, including arrowhead specifications.
+ * - Ordering of style definitions relative to graph elements.
+ * - Validity of style topics, color definitions, width values, and opacity values.
+ * - Detection of spurious semicolons in StyleBlock nodes.
+ *
+ * Each method accepts a target AST node and a callback function (accept) which
+ * is used to report validation errors or warnings along with associated issue codes.
  */
 export class GraphValidator {
   /**
-   * Checks that all Elements (e.g. Nodes, Graphs, and named edges) have unique names.
+   * Validates that all Elements in the model have unique names.
+   * For nodes and graphs, a missing or duplicate name is reported.
    *
-   * This function traverses the Model's AST, collecting names and reporting diagnostics
-   * for missing names and duplicate names.
-   *
-   * @param model The Model node.
-   * @param accept The validation acceptor callback.
+   * @param model The Model node containing the document's elements.
+   * @param accept The callback to report validation issues.
    */
   checkUniqueElementNames = (model: ast.Model, accept: ValidationAcceptor): void => {
     // Map to store names and their corresponding AST nodes
@@ -112,7 +122,7 @@ export class GraphValidator {
       // Report error if a Node or Graph has an empty name.
       if (
         (ast.isNode(element) || ast.isGraph(element)) &&
-        (!isNamed(element) || element.name.length === 0)
+        (!isNamed(element) || element.name.length == 0)
       ) {
         accept('error', `${element.$type} must have a nonempty name [${element.$cstNode?.text}]`, {
           node: element,
@@ -189,8 +199,8 @@ export class GraphValidator {
    * This check ensures that a style reference is not empty, is resolvable, and that the referenced
    * node is of type Style.
    *
-   * @param node The Element or NodeAlias node.
-   * @param accept The validation acceptor callback.
+   * @param node The Element or NodeAlias to validate.
+   * @param accept The callback to report validation issues.
    */
   checkStyleRef = (node: ast.Element | ast.NodeAlias, accept: ValidationAcceptor): void => {
     console.log(
@@ -198,7 +208,7 @@ export class GraphValidator {
     );
     if (node.styleref) {
       if (node.styleref.$refText.length === 0) {
-        accept('error', 'Style reference missing after the ":" token.', {
+        accept('error', `Style reference missing after the ':' token.`, {
           node,
           property: 'styleref',
           code: IssueCode.StyleRefMissing,
@@ -212,7 +222,7 @@ export class GraphValidator {
       } else if (!ast.isStyle(node.styleref.ref.$cstNode?.astNode)) {
         accept(
           'error',
-          `Style reference '${node.styleref.$refText}' is not a valid Style (found ${node.styleref.ref.$cstNode?.astNode.$type ?? '<undefined>'}).`,
+          `Style reference '${node.styleref.$refText}' is not a reference to a Style (found ${node.styleref.ref.$cstNode?.astNode.$type ?? '<undefined>'}).`,
           {
             node,
             property: 'styleref',
@@ -225,23 +235,29 @@ export class GraphValidator {
   /**
    * Validates that the Link node's arrowhead and link style definitions are correct.
    *
-   * This check verifies that the source and destination arrowhead definitions are not empty,
-   * are recognized, and that there are no conflicting arrowhead definitions in the link style.
+   * Checks for:
+   * - Missing or empty arrowhead definitions.
+   * - Unknown arrowhead values.
+   * - Conflicts between the arrowhead defined in the link and that inferred from the link style.
    *
-   * @param link The Link node.
-   * @param accept The validation acceptor callback.
+   * @param link The Link node to validate.
+   * @param accept The callback to report validation issues.
    */
   checkLinkStyles = (link: ast.Link, accept: ValidationAcceptor): void => {
     // Validate source arrowhead.
     if (link.src_arrowhead !== undefined) {
       if (link.src_arrowhead.length === 0) {
-        accept('error', 'Source arrowhead style definition cannot be empty.', {
-          node: link,
-          property: 'src_arrowhead',
-          code: IssueCode.SrcArrowheadEmpty,
-        });
+        accept(
+          'error',
+          'Expecting a source arrowhead style definition after the colon - it cannot be empty.',
+          {
+            node: link,
+            property: 'src_arrowhead',
+            code: IssueCode.SrcArrowheadEmpty,
+          },
+        );
       } else if (!ARROWHEADS.includes(link.src_arrowhead)) {
-        accept('error', `Unknown source arrowhead style: '${link.src_arrowhead}'`, {
+        accept('error', `Unknown source arrowhead style definition: '${link.src_arrowhead}'`, {
           node: link,
           property: 'src_arrowhead',
           code: IssueCode.SrcArrowheadInvalid,
@@ -251,13 +267,17 @@ export class GraphValidator {
     // Validate destination arrowhead.
     if (link.dst_arrowhead !== undefined) {
       if (link.dst_arrowhead.length === 0) {
-        accept('error', 'Destination arrowhead style definition cannot be empty.', {
-          node: link,
-          property: 'dst_arrowhead',
-          code: IssueCode.DstArrowheadEmpty,
-        });
+        accept(
+          'error',
+          'Expecting a destination arrowhead style definition after the colon - it cannot be empty.',
+          {
+            node: link,
+            property: 'dst_arrowhead',
+            code: IssueCode.DstArrowheadEmpty,
+          },
+        );
       } else if (!ARROWHEADS.includes(link.dst_arrowhead)) {
-        accept('error', `Unknown destination arrowhead style: '${link.dst_arrowhead}'`, {
+        accept('error', `Unknown destination arrowhead style definition: '${link.dst_arrowhead}'`, {
           node: link,
           property: 'dst_arrowhead',
           code: IssueCode.DstArrowheadInvalid,
@@ -307,21 +327,22 @@ export class GraphValidator {
     }
   };
   /**
-   * Validates the order and uniqueness of Style definitions within the model.
+   * Validates the order and uniqueness of style definitions within the model.
    *
-   * Checks that all Style definitions appear before any Element nodes and that no
-   * duplicate style names exist at the same hierarchy level.
+   * Ensures that:
+   * - Style definitions appear before any graph elements.
+   * - No duplicate style definitions exist at the same hierarchy level.
    *
-   * @param model The Model node.
-   * @param accept The validation acceptor callback.
+   * @param model The Model node containing styles and elements.
+   * @param accept The callback to report validation issues.
    */
   checkStyles = (model: ast.Model, accept: ValidationAcceptor): void => {
     console.info(chalk.cyanBright('checkStyles(model)'));
 
-    // Ensure styles are defined before elements.
+    // Ensure all style definitions precede element definitions.
     check_styles_defined_before_elements(model, accept);
 
-    // Traverse the model and collect style definitions along with their container and level.
+    // Collect style definitions along with their hierarchy level.
     const style_dict: _find_style_dict[] = find_styles(model, 0, 0, accept);
 
     // Group style definitions by container and check for duplicates.
@@ -345,7 +366,7 @@ export class GraphValidator {
           d[container_id][style_name].forEach((duplicateStyleDefinition) => {
             accept(
               'error',
-              `Found multiple style definitions with the same name '${style_name}' at the same level.`,
+              `Multiple style definitions with name '${style_name}' at the same level.`,
               {
                 node: duplicateStyleDefinition,
                 property: 'name',
@@ -360,8 +381,8 @@ export class GraphValidator {
   /**
    * Validates that a Style node has a nonempty name.
    *
-   * @param style The Style node.
-   * @param accept The validation acceptor callback.
+   * @param style The Style node to validate.
+   * @param accept The callback to report validation issues.
    */
   checkStyleNames = (style: ast.Style, accept: ValidationAcceptor): void => {
     if (!isNamed(style) || style.name.length === 0) {
@@ -373,12 +394,12 @@ export class GraphValidator {
     }
   };
   /**
-   * Validates that a StyleDefinition node has a valid topic.
+   * Validates the topic of a StyleDefinition.
    *
-   * Reports an error if the topic is missing or not recognized.
+   * Ensures that a topic is provided and that it is recognized.
    *
-   * @param styleDefinition The StyleDefinition node.
-   * @param accept The validation acceptor callback.
+   * @param styleDefinition The StyleDefinition to validate.
+   * @param accept The callback to report validation issues.
    */
   checkStyleDefinitionTopics = (
     styleDefinition: ast.StyleDefinition,
@@ -386,7 +407,7 @@ export class GraphValidator {
   ): void => {
     const topic = styleDefinition.topic;
     if (topic.length === 0) {
-      accept('error', 'Style topic is missing.', {
+      accept('error', 'Style topic missing.', {
         node: styleDefinition,
         property: 'topic',
         code: IssueCode.StyleDefinitionEmptyTopic,
@@ -400,10 +421,10 @@ export class GraphValidator {
     }
   };
   /**
-   * Validates that a ShapeStyleDefinition node specifies a valid shape name.
+   * Validates that the shape name in a ShapeStyleDefinition is provided and recognized.
    *
-   * @param shapeDefinition The ShapeStyleDefinition node.
-   * @param accept The validation acceptor callback.
+   * @param shapeDefinition The ShapeStyleDefinition to validate.
+   * @param accept The callback to report validation issues.
    */
   checkShapeStyleDefinitions = (
     shapeDefinition: ast.ShapeStyleDefinition,
@@ -411,7 +432,7 @@ export class GraphValidator {
   ): void => {
     const value = shapeDefinition.value.toLowerCase();
     if (value.length === 0) {
-      accept('error', 'Shape name is missing.', {
+      accept('error', 'Shape name missing.', {
         node: shapeDefinition,
         property: 'value',
         code: IssueCode.ShapeNameMissing,
@@ -425,10 +446,10 @@ export class GraphValidator {
     }
   };
   /**
-   * Validates that a Style node does not reference itself.
+   * Validates that a Style does not reference itself.
    *
-   * @param style The Style node.
-   * @param accept The validation acceptor callback.
+   * @param style The Style node to validate.
+   * @param accept The callback to report validation issues.
    */
   checkStyleSubstyles = (style: ast.Style, accept: ValidationAcceptor): void => {
     if (isNamed(style) && style.name.length > 0 && style.name === style.styleref?.$refText) {
@@ -444,10 +465,10 @@ export class GraphValidator {
     }
   };
   /**
-   * Validates that the named color in a TextColorDefinition is a valid CSS color.
+   * Validates that the color name in a TextColorDefinition is recognized.
    *
-   * @param colorDefinition The TextColorDefinition node.
-   * @param accept The validation acceptor callback.
+   * @param colorDefinition The TextColorDefinition to validate.
+   * @param accept The callback to report validation issues.
    */
   checkTextColorDefinitions = (
     colorDefinition: ast.TextColorDefinition,
@@ -457,7 +478,7 @@ export class GraphValidator {
     if (!NAMED_COLORS.includes(value)) {
       accept(
         'error',
-        `The color '${colorDefinition.color_name}' is not defined. Please use a valid CSS color name.`,
+        `The color '${colorDefinition.color_name}' is not defined. Please use a CSS named color.`,
         {
           node: colorDefinition,
           property: 'color_name',
@@ -467,10 +488,12 @@ export class GraphValidator {
     }
   };
   /**
-   * Validates that the hexadecimal color code in a HexColorDefinition is valid.
+   * Validates that a hexadecimal color code in a HexColorDefinition is valid.
    *
-   * @param hexColorDefinition The HexColorDefinition node.
-   * @param accept The validation acceptor callback.
+   * The code must start with '#' and be followed by either 3 or 6 hexadecimal digits.
+   *
+   * @param hexColorDefinition The HexColorDefinition to validate.
+   * @param accept The callback to report validation issues.
    */
   checkHexColorDefinitions = (
     hexColorDefinition: ast.HexColorDefinition,
@@ -490,10 +513,12 @@ export class GraphValidator {
     }
   };
   /**
-   * Validates that the RGB color values in a RgbColorDefinition are integers within 0–255.
+   * Validates that RGB color definitions have integer channel values within 0–255.
    *
-   * @param rgbColorDefinition The RgbColorDefinition node.
-   * @param accept The validation acceptor callback.
+   * Checks the red, green, and blue channel values for type and range.
+   *
+   * @param rgbColorDefinition The RgbColorDefinition to validate.
+   * @param accept The callback to report validation issues.
    */
   checkRgbColorDefinitions = (
     rgbColorDefinition: ast.RgbColorDefinition,
@@ -530,14 +555,16 @@ export class GraphValidator {
     checkChannel(rgbColorDefinition.blue, ColorChannel.Blue);
   };
   /**
-   * Validates that the WidthValue node has a nonnegative number and a valid unit.
+   * Validates that a WidthValue has a valid numeric value and an allowed unit.
    *
-   * @param widthValue The WidthValue node.
-   * @param accept The validation acceptor callback.
+   * If the unit is missing, a warning is issued. If the unit is invalid, an error is reported.
+   *
+   * @param widthValue The WidthValue to validate.
+   * @param accept The callback to report validation issues.
    */
   checkWidthDefinitions = (widthValue: ast.WidthValue, accept: ValidationAcceptor): void => {
     if (widthValue.value < 0) {
-      accept('error', `Width value '${widthValue.value}' is invalid.`, {
+      accept('error', `Invalid width value: '${widthValue.value}'.`, {
         node: widthValue,
         property: 'value',
         code: IssueCode.LinkWidthValueInvalid,
@@ -546,7 +573,7 @@ export class GraphValidator {
     if (!('unit' in widthValue) || widthValue.unit?.length === 0) {
       accept(
         'warning',
-        `Width has no unit. The default unit will be used in conversions. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
+        `Width is missing a unit. The default unit will be used in conversions. Allowed units: ${LENGTH_UNITS.join(', ')}.`,
         {
           node: widthValue,
           property: undefined, // there is no "unit"
@@ -566,12 +593,13 @@ export class GraphValidator {
     }
   };
   /**
-   * Validates that the opacity in an OpacityStyleDefinition is within the expected range.
-   * For percentage values, it must be an integer between 0 and 100; for decimal values,
-   * it must be between 0.0 and 1.0.
+   * Validates the opacity value in an OpacityStyleDefinition.
    *
-   * @param opacityStyleDefinition The OpacityStyleDefinition node.
-   * @param accept The validation acceptor callback.
+   * Checks whether the opacity is specified as a percentage (integer 0–100) or a float (0–1)
+   * and validates its range accordingly.
+   *
+   * @param opacityStyle The OpacityStyleDefinition to validate.
+   * @param accept The callback to report validation issues.
    */
   checkOpacityStyleDefinition = (
     opacityStyleDefinition: ast.OpacityStyleDefinition,
@@ -615,10 +643,11 @@ export class GraphValidator {
    * - Redundant semicolons between StyleDefinition nodes.
    * - Trailing semicolons (after the last StyleDefinition).
    *
-   * The diagnostic range is computed by grouping adjacent semicolon tokens (ignoring hidden comment nodes).
+   * The ranges for diagnostics are computed by grouping adjacent semicolon tokens,
+   * skipping over hidden comment nodes.
    *
    * @param styleBlock The StyleBlock node to validate.
-   * @param accept The validation acceptor callback.
+   * @param accept The callback to report validation issues.
    */
   checkSpuriousSemicolons = (styleBlock: ast.StyleBlock, accept: ValidationAcceptor): void => {
     const cstNode = styleBlock.$cstNode;
@@ -716,83 +745,23 @@ export class GraphValidator {
         const redundant = semisBetween.slice(1);
         if (redundant.length > 0) {
           groupAdjacentArrayIndexes(redundant).forEach(([start, end]) => {
-            accept('warning', 'Excess semicolons between Style Definitions.', {
-              node: styleBlock,
-              code: IssueCode.SpuriousSemicolonDelete,
-              range: {
-                start: directChildren[start].cstNode.range.start,
-                end: directChildren[end].cstNode.range.end,
+            accept(
+              'warning',
+              `Excess ${end - start > 0 ? 'semicolons' : 'semicolon'} between Style Definitions.`,
+              {
+                node: styleBlock,
+                code: IssueCode.SpuriousSemicolonDelete,
+                range: {
+                  start: directChildren[start].cstNode.range.start,
+                  end: directChildren[end].cstNode.range.end,
+                },
               },
-            });
+            );
           });
         }
       }
     }
   };
-}
-
-/**
- * Groups adjacent integer values in a sorted array into ranges.
- *
- * This function takes a sorted array of integers and identifies sequences of
- * consecutive numbers. It then represents these sequences as pairs of the
- * starting and ending values of the range.
- *
- * @param arr A sorted array of integers.
- * @returns An array of number pairs, where each pair represents a range of
- * adjacent integers. The first element of the pair is the start of the
- * range, and the second element is the end. Returns an empty array if
- * the input array is empty.
- *
- * @example
- * ```typescript
- * const indices = [0, 1, 3, 5, 6, 9];
- * const groupedRanges = groupAdjacentArrayIndexes(indices);
- * console.log(groupedRanges); // Output: [ [ 0, 1 ], [ 3, 3 ], [ 5, 6 ], [ 9, 9 ] ]
- * ```
- *
- * @example
- * ```typescript
- * const indices2 = [1, 2, 3, 7, 8, 9];
- * const groupedRanges2 = groupAdjacentArrayIndexes(indices2);
- * console.log(groupedRanges2); // Output: [ [ 1, 3 ], [ 7, 9 ] ]
- * ```
- *
- * @example
- * ```typescript
- * const indices3 = [4];
- * const groupedRanges3 = groupAdjacentArrayIndexes(indices3);
- * console.log(groupedRanges3); // Output: [ [ 4, 4 ] ]
- * ```
- *
- * @example
- * ```typescript
- * const indices4: number[] = [];
- * const groupedRanges4 = groupAdjacentArrayIndexes(indices4);
- * console.log(groupedRanges4); // Output: []
- * ```
- */
-function groupAdjacentArrayIndexes(arr: number[]): number[][] {
-  if (arr.length === 0) {
-    return [];
-  }
-
-  const result = arr.reduce((acc: number[][], currentValue, index) => {
-    if (index === 0) {
-      acc.push([currentValue, currentValue]);
-    } else {
-      const lastGroup = acc[acc.length - 1];
-      if (currentValue === lastGroup[1] + 1) {
-        lastGroup[1] = currentValue;
-      } else {
-        acc.push([currentValue, currentValue]);
-      }
-    }
-    return acc;
-  }, []);
-  console.log(`groupAdjacentArrayIndexes( ${JSON.stringify(arr)} ) : ${JSON.stringify(result)}`);
-
-  return result;
 }
 
 interface _find_style_dict {
@@ -801,6 +770,16 @@ interface _find_style_dict {
   style: ast.Style;
 }
 
+/**
+ * Recursively finds all style definitions within the given container (Model or Graph),
+ * along with their hierarchy level and container identifier.
+ *
+ * @param container The Model or Graph node to search.
+ * @param level The current hierarchy level.
+ * @param seq A sequence number for container identification.
+ * @param accept The validation acceptor (unused in this function but available for extensions).
+ * @returns An array of objects each containing a style, its level, and its container ID.
+ */
 function find_styles(
   container: ast.Model | ast.Graph,
   level: number,
@@ -825,6 +804,16 @@ function find_styles(
   return style_dict;
 }
 
+/**
+ * Checks that all Style nodes appear before any graph elements in the document.
+ *
+ * This function traverses the AST and ensures that no Style node appears after an Element.
+ * If a Style is found after an Element, an error is reported.
+ *
+ * @param node The root AST node.
+ * @param accept The validation acceptor callback.
+ * @param level The current recursion level (for logging purposes).
+ */
 function check_styles_defined_before_elements(
   node: AstNode,
   accept: ValidationAcceptor,
