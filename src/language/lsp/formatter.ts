@@ -1,34 +1,85 @@
-import { AstNode, CstNode, CstUtils, isLeafCstNode, isNamed } from 'langium';
+import {
+  AstNode,
+  AstUtils,
+  CstNode,
+  CstUtils,
+  TextDocument,
+  isLeafCstNode,
+  isNamed,
+} from 'langium';
 import {
   AbstractFormatter,
   Formatting,
   FormattingAction,
   FormattingContext,
+  FormattingRegion,
   NodeFormatter,
 } from 'langium/lsp';
 import { rangeToString } from 'langium/test';
-import { inspect } from 'util';
 import type { Range, TextEdit } from 'vscode-languageserver-protocol';
 
 import * as ast from '../generated/ast.js';
+import { groupAdjacentArrayIndexes, isCommentCstNode } from '../graph-util.js';
 
 /**
  * GraphFormatter provides custom formatting for the Graph language.
- * It extends the AbstractFormatter from Langium to define specific formatting rules.
+ *
+ * General Formatting Rules:
+ *
+ * 1. Overall File Formatting:
+ *    - The formatted file must have no leading or trailing blank lines.
+ *
+ * 2. Nodes with Braces (e.g. Graph, Style):
+ *    - Insert a newline before the "graph" or "style" keyword unless that would produce a blank first line.
+ *    - The opening "{" and closing "}" braces must each appear on their own line.
+ *    - The content between the braces must be uniformly indented.
+ *    - Single-line comments (SL_COMMENT) immediately following an opening brace should be moved to a new, indented line.
+ *
+ * 3. StyleRef Definitions:
+ *    - No spaces should surround the colon ":".
+ *
+ * 4. Link Nodes:
+ *    - Items in the "src" or "dst" arrays must be separated by commas with no space before the comma and exactly one space after.
+ *    - Arrowhead properties (src_arrowhead, dst_arrowhead) must have no spaces surrounding the colon.
+ *
+ * 5. StyleBlock Nodes (CSS-like formatting):
+ *    - Each StyleDefinition inside a StyleBlock must start on a new line with no extra blank lines.
+ *    - In a StyleDefinition, the colon ":" should have no space before it and one space after it.
+ *    - Any semicolons appearing before the first StyleDefinition should be removed.
+ *    - Consecutive semicolons must be collapsed into a single semicolon.
+ *    - A semicolon following a StyleDefinition must have no space before it and be immediately followed by a newline.
+ *    - If the last StyleDefinition is not terminated by a semicolon, one must be added.
+ *
+ * 6. General Whitespace:
+ *    - In all other cases, only minimal whitespace (typically a single space) should be used.
  */
 export class GraphFormatter extends AbstractFormatter {
+  private fmtCnt = 0;
+  // Debug flag to control logging.
+  private readonly DEBUG = true;
+
   /**
-   * Formats the given AST node based on its type.
-   * Dispatches to specific formatting methods for each node type.
-   *
+   * Logs a debug message if DEBUG mode is enabled.
+   * @param message The message to log.
+   */
+  private log(message: string): void {
+    if (this.DEBUG) {
+      console.log(message);
+    }
+  }
+
+  /**
+   * Main entry for formatting a document.
+   * Traverses the AST and dispatches formatting for each node type.
    * @param node The AST node to format.
    */
   protected format(node: AstNode): void {
-    console.log(
+    this.log(
       `format(${node.$type}) - Grammar source: type "${node.$cstNode?.grammarSource?.$type}"` +
         // + '\n' + render_text(inspect(node.$cstNode?.grammarSource), `${node.$type}: node.$cstNode?.grammarSource`)
         ` ${node.$type}: node.$cstNode?.grammarSource: { $type "${node.$cstNode?.grammarSource?.$type}", $containerProperty "${node.$cstNode?.grammarSource?.$containerProperty ?? '<N/A>'}", $containerIndex "${node.$cstNode?.grammarSource?.$containerIndex ?? '<N/A>'}" }`,
     );
+
     if (ast.isModel(node)) {
       this.formatModel(node);
     } else if (ast.isNodeAlias(node)) {
@@ -45,463 +96,773 @@ export class GraphFormatter extends AbstractFormatter {
       this.formatStyleBlock(node);
     } else if (ast.isStyleDefinition(node)) {
       this.formatStyleDefinition(node);
+    } else if (ast.isLabel(node)) {
+      this.formatLabel(node);
+    }
+  }
+
+  // DEBUG
+  protected override avoidOverlappingEdits(
+    textDocument: TextDocument,
+    textEdits: TextEdit[],
+  ): TextEdit[] {
+    const edits: TextEdit[] = [];
+    this.log(`avoidOverlappingEdits() - BEFORE processing: ${textEdits.length} edits`);
+    textEdits.forEach((edit, index) =>
+      this.log(
+        `avoidOverlappingEdits() - edit [${`   ${index}`.slice(-4)}] at ${rangeToString(edit.range)}: oldText: ${JSON.stringify(textDocument.getText(edit.range))} --> newText: ${JSON.stringify(edit.newText)}`,
+      ),
+    );
+    for (const edit of textEdits) {
+      let last = edits[edits.length - 1];
+      while (edits.length > 0) {
+        const currentStart = textDocument.offsetAt(edit.range.start);
+        const lastEnd = textDocument.offsetAt(last.range.end);
+        if (currentStart < lastEnd) {
+          this.log(
+            `avoidOverlappingEdits() - popping edit [${`   ${edits.length - 1}`.slice(-4)}] at ${rangeToString(last.range)}: oldText: ${JSON.stringify(textDocument.getText(last.range))} --> newText: ${JSON.stringify(last.newText)}`,
+          );
+          edits.pop();
+          last = edits[edits.length - 1];
+        } else {
+          break;
+        }
+      }
+      edits.push(edit);
+    }
+    this.log(`avoidOverlappingEdits() - AFTER processing: ${edits.length} edits`);
+    const filteredEdits = edits.filter((edit) => this.isNecessary(edit, textDocument));
+    this.log(`avoidOverlappingEdits() - AFTER filtering: ${edits.length} edits`);
+    return filteredEdits;
+  }
+
+  // ------------------------------
+  // Helper Functions for Formatting
+  // ------------------------------
+
+  /**
+   * Executes a formatting action on the given FormattingRegion.
+   *
+   * @param method The name of the calling method (for logging purposes).
+   * @param label A label identifying the region (e.g. "keyword(':')").
+   * @param region The FormattingRegion to format.
+   * @param verb The formatting verb: 'prepend', 'append', or 'surround'.
+   * @param action The formatting action to apply (e.g. 'oneSpace').
+   * @param count Optional parameter used by actions that require a count.
+   */
+  private doFmt(
+    method: string,
+    label: string,
+    region: FormattingRegion,
+    verb: FormatVerb,
+    action: FormatActionType,
+    count?: number,
+  ): void {
+    try {
+      const actionFunc = formattingActionMap[action];
+      const fmt = actionFunc(count);
+      const nodeCount = region.nodes.length;
+
+      if (nodeCount == 0) {
+        this.log(
+          `${method} FormatActions: 0 [-] ${label} -- ${verb} (${action}) [nodes: ${nodeCount}] -- NOTHING TO DO`,
+        );
+        return;
+      }
+
+      switch (verb) {
+        case FormatVerb.Prepend:
+          region.prepend(fmt);
+          break;
+        case FormatVerb.Append:
+          region.append(fmt);
+          break;
+        case FormatVerb.Surround:
+          // For surround, apply the same formatting action to both sides.
+          region.surround(fmt);
+          break;
+      }
+      // Now generate the debug log statement:
+
+      const cntFormattingActions = verb == FormatVerb.Surround ? nodeCount * 2 : nodeCount;
+      let fmtCntRange = `${this.fmtCnt}`;
+      for (let j = 1; j < cntFormattingActions; j++) {
+        fmtCntRange += `, ${this.fmtCnt + j}`;
+      }
+
+      this.log(
+        `${method} FormatActions: ${cntFormattingActions} [${fmtCntRange}] ${label} -- ${verb} (${action}) [nodes: ${nodeCount}]`,
+      );
+      this.fmtCnt += cntFormattingActions;
+    } catch (e) {
+      this.log(`[ERROR] ${e}`);
     }
   }
 
   /**
-   * Formats a Model node.
-   * Adds newlines between styles and elements.
+   * Formats braces by ensuring that the opening and closing braces are on new lines,
+   * and that the content between them is indented.
    *
-   * @param node The Model node to format.
+   * @param formatter The NodeFormatter for the node with braces.
    */
-  private formatModel(node: ast.Model): void {
-    console.log(
-      `format${node.$type}() -- ${node.$type} ${isNamed(node) ? `"${node.name}"` : '(unnamed)'}`,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private formatBracesWithIndent(formatter: NodeFormatter<AstNode>, node: AstNode): void {
+    const bracesOpen = formatter.keyword('{');
+    const bracesClose = formatter.keyword('}');
+
+    this.doFmt(
+      this.formatBracesWithIndent.name,
+      'formatter.interior(bracesOpen, bracesClose)',
+      formatter.interior(bracesOpen, bracesClose),
+      FormatVerb.Prepend,
+      FormatActionType.Indent,
     );
 
-    // Add newline between each style definition
-    node.styles.forEach((style) => {
-      const styleFormatter = this.getNodeFormatter(style);
-      styleFormatter.node(style).prepend(Formatting.newLine());
-    });
+    this.doFmt(
+      this.formatBracesWithIndent.name,
+      'bracesOpen',
+      bracesOpen,
+      FormatVerb.Prepend,
+      FormatActionType.NewLine,
+    );
 
-    // Add newline between each element (graph, node, link)
-    node.elements.forEach((element, index) => {
-      const elementFormatter = this.getNodeFormatter(element);
-      if (index > 0) {
-        elementFormatter.node(element).prepend(Formatting.newLine());
-      }
-    });
+    this.doFmt(
+      this.formatBracesWithIndent.name,
+      'bracesClose',
+      bracesClose,
+      FormatVerb.Prepend,
+      FormatActionType.NewLine,
+    );
+  }
+
+  // ------------------------------
+  // Formatting Methods for Specific Node Types
+  // ------------------------------
+  private formatModel(node: ast.Model): void {
+    // const formatter = this.getNodeFormatter(node);
+    this.log(
+      `${this.formatModel.name}() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)}`,
+    );
+
+    // TODO
+  }
+
+  private formatNodeAlias(node: ast.NodeAlias): void {
+    this.log(
+      `${this.formatNodeAlias.name}() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)}`,
+    );
+
+    const formatter = this.getNodeFormatter(node);
+
+    this.doFmt(
+      this.formatNodeAlias.name,
+      "keyword('define')",
+      formatter.keyword('define'),
+      FormatVerb.Prepend,
+      FormatActionType.NewLines,
+      node.definition ? 2 : 1,
+    );
+
+    this.doFmt(
+      this.formatNodeAlias.name,
+      "property('name')",
+      formatter.property('name'),
+      FormatVerb.Surround,
+      FormatActionType.OneSpace,
+    );
+
+    if (node.styleref) {
+      this.doFmt(
+        this.formatNodeAlias.name,
+        "keyword(':')",
+        formatter.keyword(':'),
+        FormatVerb.Surround,
+        FormatActionType.NoSpace,
+      );
+    }
   }
 
   /**
    * Formats a Graph node.
-   * Adds spacing around keywords, optional StyleRef, name, and label.
-   * Indents the content within the graph's braces.
+   * Adjusts spacing around keywords, optional StyleRef, name, label, and braces.
    *
-   * @param node The Graph node to format.
+   * @param node The Graph node.
    */
   private formatGraph(node: ast.Graph): void {
-    console.log(
-      `format${node.$type}() -- ${node.$type} ${isNamed(node) ? `"${node.name}"` : '(unnamed)'}`,
+    const formatter = this.getNodeFormatter(node);
+    this.log(
+      `formatGraph() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
-    const formatter = this.getNodeFormatter(node);
+    // Prepend newline
+    this.doFmt(
+      this.formatGraph.name,
+      "keyword('graph')",
+      formatter.keyword('graph'),
+      FormatVerb.Prepend,
+      FormatActionType.NewLines,
+      2,
+    );
 
-    // Format 'graph' keyword and optional style reference
-    formatter.keyword('graph').surround(Formatting.noSpace()).prepend(Formatting.newLine());
+    this.doFmt(
+      this.formatGraph.name,
+      "keyword('graph')",
+      formatter.keyword('graph'),
+      FormatVerb.Append,
+      FormatActionType.NoSpace,
+    );
     if (node.styleref) {
-      formatter.keyword(':').surround(Formatting.noSpace());
-      formatter.property('styleref').append(Formatting.oneSpace());
+      this.doFmt(
+        this.formatGraph.name,
+        "keyword(':')",
+        formatter.keyword(':'),
+        FormatVerb.Surround,
+        FormatActionType.NoSpace,
+      );
     }
+    this.doFmt(
+      this.formatGraph.name,
+      "property('name')",
+      formatter.property('name'),
+      FormatVerb.Prepend,
+      FormatActionType.OneSpace,
+    );
 
-    // Format graph name and optional label
-    formatter.property('name').surround(Formatting.noSpace()).prepend(Formatting.oneSpace());
-    if (node.label) {
-      formatter.property('label').surround(Formatting.oneSpace());
-    }
-
-    // Indent content within braces
-    formatter.keyword('{').prepend(Formatting.newLine());
-    this.formatBracesWithIndent(formatter);
-
-    // Indent elements and styles within the graph
-    node.elements.forEach((element) => {
-      const elementFormatter = this.getNodeFormatter(element);
-      elementFormatter.node(element).prepend(Formatting.indent());
-    });
-    node.styles.forEach((style) => {
-      const styleFormatter = this.getNodeFormatter(style);
-      styleFormatter.node(style).prepend(Formatting.indent());
-    });
+    this.formatBracesWithIndent(formatter, node);
   }
 
   /**
    * Formats a Node node.
-   * Adds spacing around the 'node' keyword, optional StyleRef, name, and label.
+   * Handles the 'node' keyword or alias, optional StyleRef, and name.
    *
-   * @param node The Node node to format.
+   * @param node The Node node.
    */
   private formatNode(node: ast.Node): void {
-    console.log(
-      `format${node.$type}() -- ${node.$type} ${isNamed(node) ? `"${node.name}"` : '(unnamed)'}`,
+    const formatter = this.getNodeFormatter(node);
+    this.log(
+      `formatNode() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
-    const formatter = this.getNodeFormatter(node);
-
-    // Format 'node' keyword and optional style reference
-    const nodeStartTokenFormatter = node.alias
-      ? formatter.property('alias')
-      : formatter.keyword('node');
-    nodeStartTokenFormatter.surround(Formatting.noSpace()).prepend(Formatting.newLine());
-
-    // Apply indent based on the container type
-    if (node.$container.$type === 'Model') {
-      nodeStartTokenFormatter.append(Formatting.newLine()).append(Formatting.indent());
-    } else {
-      formatter.node(node).prepend(Formatting.indent());
-    }
+    this.doFmt(
+      this.formatNode.name,
+      node.alias ? "property('alias')" : "keyword('node')",
+      node.alias ? formatter.property('alias') : formatter.keyword('node'),
+      FormatVerb.Append,
+      FormatActionType.NoSpace,
+    );
 
     if (node.styleref) {
-      formatter.keyword(':').surround(Formatting.noSpace());
-      formatter.property('styleref').append(Formatting.oneSpace());
+      this.doFmt(
+        this.formatNode.name,
+        "keyword(':')",
+        formatter.keyword(':'),
+        FormatVerb.Surround,
+        FormatActionType.NoSpace,
+      );
     }
 
-    // Format node name and optional label
-    formatter.property('name').surround(Formatting.oneSpace());
-    /*
-    if (node.label) {
-      formatter.property('label').append(Formatting.oneSpace());
-    }
-    */
+    this.doFmt(
+      this.formatNode.name,
+      "property('name')",
+      formatter.property('name'),
+      FormatVerb.Prepend,
+      FormatActionType.OneSpace,
+    );
   }
 
   /**
    * Formats a Link node.
-   * Adds spacing around the 'link' keyword, optional StyleRef, name, source, destination, and label.
-   * Handles spacing around commas and colons.
+   * Adjusts spacing for the 'link' keyword, optional name (within parentheses),
+   * arrays for src/dst, arrowhead properties, and label.
    *
-   * @param node The Link node to format.
+   * @param node The Link node.
    */
   private formatLink(node: ast.Link): void {
-    console.log(
-      `format${node.$type}() -- ${node.$type} ${isNamed(node) ? `"${node.name}"` : '(unnamed)'}`,
+    const formatter = this.getNodeFormatter(node);
+    this.log(
+      `formatLink() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
-    const formatter = this.getNodeFormatter(node);
-    // Format 'link' keyword and optional style reference
-    formatter.keyword('link').surround(Formatting.noSpace()).prepend(Formatting.newLine());
+    this.doFmt(
+      this.formatLink.name,
+      "keyword('link')",
+      formatter.keyword('link'),
+      FormatVerb.Append,
+      isNamed(node) ? FormatActionType.OneSpace : FormatActionType.NoSpace,
+    );
 
-    // Apply indent based on the container type
-    if (node.$container.$type === 'Model') {
-      formatter.keyword('link').append(Formatting.newLine()).append(Formatting.indent());
-    } else {
-      // node.$container.$type === 'Graph'
-      formatter.node(node).prepend(Formatting.indent());
-    }
+    this.doFmt(
+      this.formatLink.name,
+      "keyword(':')",
+      formatter.keyword(':'),
+      FormatVerb.Surround,
+      FormatActionType.NoSpace,
+    );
 
-    formatter.keyword(':').surround(Formatting.noSpace());
+    this.doFmt(
+      this.formatLink.name,
+      "property('src')",
+      formatter.property('src'),
+      FormatVerb.Prepend,
+      FormatActionType.OneSpace,
+    );
 
-    if (node.styleref) {
-      formatter.property('styleref').surround(Formatting.noSpace());
-    }
+    this.doFmt(
+      this.formatLink.name,
+      "property('dst')",
+      formatter.property('dst'),
+      FormatVerb.Append,
+      FormatActionType.NoSpace,
+    );
 
-    // Format optional link name
-    if (node.name !== undefined) {
-      formatter.keyword('(').surround(Formatting.noSpace()).prepend(Formatting.oneSpace());
-      formatter.property('name').surround(Formatting.noSpace());
-      formatter.keyword(')').surround(Formatting.noSpace()).append(Formatting.oneSpace());
-    }
+    this.doFmt(
+      this.formatLink.name,
+      "properties('relation', 'link')",
+      formatter.properties('relation', 'link'),
+      FormatVerb.Surround,
+      FormatActionType.OneSpace,
+    );
 
-    // Format source, relation, link, destination, and label
-    formatter.property('src').prepend(Formatting.oneSpace());
-    if (node.src_arrowhead !== undefined) {
-      formatter.property('src_arrowhead').surround(Formatting.noSpace());
-    }
+    const commas = formatter.keyword(',');
 
-    if (node.relation !== undefined) {
-      formatter.property('relation').surround(Formatting.oneSpace());
-    }
-    if (node.link !== undefined) {
-      formatter.property('link').surround(Formatting.oneSpace());
-    }
+    this.doFmt(
+      this.formatLink.name,
+      'commas',
+      commas,
+      FormatVerb.Append,
+      FormatActionType.OneSpace,
+    );
 
-    formatter.property('dst').surround(Formatting.noSpace()).prepend(Formatting.oneSpace());
-    if (node.dst_arrowhead !== undefined) {
-      formatter.property('dst_arrowhead').surround(Formatting.noSpace());
-    }
-
-    if (node.label) {
-      formatter.property('label').surround(Formatting.noSpace()).prepend(Formatting.oneSpace());
-    }
-
-    // Handle commas (no space before, one space after)
-    if (node.$cstNode) {
-      const cstNodes = CstUtils.streamCst(node.$cstNode).toArray();
-      const commaNodes = cstNodes.filter((cstNode) => cstNode.text === ',');
-      formatter.cst(commaNodes).surround(Formatting.noSpace()).append(Formatting.oneSpace());
-    }
+    this.doFmt(
+      this.formatLink.name,
+      "properties('src_arrowhead','dst_arrowhead')",
+      formatter.properties('src_arrowhead', 'dst_arrowhead'),
+      FormatVerb.Prepend,
+      FormatActionType.NoSpace,
+    );
   }
 
   /**
    * Formats a Style node.
-   * Adds spacing around the 'style' keyword, optional StyleRef, and name.
+   * Adjusts spacing around the 'style' keyword, optional StyleRef, and name.
    *
-   * @param node The Style node to format.
+   * @param node The Style node.
    */
   private formatStyle(node: ast.Style): void {
-    console.log(
-      `format${node.$type}() -- ${node.$type} ${isNamed(node) ? `"${node.name}"` : '(unnamed)'}`,
-    );
-
     const formatter = this.getNodeFormatter(node);
-    console.log(`format${node.$type}() Formatting style: "${node.name}"`);
-    console.log(
-      `format${node.$type}() Before formatting: [[${(node.$cstNode?.text ?? '<CST node undefined>').replaceAll('\r', '\\r').replaceAll('\n', '\\n')}]]`,
+    this.log(
+      `formatStyle() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
-    // Format 'style' keyword and optional style reference
-    if (node.styleref) {
-      formatter.keyword('style').append(Formatting.noSpace());
-      formatter.keyword(':').surround(Formatting.noSpace());
-      formatter.property('styleref').append(Formatting.noSpace());
-    } else {
-      formatter.keyword('style').append(Formatting.oneSpace());
-    }
-    // Format style name and add newline
-    formatter.property('name').surround(Formatting.oneSpace());
-    if (node.$cstNode) {
-      formatter.cst([node.$cstNode]).append(Formatting.newLine());
-      console.log(
-        `format${node.$type}() appended newline to: [[${node.$cstNode.text.replaceAll('\r', '\\r').replaceAll('\n', '\\n')}]]`,
-      );
-    }
-  }
+    // formatter.keyword('style').append(Formatting.noSpace());
 
-  /**
-   * Formats a Style node.
-   * Adds spacing around the 'style' keyword, optional StyleRef, and name.
-   *
-   * @param node The Style node to format.
-   */
-  private formatNodeAlias(node: ast.NodeAlias): void {
-    console.log(
-      `format${node.$type}() -- ${node.$type} ${isNamed(node) ? `"${node.name}"` : '(unnamed)'}`,
+    // Prepend newline if not first
+
+    this.doFmt(
+      this.formatStyle.name,
+      "keyword('style')",
+      formatter.keyword('style'),
+      FormatVerb.Prepend,
+      FormatActionType.NewLines,
+      (node.$containerIndex ?? 0) > 0 ? 2 : 1, // Add extra blank line if not first Style
     );
 
-    const formatter = this.getNodeFormatter(node);
-    console.log(`format${node.$type}() Formatting ${node.$type}: "${node.name}"`);
-    console.log(
-      `format${node.$type}() Before formatting: [[${(node.$cstNode?.text ?? '<CST node undefined>').replaceAll('\r', '\\r').replaceAll('\n', '\\n')}]]`,
+    this.doFmt(
+      this.formatStyle.name,
+      "keyword('style')",
+      formatter.keyword('style'),
+      FormatVerb.Append,
+      FormatActionType.NoSpace,
     );
-
-    // Format 'define' keyword and optional style reference
-    formatter.property('name').surround(Formatting.oneSpace());
-    formatter.keyword('node').append(Formatting.noSpace());
 
     if (node.styleref) {
-      formatter.keyword('define').append(Formatting.noSpace());
-      formatter.keyword(':').surround(Formatting.noSpace());
-      formatter.property('styleref').append(Formatting.noSpace());
-    } else {
-      formatter.keyword('define').append(Formatting.oneSpace());
-    }
-    // Format style name and add newline
-    if (node.$cstNode) {
-      formatter.cst([node.$cstNode]).append(Formatting.newLine());
-      console.log(
-        `format${node.$type}() appended newline to: [[${node.$cstNode.text.replaceAll('\r', '\\r').replaceAll('\n', '\\n')}]]`,
+      this.doFmt(
+        this.formatStyle.name,
+        "keyword(':')",
+        formatter.keyword(':'),
+        FormatVerb.Surround,
+        FormatActionType.NoSpace,
       );
     }
+
+    this.doFmt(
+      this.formatStyle.name,
+      "property('name')",
+      formatter.property('name'),
+      FormatVerb.Prepend,
+      FormatActionType.OneSpace,
+    );
   }
 
   /**
    * Formats a StyleBlock node.
-   * Adds indentation and newlines within the style block.
-   * Handles spacing around semicolons and colons.
+   * Ensures that the braces are handled via formatBracesWithIndent() and then
+   * applies specific formatting to semicolon tokens based on their position relative
+   * to StyleDefinition nodes. (The goal is to collapse or reposition semicolons as follows:)
+   *
+   * - Leading semicolons (before the first StyleDefinition) are moved so that the first one appears on a new indented line.
+   * - Semicolons between adjacent StyleDefinition nodes are collapsed so that only the first is preserved,
+   *   and if the first follows a SL_COMMENT, it starts on a new indented line.
+   * - Trailing semicolons (after the last StyleDefinition) are similarly placed on a new indented line.
+   *
+   * This implementation reuses the grouping logic similar to checkSpuriousSemicolons().
    *
    * @param node The StyleBlock node to format.
    */
   private formatStyleBlock(node: ast.StyleBlock): void {
-    console.log(
-      `format${node.$type}() -- ${node.$type} ${isNamed(node) ? `"${node.name}"` : '(unnamed)'}`,
+    const formatter = this.getNodeFormatter(node);
+    this.log(
+      `${this.formatStyleBlock.name}() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
-    const formatter = this.getNodeFormatter(node);
+    // Format the braces and indent the interior.
+    this.formatBracesWithIndent(formatter, node);
 
-    // Format braces with indentation
-    this.formatBracesWithIndent(formatter);
+    // Get only the direct child CST nodes of the StyleBlock.
+    if (!node.$cstNode) {
+      return;
+    }
+    const cstNode: CstNode = node.$cstNode;
+    const directChildren = CstUtils.streamCst(cstNode)
+      .filter((child) => CstUtils.isChildNode(child, cstNode))
+      .toArray();
 
-    // Format style definitions within the block
-    node.items.forEach((item) => {
-      const itemFormatter = this.getNodeFormatter(item);
-      itemFormatter.node(item).prepend(Formatting.newLine()).prepend(Formatting.indent());
+    // Compute indexes for semicolon tokens and for StyleDefinition nodes.
+    // (We ignore hidden nodes – e.g. comments – in the semicolon list.)
+    const semiIndexes: number[] = [];
+    const defIndexes: number[] = [];
+    directChildren.forEach((child, index) => {
+      if (isLeafCstNode(child) && child.text === ';' && !child.hidden) {
+        semiIndexes.push(index);
+      } else if (ast.isStyleDefinition(child.astNode)) {
+        defIndexes.push(index);
+      }
     });
 
-    // Handle spacing around semicolons and colons
-    if (node.$cstNode) {
-      const cstNodes = CstUtils.streamCst(node.$cstNode).toArray();
-      const semicolonNodes: CstNode[] = cstNodes.filter((cstNode) => cstNode.text === ';');
-      formatter.cst(semicolonNodes).prepend(Formatting.oneSpace());
-      const colonNodes: CstNode[] = cstNodes.filter((cstNode) => cstNode.text === ':');
-      formatter.cst(colonNodes).surround(Formatting.noSpace());
+    // If no semicolons, nothing to do.
+    if (semiIndexes.length === 0) {
+      return;
+    }
+    // Group the semicolon indexes.
+    const groups = groupAdjacentArrayIndexes(semiIndexes);
+
+    // Case A: If there are 0 or 1 StyleDefinition nodes, treat all semicolons as redundant.
+    if (defIndexes.length <= 1) {
+      groups.forEach(([start, end]) => {
+        // Indent the first spurious semicolon
+        this.doFmt(
+          this.formatStyleBlock.name,
+          `semicolons[${start}..${end}] (empty block)`,
+          formatter.cst([directChildren[start]]),
+          FormatVerb.Prepend,
+          FormatActionType.Indent,
+        );
+
+        // Prepend next redundant semicolons with one space
+        this.doFmt(
+          this.formatStyleBlock.name,
+          `semicolons[${start}..${end}] (empty block)`,
+          formatter.cst(directChildren.slice(start + 1, end + 1)),
+          FormatVerb.Prepend,
+          FormatActionType.OneSpace,
+        );
+      });
+      return;
+    }
+
+    // --- Case 2: Multiple StyleDefinition nodes
+    const firstDefIdx = defIndexes[0];
+    const lastDefIdx = defIndexes[defIndexes.length - 1];
+
+    // (a) Process semicolons that appear before the first StyleDefinition.
+    groupAdjacentArrayIndexes(semiIndexes.filter((i) => i < firstDefIdx)).forEach(
+      ([start, end]) => {
+        // Indent the first redundant semicolon
+        this.doFmt(
+          this.formatStyleBlock.name,
+          `semicolons[${start}] (before first StyleDefinition) - REDUNDANT - indent (newline)`,
+          formatter.cst([directChildren[start]]),
+          FormatVerb.Prepend,
+          FormatActionType.Indent,
+        );
+
+        // Prepend next redundant semicolons with one space
+        this.doFmt(
+          this.formatStyleBlock.name,
+          `semicolons[${start + 1}..${end}] (before first StyleDefinition) - REDUNDANT - prepend space (same line)`,
+          formatter.cst(directChildren.slice(start + 1, end + 1)),
+          FormatVerb.Prepend,
+          FormatActionType.OneSpace,
+        );
+      },
+    );
+
+    // (b) Process semicolons that appear after the last StyleDefinition.
+    groupAdjacentArrayIndexes(semiIndexes.filter((i) => i > lastDefIdx)).forEach(([start, end]) => {
+      // Indent the first redundant semicolon
+      this.doFmt(
+        this.formatStyleBlock.name,
+        `semicolons[${start}] (after last StyleDefinition) - indent (newline) -- REDUNDANT - WATCH OUT FOR FIRST SEMI -- TODO!`,
+        formatter.cst([directChildren[start]]),
+        FormatVerb.Prepend,
+        FormatActionType.Indent,
+      );
+
+      // Prepend next redundant semicolons with one space
+      this.doFmt(
+        this.formatStyleBlock.name,
+        `semicolons[${start + 1}..${end}] (after last StyleDefinition) - REDUNDANT - prepend space (same line)`,
+        formatter.cst(directChildren.slice(start + 1, end + 1)),
+        FormatVerb.Prepend,
+        FormatActionType.OneSpace,
+      );
+    });
+
+    // (c) Process semicolons between adjacent StyleDefinition nodes.
+    for (let i = 0; i < defIndexes.length - 1; i++) {
+      // Get semicolon indexes between the current and next definition.
+      const betweenSemis = semiIndexes.filter((j) => j > defIndexes[i] && j < defIndexes[i + 1]);
+      if (betweenSemis.length === 0) {
+        // Should not happen
+        continue;
+      }
+      const firstSemi = betweenSemis[0];
+      // Keep the first semicolon; all later ones are reduncant.
+      this.doFmt(
+        this.formatStyleBlock.name,
+        `first semicolon after StyleDefinition [${firstSemi}]`,
+        formatter.cst([directChildren[firstSemi]]),
+        FormatVerb.Prepend,
+        FormatActionType.NoSpace,
+      );
+
+      if (betweenSemis.length > 1) {
+        // Process the redundant semicolons
+        const redundant = betweenSemis.slice(1);
+        if (redundant.length == 0) {
+          // No redundant semicolons
+          continue;
+        }
+        groupAdjacentArrayIndexes(redundant).forEach(([start, end]) => {
+          // Indent the first redundant semicolon
+          this.doFmt(
+            this.formatStyleBlock.name,
+            `semicolons[${start}] (between StyleDefinition nodes) - REDUNDANT - indent (newline)`,
+            formatter.cst([directChildren[start]]),
+            FormatVerb.Prepend,
+            FormatActionType.Indent,
+          );
+
+          // Prepend next redundant semicolons with one space
+          if (start < end) {
+            this.doFmt(
+              this.formatStyleBlock.name,
+              `semicolons[${start + 1}..${end}] (between StyleDefinition nodes) - REDUNDANT - prepend space (same line)`,
+              formatter.cst(directChildren.slice(start + 1, end + 1)),
+              FormatVerb.Prepend,
+              FormatActionType.OneSpace,
+            );
+          }
+        });
+      }
     }
   }
 
   /**
    * Formats a StyleDefinition node.
-   * Adds indentation and spacing around the colon.
+   * Ensures each definition starts on a new indented line and that a single space surrounds the colon.
    *
-   * @param node The StyleDefinition node to format.
+   * @param node The StyleDefinition node.
    */
   private formatStyleDefinition(node: ast.StyleDefinition): void {
-    console.log(
-      `format${node.$type}() -- ${node.$type} ${node.topic} : ${inspect(node.value, false, 1).replaceAll('\r', '\\r').replaceAll('\n', '\\n')}`,
+    const formatter = this.getNodeFormatter(node);
+    this.log(
+      `formatStyleDefinition() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)}`,
     );
 
-    const formatter = this.getNodeFormatter(node);
+    // Each StyleDefinition starts on a new line and is indented.
 
-    // Add indentation
-    formatter.node(node).prepend(Formatting.indent());
+    /*
+    this.doFmt(
+      this.formatStyleDefinition.name,
+      "property('topic')",
+      formatter.property('topic'),
+      FormatVerb.Prepend,
+      FormatActionType.Indent,
+    );
+    */
+
+    this.doFmt(
+      this.formatStyleDefinition.name,
+      "property('value')",
+      formatter.property('value'),
+      FormatVerb.Append,
+      FormatActionType.NoSpace,
+    );
 
     // Handle spacing around the colon and semicolon
     if (node.$cstNode) {
       const cstNodes = CstUtils.streamCst(node.$cstNode).toArray();
+
+      // Ensure colon has no space before and one space after.
       const colonNodes: CstNode[] = cstNodes.filter((cstNode) => cstNode.text === ':');
+      this.log(
+        `formatStyleDefinition(${AstUtils.getDocument(node).uri.path}) -- colonNodes: ${colonNodes.length}`,
+      );
 
       if (colonNodes.length > 0) {
-        formatter.cst(colonNodes).prepend(Formatting.oneSpace()).append(Formatting.oneSpace());
+        this.doFmt(
+          this.formatStyleDefinition.name,
+          'cst(colonNodes)',
+          formatter.cst(colonNodes),
+          FormatVerb.Prepend,
+          FormatActionType.NoSpace,
+        );
+        this.doFmt(
+          this.formatStyleDefinition.name,
+          'cst(colonNodes)',
+          formatter.cst(colonNodes),
+          FormatVerb.Append,
+          FormatActionType.OneSpace,
+        );
       }
-      const semicolonNodes = cstNodes.filter((cstNode) => cstNode.text === ';');
-      formatter.cst(semicolonNodes).prepend(Formatting.oneSpace());
     }
   }
 
-  /**
-   * Formats braces with indentation.
-   * Ensures opening and closing braces are on new lines and indents the content.
-   *
-   * @param formatter The NodeFormatter to use.
-   */
-  private formatBracesWithIndent(formatter: NodeFormatter<AstNode>) {
-    console.log(`formatBracesWithIndent()`);
+  private formatLabel(node: ast.Label): void {
+    const formatter = this.getNodeFormatter(node);
+    this.log(
+      `formatLabel() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)}`,
+    );
 
-    const bracesOpen = formatter.keyword('{');
-    const bracesClose = formatter.keyword('}');
-
-    // Ensure opening brace is on a new line
-    bracesOpen.prepend(Formatting.newLine());
-
-    // Format content inside the braces
-    formatter.interior(bracesOpen, bracesClose).prepend(Formatting.indent());
-
-    // Ensure closing brace is on a new line
-    bracesClose.prepend(Formatting.newLine());
+    this.doFmt(
+      this.formatLabel.name,
+      'formatter.node(node)',
+      formatter.node(node),
+      FormatVerb.Prepend,
+      FormatActionType.OneSpace,
+    );
   }
 
-  /**
-   * Creates hidden text edits for single-line comments after an opening brace.
-   * Adjusts indentation and adds newlines as needed.
-   *
-   * @param previous The previous CST node.
-   * @param hidden The hidden CST node (single-line comment).
-   * @param formatting The formatting action.
-   * @param context The formatting context.
-   * @returns An array of TextEdit objects.
-   */
   protected override createHiddenTextEdits(
     previous: CstNode | undefined,
     hidden: CstNode,
     formatting: FormattingAction | undefined,
     context: FormattingContext,
   ): TextEdit[] {
-    console.log(`createHiddenTextEdits("${hidden.text}")`);
-
+    // Only handle comment tokens (SL or ML comments) immediately following an opening brace.
     if (
       isLeafCstNode(hidden) &&
-      hidden.tokenType.name === 'SL_COMMENT' &&
+      isCommentCstNode(hidden) &&
+      previous &&
       isLeafCstNode(previous) &&
-      previous.tokenType.name === '{'
+      previous.text === '{'
     ) {
-      // Custom logic for SL_COMMENT comments after '{'
+      const doc = context.document;
       const startLine = hidden.range.start.line;
 
-      // Calculate the start range for the new text edit
-      let startRange: Range | undefined = undefined;
-      if (isLeafCstNode(previous) && previous.range.end.line === startLine) {
-        // Hidden node is on the same line as its previous node
+      // Determine if the comment is on the same line as the '{' token.
+      const onSameLine = previous.range.end.line === hidden.range.start.line;
 
-        startRange = {
-          start: previous.range.end,
-          end: hidden.range.start,
-        };
-      } else {
-        // Not on same line
-        startRange = {
-          start: {
-            character: 0,
-            line: startLine,
-          },
-          end: hidden.range.start,
-        };
-      }
+      // Compute the range that currently holds the white space before the comment.
+      // If onSameLine, the range is from the end of the previous token to the start of the hidden token.
+      // Otherwise, it is the white space at the beginning of the line of the comment.
+      const startRange: Range = onSameLine
+        ? { start: previous.range.end, end: hidden.range.start }
+        : { start: { line: startLine, character: 0 }, end: hidden.range.start };
 
-      const edits: TextEdit[] = [];
+      console.log(
+        `createHiddenTextEdits(hidden: ${rangeToString(hidden.range)}, previous: ${rangeToString(previous.range)}) -- ${onSameLine ? 'same line' : 'different lines'} -- startRange: ${rangeToString(startRange)}`,
+      );
 
-      // Calculate the expected indentation
-      const hiddenStartText = context.document.getText(startRange);
+      // Read the white space currently in that range.
+      const hiddenStartText = doc.getText(startRange);
       const move = this.findFittingMove(startRange, formatting?.moves ?? [], context);
       const hiddenStartChar = this.getExistingIndentationCharacterCount(hiddenStartText, context);
       const expectedStartChar = this.getIndentationCharacterCount(context, move);
-
       const characterIncrease = expectedStartChar - hiddenStartChar;
 
-      if (characterIncrease === 0) {
+      console.log(`createHiddenTextEdits: startRange = ${rangeToString(startRange)}`);
+      console.log(`createHiddenTextEdits: hiddenStartText = "${hiddenStartText}"`);
+      console.log(`createHiddenTextEdits: hiddenStartChar = ${hiddenStartChar}`);
+      console.log(`createHiddenTextEdits: expectedStartChar = ${expectedStartChar}`);
+      console.log(`createHiddenTextEdits: characterIncrease = ${characterIncrease}`);
+
+      // Determine the new white space to insert.
+      const indentChar = context.options.insertSpaces ? ' ' : '\t';
+      let newText: string;
+      if (characterIncrease > 0) {
+        // Need to add extra indent characters.
+        // If on the same line, we want to force a newline followed by indent;
+        // if already on a new line, we simply replace the existing whitespace.
+        newText = onSameLine
+          ? '\n' + indentChar.repeat(expectedStartChar)
+          : indentChar.repeat(expectedStartChar);
+        console.log(`createHiddenTextEdits: Adding ${characterIncrease} indent character(s).`);
+      } else if (characterIncrease < 0) {
+        // Too many spaces – replace with exactly the expected indent.
+        newText = onSameLine
+          ? '\n' + indentChar.repeat(expectedStartChar)
+          : indentChar.repeat(expectedStartChar);
+        console.log(
+          `createHiddenTextEdits: Removing extra whitespace; setting indent to ${expectedStartChar} characters.`,
+        );
+      } else {
+        console.log(
+          `createHiddenTextEdits: No change needed (characterIncrease = ${characterIncrease}).`,
+        );
         return [];
       }
 
-      let newText = '\n';
-      if (characterIncrease > 0) {
-        newText = newText + (context.options.insertSpaces ? ' ' : '\t').repeat(characterIncrease);
-      }
+      console.log(
+        `createHiddenTextEdits: Replacing whitespace ${rangeToString(startRange)} with ${JSON.stringify(newText)} for comment "${hidden.text}"`,
+      );
 
-      const lines = hidden.text.split('\n');
-      lines[0] = hiddenStartText + lines[0];
-      for (let i = 0; i < lines.length; i++) {
-        const currentLine = startLine + i;
-        if (characterIncrease > 0) {
-          const textEdit: TextEdit = {
-            newText,
-            range: {
-              start: startRange.start,
-              end: startRange.end,
-            },
-          };
-          console.log(
-            `createHiddenTextEdits("${hidden.text}") -- SL_COMMENT after '{' token -- characterIncrease: ${characterIncrease} > 0 -- textEdit: range: ${rangeToString(textEdit.range)}, newText: ${JSON.stringify(textEdit.newText)}`,
-          );
-
-          edits.push(textEdit);
-        } else {
-          const currentText = lines[i];
-          let j = 0;
-          for (; j < currentText.length; j++) {
-            const char = currentText.charAt(j);
-            if (char !== ' ' && char !== '\t') {
-              break;
-            }
-          }
-
-          const textEdit: TextEdit = {
-            newText: '\n',
-            range: {
-              start: {
-                character: startRange.start.character, // Was 0
-                line: currentLine,
-              },
-              end: {
-                line: currentLine,
-                // Remove as much whitespace characters as necessary
-                // In some cases `characterIncrease` is actually larger than the amount of whitespace available
-                // So we simply remove all whitespace characters `j`
-                character: startRange.start.character + Math.min(j, Math.abs(characterIncrease)),
-              },
-            },
-          };
-          console.log(
-            `createHiddenTextEdits("${hidden.text}") -- SL_COMMENT after '{' token -- characterIncrease: ${characterIncrease} < 0 -- textEdit: range: ${rangeToString(textEdit.range)}, newText: ${JSON.stringify(textEdit.newText)}`,
-          );
-          edits.push(textEdit);
-        }
-      }
-
-      return edits;
+      const edit: TextEdit = {
+        range: startRange,
+        newText,
+      };
+      return [edit];
     }
-    console.log(
-      `createHiddenTextEdits("${hidden.text}") -- NOT [ SL_COMMENT after '{' token ] -- will call super.createHiddenTextEdits()`,
-    );
 
-    // Call the default implementation for other cases
+    console.log(
+      `createHiddenTextEdits("${hidden.text}") -- Not a SL_COMMENT after '{', delegating to default implementation.`,
+    );
     return super.createHiddenTextEdits(previous, hidden, formatting, context);
   }
 }
+
+// Define enums for verbs and actions for type safety.
+enum FormatVerb {
+  Prepend = 'prepend',
+  Append = 'append',
+  Surround = 'surround',
+}
+
+enum FormatActionType {
+  NoSpace = 'noSpace',
+  OneSpace = 'oneSpace',
+  NewLine = 'newLine',
+  Indent = 'indent',
+  NoIndent = 'noIndent',
+  NewLines = 'newLines',
+  Spaces = 'spaces',
+}
+
+// Map each FormatActionType to the corresponding Formatting function.
+const formattingActionMap: Record<FormatActionType, (count?: number) => FormattingAction> = {
+  [FormatActionType.NoSpace]: () => Formatting.noSpace(),
+  [FormatActionType.OneSpace]: () => Formatting.oneSpace(),
+  [FormatActionType.NewLine]: () => Formatting.newLine(),
+  [FormatActionType.Indent]: () => Formatting.indent(),
+  [FormatActionType.NoIndent]: () => Formatting.noIndent(),
+  [FormatActionType.NewLines]: (count?: number) => {
+    if (count === undefined)
+      throw new Error(`Action ${FormatActionType.NewLines} expects a count.`);
+    return Formatting.newLines(count);
+  },
+  [FormatActionType.Spaces]: (count?: number) => {
+    if (count === undefined) throw new Error(`Action ${FormatActionType.Spaces} expects a count.`);
+    return Formatting.spaces(count);
+  },
+};

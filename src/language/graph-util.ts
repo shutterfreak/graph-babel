@@ -238,3 +238,29 @@ export function checkNextCstNodeIs(givenCstNode: CstNode, tokens: string[]): boo
   const succeedingNode = parent.content[index + 1];
   return tokens.includes(succeedingNode.text);
 }
+
+/**
+ * Checks whether the next sibling of the given CST node (if any) has an AST node
+ * with the given type.
+ */
+export function checkNextAstType(given: CstNode, expectedType: string): boolean {
+  const parent = given.container;
+  if (!parent) return false;
+  const idx = parent.content.indexOf(given);
+  if (idx < 0 || idx >= parent.content.length - 1) return false;
+  const next = parent.content[idx + 1];
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, @typescript-eslint/strict-boolean-expressions
+  return next.astNode ? next.astNode.$type === expectedType : false;
+}
+
+/**
+ * Checks whether the previous sibling of the given CST node is a hidden token with the given token type.
+ */
+export function checkPreviousTokenType(given: CstNode, expectedTokenType: string): boolean {
+  const parent = given.container;
+  if (!parent) return false;
+  const idx = parent.content.indexOf(given);
+  if (idx <= 0) return false;
+  const prev = parent.content[idx - 1];
+  return isLeafCstNode(prev) && prev.hidden && prev.tokenType.name === expectedTokenType;
+}
