@@ -214,33 +214,34 @@ See [name-provider.ts](src/language/lsp/name-provider.ts).
 
 The following diagonstics have been implemented, some of which also provide code actions:
 
-|   vscode diagnostic code    |            code text             | description                                   | code action and explanation                                                             |
-| :-------------------------: | :------------------------------: | --------------------------------------------- | --------------------------------------------------------------------------------------- |
-|         NameMissing         |          "name-missing"          | Object has a missing `name` property          | `generateNewName()` - generate a (new) unique `name`                                    |
-|        NameDuplicate        |         "name-duplicate"         | Object has a duplicate `name` property        | `generateNewName()` - generate a (new) unique `name`                                    |
-|     StyleSelfReference      |      "style-self-reference"      | `Style` references itself                     | `removeStyleSelfReference` - remove ': styleref' from self-referencing style definition |
-|    LinkWidthUnitUnknown     |    "link-width-unit-unknown"     | `WidthValue` has an unknown width unit        | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
-|     LinkWidthHasNoUnit      |       "link-width-no-unit"       | `WidthValue` has no width unit                | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
-|      SrcArrowheadEmpty      |      "src-arrowhead-empty"       | Source arrowhead is empty                     | No code action implemented                                                              |
-|     SrcArrowheadInvalid     |     "src-arrowhead-invalid"      | Source arrowhead is invalid                   | No code action implemented                                                              |
-|      DstArrowheadEmpty      |      "dst-arrowhead-empty"       | Destination arrowhead is empty                | No code action implemented                                                              |
-|     DstArrowheadInvalid     |     "dst-arrowhead-invalid"      | Destination arrowhead is invalid              | No code action implemented                                                              |
-|    SrcArrowheadRedefined    |    "src-arrowhead-redefined"     | Source arrowhead is redefined                 | No code action implemented                                                              |
-|    DstArrowheadRedefined    |    "dst-arrowhead-redefined"     | Destination arrowhead is redefined            | No code action implemented                                                              |
-|      LinkStyleInvalid       |       "link-style-invalid"       | Link style is invalid                         | No code action implemented                                                              |
-|      StyleAfterElement      |      "style-after-element"       | Style defined after element                   | No code action implemented                                                              |
-|  StyleMultipleDefinitions   |   "style-multiple-definitions"   | Multiple style definitions with the same name | No code action implemented                                                              |
-|  StyleDefinitionEmptyTopic  |  "style-definition-empty-topic"  | Style definition has an empty topic           | No code action implemented                                                              |
-| StyleDefinitionUnknownTopic | "style-definition-unknown-topic" | Style definition has an unknown topic         | No code action implemented                                                              |
-|      ShapeNameMissing       |       "shape-name-missing"       | Shape name is missing                         | No code action implemented                                                              |
-|      ShapeNameUnknown       |       "shape-name-unknown"       | Shape name is unknown                         | No code action implemented                                                              |
-|      ColorNameUnknown       |       "color-name-unknown"       | Color name is unknown                         | No code action implemented                                                              |
-|       HexColorInvalid       |       "hex-color-invalid"        | Hex color is invalid                          | No code action implemented                                                              |
-|   RgbChannelValueInvalid    |   "rgb-channel-value-invalid"    | RGB channel value is invalid                  | No code action implemented                                                              |
-|  RgbChannelValueOutOfRange  | "rgb-channel-value-out-of-range" | RGB channel value is out of range             | No code action implemented                                                              |
-|    LinkWidthValueInvalid    |    "link-width-value-invalid"    | Link width value is invalid                   | No code action implemented                                                              |
-|   OpacityValueOutOfRange    |   "opacity-value-out-of-range"   | Opacity value is out of range                 | No code action implemented                                                              |
-|     OpacityValueInvalid     |     "opacity-value-invalid"      | Opacity value is invalid                      | No code action implemented                                                              |
+|   vscode diagnostic code    |               code text                | description                                   | code action and explanation                                                             |
+| :-------------------------: | :------------------------------------: | --------------------------------------------- | --------------------------------------------------------------------------------------- |
+|         NameMissing         |             "name-missing"             | Object has a missing `name` property          | `generateNewName()` - generate a (new) unique `name`                                    |
+|        NameDuplicate        |            "name-duplicate"            | Object has a duplicate `name` property        | `generateNewName()` - generate a (new) unique `name`                                    |
+|     StyleSelfReference      |         "style-self-reference"         | `Style` references itself                     | `removeStyleSelfReference` - remove ': styleref' from self-referencing style definition |
+|    LinkWidthUnitUnknown     |       "link-width-unit-unknown"        | `WidthValue` has an unknown width unit        | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
+|     LinkWidthHasNoUnit      |          "link-width-no-unit"          | `WidthValue` has no width unit                | `fixIncorrectWidthUnit` - propose the selection of valid units                          |
+|      SrcArrowheadEmpty      |         "src-arrowhead-empty"          | Source arrowhead is empty                     | No code action implemented                                                              |
+|     SrcArrowheadInvalid     |        "src-arrowhead-invalid"         | Source arrowhead is invalid                   | No code action implemented                                                              |
+|      DstArrowheadEmpty      |         "dst-arrowhead-empty"          | Destination arrowhead is empty                | No code action implemented                                                              |
+|     DstArrowheadInvalid     |        "dst-arrowhead-invalid"         | Destination arrowhead is invalid              | No code action implemented                                                              |
+|    SrcArrowheadRedefined    |       "src-arrowhead-redefined"        | Source arrowhead is redefined                 | No code action implemented                                                              |
+|    DstArrowheadRedefined    |       "dst-arrowhead-redefined"        | Destination arrowhead is redefined            | No code action implemented                                                              |
+|      LinkStyleInvalid       |          "link-style-invalid"          | Link style is invalid                         | No code action implemented                                                              |
+|      StyleAfterElement      |         "style-after-element"          | Style defined after element                   | No code action implemented                                                              |
+|  StyleMultipleDefinitions   |      "style-multiple-definitions"      | Multiple style definitions with the same name | No code action implemented                                                              |
+|  StyleDefinitionEmptyTopic  |     "style-definition-empty-topic"     | Style definition has an empty topic           | No code action implemented                                                              |
+| StyleDefinitionUnknownTopic |    "style-definition-unknown-topic"    | Style definition has an unknown topic         | No code action implemented                                                              |
+|      ShapeNameMissing       |          "shape-name-missing"          | Shape name is missing                         | No code action implemented                                                              |
+|      ShapeNameUnknown       |          "shape-name-unknown"          | Shape name is unknown                         | No code action implemented                                                              |
+|      ColorNameUnknown       |          "color-name-unknown"          | Color name is unknown                         | No code action implemented                                                              |
+|       HexColorInvalid       |          "hex-color-invalid"           | Hex color is invalid                          | No code action implemented                                                              |
+|   RgbChannelValueInvalid    |      "rgb-channel-value-invalid"       | RGB channel value is invalid                  | No code action implemented                                                              |
+|  RgbChannelValueOutOfRange  |    "rgb-channel-value-out-of-range"    | RGB channel value is out of range             | No code action implemented                                                              |
+|    LinkWidthValueInvalid    |       "link-width-value-invalid"       | Link width value is invalid                   | No code action implemented                                                              |
+|   OpacityValueOutOfRange    |      "opacity-value-out-of-range"      | Opacity value is out of range                 | No code action implemented                                                              |
+|     OpacityValueInvalid     |        "opacity-value-invalid"         | Opacity value is invalid                      | No code action implemented                                                              |
+|   SpuriousSemicolonDelete   | "styleblock-spurious-semicolon-delete" | Spurious semicolons in StyleBlock             | `deleteSpuriousSemicolons` - remove spurious semicolons                                 |
 
 See [graph-validators.ts](src/language/graph-validators.ts) and [code-actions.ts](src/language/lsp/code-actions.ts).
 
@@ -269,7 +270,7 @@ The following table outlines the AST node types and properties for which semanti
 
 ### Formatting provider
 
-A custom formatting provider has been implemented to format an unformatted `.graph` file. It takes care of indentation, brace placement and single-line comments after an opening brace.
+A custom formatting provider has been implemented to format an unformatted `.graph` file. It takes care of indentation, brace placement and comments after an opening brace.
 
 See [formatting-provider.ts](src/language/lsp/formatting-provider.ts).
 
