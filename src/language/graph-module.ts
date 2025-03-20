@@ -104,7 +104,7 @@ export interface GraphAddedServices {
     /**
      * Custom completion provider for the Graph language.
      */
-    CompletionOProvider: GraphCompletionProvider;
+    CompletionProvider: GraphCompletionProvider;
   };
 }
 
@@ -150,7 +150,7 @@ export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAd
     /** Registers the custom GraphSemanticTokenProvider for semantic token rendering. */
     SemanticTokenProvider: (services) => new GraphSemanticTokenProvider(services),
     /** Registers the custom completion provider for code completion. */
-    CompletionOProvider: (services) => new GraphCompletionProvider(services),
+    CompletionProvider: (services) => new GraphCompletionProvider(services),
   },
 };
 
