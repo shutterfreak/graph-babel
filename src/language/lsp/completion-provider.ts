@@ -3,42 +3,32 @@ import {
   CompletionAcceptor,
   CompletionContext,
   DefaultCompletionProvider,
-  LangiumServices,
   NextFeature,
 } from 'langium/lsp';
 import { CompletionItemKind } from 'vscode-languageserver';
 
 import * as ast from '../generated/ast.js';
 import { positionToString } from '../graph-util.js';
-import { NAMED_SHAPES, STYLE_TOPICS } from '../model-helpers.js';
+import { NAMED_COLORS, NAMED_SHAPES, STYLE_TOPICS, color_name_to_hex } from '../model-helpers.js';
 
 /**
  * Custom completion provider for Graph DSL.
  *
  * This provider handles completions for StyleDefinition nodes:
  *
- * - For any StyleDefinition node, when the expected property is the first property (i.e., `topic`),
- *   `next.property` is undefined. In that case, it provides completions using the STYLE_TOPICS list.
- *
- * - For a ShapeStyleDefinition node, when the expected property is 'value', it provides completions
- *   using the NAMED_SHAPES list.
+ * - If the expected property is undefined, it provides completions for the `topic` property using STYLE_TOPICS.
+ * - For a ShapeStyleDefinition node with expected property 'value', it provides shape name completions using NAMED_SHAPES.
+ * - For a TextColorDefinition node, it provides CSS color name completions from NAMED_COLORS.
  *
  * In all other cases, it delegates to the default completion behavior.
  */
 export class GraphCompletionProvider extends DefaultCompletionProvider {
-  /** can be deleted (debugging only) */
-  constructor(services: LangiumServices) {
-    super(services);
-    console.log('GraphCompletionProvider instantiated');
-  }
-
   /**
-   * Provides completion items based on the current completion context.
+   * Main entry point for providing completion items.
    *
-   * @param context - The current completion context, including the document, cursor position, and AST node.
-   * @param next - The next expected feature (e.g., the property being completed).
-   * @param acceptor - A callback function to accept completion items.
-   * @returns A MaybePromise that resolves when completion items are provided.
+   * @param context - The current completion context.
+   * @param next - The next expected feature.
+   * @param acceptor - Callback function to accept completion items.
    */
   protected override completionFor(
     context: CompletionContext,
@@ -58,61 +48,92 @@ export class GraphCompletionProvider extends DefaultCompletionProvider {
     if (ast.isStyleDefinition(node)) {
       // When the expected property is undefined, we interpret it as the first property ("topic").
       if (next.property === undefined) {
-        console.log(
-          `GraphCompletionProvider: Detected undefined next.property for ${node.$type}, ` +
-            `interpreting as 'topic' property. Providing STYLE_TOPICS completions.`,
-        );
-        for (const topic of STYLE_TOPICS) {
-          acceptor(context, {
-            label: topic,
-            kind: CompletionItemKind.EnumMember,
-            detail: 'Style Topic',
-            insertText: topic,
-          });
-        }
-        // Prevent further (default) completions.
+        // Provide completions for the topic property.
+        this.provideTopicCompletions(context, acceptor);
         return;
       }
-      // For ShapeStyleDefinition nodes, when completing the 'value' property, provide shape names.
-      if (next.property === 'value') {
-        console.log(
-          `GraphCompletionProvider.completionFor(${positionToString(context.position)}): type: '${node.$type}' (is StyleDefinition) - next.property === ${next.property} -- PROCEED`,
-        );
-        if (ast.isShapeStyleDefinition(node)) {
-          console.log(
-            `GraphCompletionProvider: Detected 'value' property for ShapeStyleDefinition. ` +
-              `Providing NAMED_SHAPES completions.`,
-          );
-          for (const shape of NAMED_SHAPES) {
-            acceptor(context, {
-              label: shape,
-              kind: CompletionItemKind.EnumMember,
-              detail: 'Named Shape',
-              insertText: shape,
-            });
-          }
-          // Prevent further (default) completions.
-          return;
-        }
+      if (next.property === 'value' && ast.isShapeStyleDefinition(node)) {
+        // Provide shape completions for the value property of a ShapeStyleDefinition.
+        this.provideShapeCompletions(context, acceptor);
+        return;
       }
+    } else if (ast.isTextColorDefinition(node)) {
+      // Provide completions for CSS color names for a TextColorDefinition.
+      this.provideColorCompletions(context, acceptor);
+      return;
     }
-
-    /*
-    console.log(
-      render_text(
-        inspect(context),
-        `GraphCompletionProvider.completionFor(${positionToString(context.position)}): context`,
-      ),
-    );
-    console.log(
-      render_text(
-        inspect(next),
-        `GraphCompletionProvider.completionFor(${positionToString(context.position)}): next`,
-      ),
-    );
-    */
 
     // Delegate to the default completion provider for any other context.
     return super.completionFor(context, next, acceptor);
+  }
+
+  /**
+   * Provides completions for the topic property using STYLE_TOPICS.
+   *
+   * @param context - The completion context.
+   * @param acceptor - The completion acceptor callback.
+   */
+  protected provideTopicCompletions(
+    context: CompletionContext,
+    acceptor: CompletionAcceptor,
+  ): void {
+    console.log(
+      `GraphCompletionProvider: Providing topic completions at ${positionToString(context.position)}.`,
+    );
+    for (const topic of STYLE_TOPICS) {
+      acceptor(context, {
+        label: topic,
+        kind: CompletionItemKind.EnumMember,
+        detail: 'Style Topic',
+        insertText: topic,
+      });
+    }
+  }
+
+  /**
+   * Provides shape completions for a ShapeStyleDefinition node.
+   *
+   * @param context - The completion context.
+   * @param acceptor - The completion acceptor callback.
+   */
+  protected provideShapeCompletions(
+    context: CompletionContext,
+    acceptor: CompletionAcceptor,
+  ): void {
+    console.log(
+      `GraphCompletionProvider: Providing shape completions at ${positionToString(context.position)}.`,
+    );
+    for (const shape of NAMED_SHAPES) {
+      acceptor(context, {
+        label: shape,
+        kind: CompletionItemKind.EnumMember,
+        detail: 'Named Shape',
+        insertText: shape,
+      });
+    }
+  }
+
+  /**
+   * Provides CSS color completions for a TextColorDefinition node.
+   *
+   * @param context - The completion context.
+   * @param acceptor - The completion acceptor callback.
+   */
+  protected provideColorCompletions(
+    context: CompletionContext,
+    acceptor: CompletionAcceptor,
+  ): void {
+    console.log(
+      `GraphCompletionProvider: Providing color completions at ${positionToString(context.position)}.`,
+    );
+    for (const color of NAMED_COLORS) {
+      acceptor(context, {
+        label: color,
+        documentation: `(${color_name_to_hex(color)})`,
+        kind: CompletionItemKind.EnumMember,
+        detail: 'CSS Color Name',
+        insertText: color,
+      });
+    }
   }
 }
