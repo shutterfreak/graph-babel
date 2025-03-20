@@ -12,6 +12,7 @@ import {
 import { GraphGeneratedModule, GraphGeneratedSharedModule } from './generated/module.js';
 import { GraphValidator, registerValidationChecks } from './graph-validator.js';
 import { GraphCodeActionProvider } from './lsp/code-actions.js';
+import { GraphCompletionProvider } from './lsp/completion-provider.js';
 import { GraphFoldingProvider } from './lsp/folding-range-provider.js';
 import { GraphFormatter } from './lsp/formatter.js';
 //import { GraphDefinitionProvider } from './lsp/definition-provider.js';
@@ -99,6 +100,11 @@ export interface GraphAddedServices {
      * Provides semantic highlighting for language elements, enhancing code readability.
      */
     SemanticTokenProvider: GraphSemanticTokenProvider;
+
+    /**
+     * Custom completion provider for the Graph language.
+     */
+    CompletionOProvider: GraphCompletionProvider;
   };
 }
 
@@ -143,6 +149,8 @@ export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAd
     FoldingRangeProvider: (services) => new GraphFoldingProvider(services),
     /** Registers the custom GraphSemanticTokenProvider for semantic token rendering. */
     SemanticTokenProvider: (services) => new GraphSemanticTokenProvider(services),
+    /** Registers the custom completion provider for code completion. */
+    CompletionOProvider: (services) => new GraphCompletionProvider(services),
   },
 };
 
