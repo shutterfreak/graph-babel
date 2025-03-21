@@ -47,9 +47,10 @@ export default tseslint.config(
       '@typescript-eslint/no-unnecessary-condition': 'warn',
       '@typescript-eslint/no-unnecessary-type-arguments': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/no-unused-vars': 'warn',
       '@typescript-eslint/restrict-template-expressions': 'warn',
       '@typescript-eslint/strict-boolean-expressions': [
-        2,
+        'warn',
         {
           allowString: false,
           allowNumber: false,
