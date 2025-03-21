@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import {
   AstNode,
   AstUtils,
@@ -115,8 +114,8 @@ export class GraphValidator {
     const nameMap = new Map<string, ast.Element[]>();
 
     function traverseElement(element: ast.Element): void {
-      const preamble = `traverseElement(${element.$type} element (${element.name ?? '<no name>'}))`;
-      console.log(chalk.white(`${preamble} - START`));
+      //const preamble = `traverseElement(${element.$type} element (${element.name ?? '<no name>'}))`;
+      //console.log(chalk.white(`${preamble} - START`));
 
       // Report error if a Node or Graph has an empty name.
       if (
@@ -148,7 +147,7 @@ export class GraphValidator {
       }
     }
 
-    console.log(chalk.whiteBright('checkUniqueElementNames() - START'));
+    //console.log(chalk.whiteBright('checkUniqueElementNames() - START'));
 
     // Traverse the elements in the model:
     for (const element of model.elements) {
@@ -202,9 +201,11 @@ export class GraphValidator {
    * @param accept The callback to report validation issues.
    */
   checkStyleRef = (node: ast.Element | ast.NodeAlias, accept: ValidationAcceptor): void => {
+    /*
     console.log(
       `checkStyleRef() called for ${node.$type}${isNamed(node) ? ` "${node.name}"` : '(unnamed)'} - Style reference '${node.styleref?.$refText}' (${node.styleref?.ref?.$cstNode?.astNode.$type ?? '<undefined>'})`,
     );
+    */
     if (node.styleref) {
       if (node.styleref.$refText.length === 0) {
         accept('error', `Style reference missing after the ':' token.`, {
@@ -336,7 +337,7 @@ export class GraphValidator {
    * @param accept The callback to report validation issues.
    */
   checkStyles = (model: ast.Model, accept: ValidationAcceptor): void => {
-    console.info(chalk.cyanBright('checkStyles(model)'));
+    //console.info(chalk.cyanBright('checkStyles(model)'));
 
     // Ensure all style definitions precede element definitions.
     check_styles_defined_before_elements(model, accept);
