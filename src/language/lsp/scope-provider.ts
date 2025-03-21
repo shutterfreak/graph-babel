@@ -77,20 +77,36 @@ export class GraphScopeProvider extends DefaultScopeProvider {
 
     if (precomputed) {
       const allDescriptions = precomputed.get(document.parseResult.value);
+      // Keep trac k of duplicate scope entries
+      const seenPaths = new Set<string>();
+
+      const filterUnique = (desc: AstNodeDescription) => {
+        if (seenPaths.has(desc.path)) {
+          return false;
+        }
+        seenPaths.add(desc.path);
+        return true;
+      };
 
       // Handling style references: only Style nodes declared in the same file should be considered.
       if (context.property === 'styleref') {
         // console.log('Filtering for styleref (restricting to current file)');
 
-        const styleScope = stream(allDescriptions)
-          .filter(
-            (desc) =>
-              isStyle(desc.node) && // Must be a Style node
-              (context.reference.$refText.length === 0 ||
-                desc.name.toLowerCase().includes(context.reference.$refText.toLowerCase())) && // Empty name or case-insensitive incomplete match
-              desc.documentUri.toString() === documentUri, // Must be defined in the current file
-          )
-          .filter((desc) => this.reflection.isSubtype(desc.type, referenceType)); // Must be a subtype of the expected type
+        const styleScope = stream(allDescriptions).filter(
+          (desc) =>
+            isStyle(desc.node) && // Must be a Style node
+            (context.reference.$refText.length === 0 ||
+              desc.name.toLowerCase().includes(context.reference.$refText.toLowerCase())) && // Empty name or case-insensitive incomplete match
+            desc.documentUri.toString() === documentUri && // Must be defined in the current file
+            this.reflection.isSubtype(desc.type, referenceType) && // Must be a subtype of the expected type
+            filterUnique(desc), // Deduplicate
+        );
+
+        allDescriptions.forEach((description) => {
+          console.log(
+            `getScope(${path_get_file(documentUri)}) - reference type: ${referenceType}): type: "${description.type}", name: "${description.name}", path: ${description.path}`,
+          );
+        });
 
         // Return a scope containing only the filtered Style nodes.
         return this.createScope(
@@ -101,15 +117,15 @@ export class GraphScopeProvider extends DefaultScopeProvider {
         // For link source and destination references, restrict resolution to Node nodes.
         if (isLink(context.container)) {
           // console.log(`Filtering for ${context.property} (restricting to current file)`);
-          const nodeScope = stream(allDescriptions)
-            .filter(
-              (desc) =>
-                isNode(desc.node) && // Must be a Node
-                (context.reference.$refText.length === 0 ||
-                  desc.name.toLowerCase().includes(context.reference.$refText.toLowerCase())) && // Empty name or case-insensitive incomplete match
-                desc.documentUri.toString() === documentUri, // Must belong to the current file
-            )
-            .filter((desc) => this.reflection.isSubtype(desc.type, referenceType)); // Must be a subtype of the expected type
+          const nodeScope = stream(allDescriptions).filter(
+            (desc) =>
+              isNode(desc.node) && // Must be a Node
+              (context.reference.$refText.length === 0 ||
+                desc.name.toLowerCase().includes(context.reference.$refText.toLowerCase())) && // Empty name or case-insensitive incomplete match
+              desc.documentUri.toString() === documentUri && // Must belong to the current file
+              this.reflection.isSubtype(desc.type, referenceType) && // Must be a subtype of the expected type
+              filterUnique(desc), // Deduplicate
+          );
 
           // Return a scope with only the filtered Node definitions.
           return this.createScope(
@@ -123,10 +139,12 @@ export class GraphScopeProvider extends DefaultScopeProvider {
           const aliasScope = stream(allDescriptions).filter(
             (desc) =>
               isNodeAlias(desc.node) && // Must be a NodeAlias node
-              desc.name === context.reference.$refText, // Must have a matching name
+              desc.name === context.reference.$refText && // Must have a matching name
+              this.reflection.isSubtype(desc.type, referenceType) && // Must be a subtype of the expected type
+              filterUnique(desc), // Deduplicate
           );
           return this.createScope(
-            aliasScope.filter((desc) => this.reflection.isSubtype(desc.type, referenceType)),
+            aliasScope,
             // Global scope intentionally omitted.
           );
         }
@@ -145,7 +163,10 @@ export class GraphScopeProvider extends DefaultScopeProvider {
               ) {
                 return false;
               }
-              return this.reflection.isSubtype(desc.type, referenceType);
+              return (
+                this.reflection.isSubtype(desc.type, referenceType) && // Must be a subtype of the expected type
+                filterUnique(desc) // Deduplicate
+              );
             }),
           );
         }
