@@ -1,21 +1,15 @@
-import { type MaybePromise, isNamed } from 'langium';
+import { type MaybePromise } from 'langium';
 import {
   CompletionAcceptor,
   CompletionContext,
   DefaultCompletionProvider,
   NextFeature,
 } from 'langium/lsp';
-import { CompletionItemKind, Range } from 'vscode-languageserver';
+import { CompletionItemKind } from 'vscode-languageserver';
 
 import * as ast from '../generated/ast.js';
 import { positionToString } from '../graph-util.js';
-import {
-  Label_get_label,
-  NAMED_COLORS,
-  NAMED_SHAPES,
-  STYLE_TOPICS,
-  color_name_to_hex,
-} from '../model-helpers.js';
+import { NAMED_COLORS, NAMED_SHAPES, STYLE_TOPICS, color_name_to_hex } from '../model-helpers.js';
 
 /**
  * Custom completion provider for Graph DSL.
@@ -69,13 +63,9 @@ export class GraphCompletionProvider extends DefaultCompletionProvider {
       return;
     }
 
-    // Handle cross-reference completions for Link nodes
-    // Check if the container is a Link and the expected property is one of its reference properties.
-    if (context.node?.$type === 'Link' && (next.property === 'src' || next.property === 'dst')) {
-      // Process cross-reference completions for Link
-      return this.completionForLinkReference(context, next, acceptor);
-    }
-
+    console.log(
+      `GraphCompletionProvider.completionFor(): No custom completions found for node type "${node.$type}", property "${next.property}".`,
+    );
     // Delegate to the default completion provider for any other context.
     return super.completionFor(context, next, acceptor);
   }
@@ -141,59 +131,6 @@ export class GraphCompletionProvider extends DefaultCompletionProvider {
         detail: 'CSS Color Name',
         insertText: color,
       });
-    }
-  }
-
-  /**
-   * Provides completions for cross-references in Link nodes.
-   * Filters candidates to only include named Element nodes and, if available, adds the node's label in the detail.
-   *
-   * @param context - The completion context.
-   * @param next - The next expected feature.
-   * @param acceptor - The completion acceptor callback.
-   */
-  protected completionForLinkReference(
-    context: CompletionContext,
-    next: NextFeature,
-    acceptor: CompletionAcceptor,
-  ): MaybePromise<void> {
-    const node = context.node!;
-    const property = next.property!;
-
-    const range: Range = {
-      start: context.textDocument.positionAt(context.tokenOffset),
-      end: context.textDocument.positionAt(context.offset),
-    };
-
-    const currentWord = context.textDocument.getText(range);
-    const refInfo = {
-      reference: { $refText: currentWord },
-      container: node,
-      property,
-    };
-    console.log(
-      `GraphCompletionProvider:completionForLinkReference(): Processing Link reference completion for '${property}', typed text: '${currentWord}'`,
-    );
-
-    const candidatesStream = this.getReferenceCandidates(refInfo, context).toArray();
-
-    for (const candidate of candidatesStream) {
-      if (
-        ast.isElement(candidate.node) &&
-        isNamed(candidate.node) &&
-        candidate.node.name.length > 0
-      ) {
-        const candidateName = this.nameProvider.getName(candidate.node);
-        const detail = candidate.node.label ? Label_get_label(candidate.node.label) : undefined;
-
-        acceptor(context, {
-          label: candidateName,
-          kind: CompletionItemKind.Variable,
-          detail,
-          insertText: candidateName,
-          sortText: '0',
-        });
-      }
     }
   }
 }
