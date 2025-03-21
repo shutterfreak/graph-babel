@@ -51,9 +51,12 @@ export class GraphScopeProvider extends DefaultScopeProvider {
     const documentUri = document.uri.toString();
 
     // Log the current file being processed
-    console.log(`getScope(${path_get_file(documentUri)}) - property "${context.property}"`);
-    // Log all precomputed scope entries for debugging purposes
+    console.log(
+      `getScope(${path_get_file(documentUri)}) - property "${context.property}", reference.$refText: "${context.reference.$refText}", reference.$nodeDescription?.type: "${context.reference.$nodeDescription?.type}"`,
+    );
+
     /*
+    // Log all precomputed scope entries for debugging purposes
     precomputed
       ?.get(document.parseResult.value)
       .forEach((ref, index) =>
@@ -83,7 +86,8 @@ export class GraphScopeProvider extends DefaultScopeProvider {
           .filter(
             (desc) =>
               isStyle(desc.node) && // Must be a Style node
-              desc.name === context.reference.$refText && // Must have a matching name
+              (context.reference.$refText.length === 0 ||
+                desc.name.toLowerCase().includes(context.reference.$refText.toLowerCase())) && // Empty name or case-insensitive incomplete match
               desc.documentUri.toString() === documentUri, // Must be defined in the current file
           )
           .filter((desc) => this.reflection.isSubtype(desc.type, referenceType)); // Must be a subtype of the expected type
@@ -101,7 +105,8 @@ export class GraphScopeProvider extends DefaultScopeProvider {
             .filter(
               (desc) =>
                 isNode(desc.node) && // Must be a Node
-                desc.name === context.reference.$refText && // Must have a matching name
+                (context.reference.$refText.length === 0 ||
+                  desc.name.toLowerCase().includes(context.reference.$refText.toLowerCase())) && // Empty name or case-insensitive incomplete match
                 desc.documentUri.toString() === documentUri, // Must belong to the current file
             )
             .filter((desc) => this.reflection.isSubtype(desc.type, referenceType)); // Must be a subtype of the expected type
