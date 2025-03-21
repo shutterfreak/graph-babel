@@ -1,1 +1,5 @@
+# Run full TypeScript type-check
+pnpm exec tsc -b tsconfig.src.json --noEmit
+
+# Run lint-staged for formatting and linting
 pnpm exec lint-staged
