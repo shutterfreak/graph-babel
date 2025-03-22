@@ -792,3 +792,42 @@ export function previousSiblingHasBlock(node: AstNode): boolean {
   // Check if the previous sibling's AST node is of type Style or Graph.
   return ast.isStyle(previousSibling.astNode) || ast.isGraph(previousSibling.astNode);
 }
+
+/**
+ * Constructs a string representing the ancestry of a given AST node, traversing up through
+ * nested `Graph` containers.
+ *
+ * This function walks up the container hierarchy of an AST node, collecting the `name` properties
+ * of all encountered `Graph` nodes. It builds a string representing this ancestry, using the
+ * specified separator.
+ *
+ * @param node The AST node for which to construct the ancestry string.
+ * @param separator (Optional) The string to use as a separator between graph names. Defaults to ".".
+ * @returns A string representing the ancestry of the node, or an empty string if the node
+ * has no `Graph` ancestors.
+ *
+ * @example
+ * // Given a nested Graph structure:
+ * // graph Root {
+ * //   graph Inner {
+ * //     node MyNode
+ * //   }
+ * // }
+ *
+ * const myNode = ...; // Assume this is an instance of MyNode
+ * const ancestry = getNodeAncestry(myNode); // Returns "Inner.Root"
+ * const ancestryWithCustomSeparator = getNodeAncestry(myNode, "::"); // Returns "Inner::Root"
+ */
+export function getNodeAncestry(node: AstNode, separator: string = '.'): string {
+  const ancestry: string[] = [];
+  let parent: AstNode | undefined = node.$container;
+
+  while (ast.isGraph(parent)) {
+    // Iteratively prepend the name of the parent Graph
+    // This allows us to work with nested namespaces
+    ancestry.push(parent.name);
+    parent = parent.$container;
+  }
+
+  return ancestry.length === 0 ? '' : ancestry.join(separator);
+}

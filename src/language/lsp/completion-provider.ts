@@ -1,7 +1,8 @@
-import { type MaybePromise } from 'langium';
+import { AstNodeDescription, type MaybePromise } from 'langium';
 import {
   CompletionAcceptor,
   CompletionContext,
+  CompletionValueItem,
   DefaultCompletionProvider,
   NextFeature,
 } from 'langium/lsp';
@@ -9,7 +10,14 @@ import { CompletionItemKind } from 'vscode-languageserver';
 
 import * as ast from '../generated/ast.js';
 import { positionToString } from '../graph-util.js';
-import { NAMED_COLORS, NAMED_SHAPES, STYLE_TOPICS, color_name_to_hex } from '../model-helpers.js';
+import {
+  Label_get_label,
+  NAMED_COLORS,
+  NAMED_SHAPES,
+  STYLE_TOPICS,
+  color_name_to_hex,
+  getNodeAncestry,
+} from '../model-helpers.js';
 
 /**
  * Custom completion provider for Graph DSL.
@@ -132,5 +140,33 @@ export class GraphCompletionProvider extends DefaultCompletionProvider {
         insertText: color,
       });
     }
+  }
+
+  /**
+   * Override this method to change how reference completion items are created.
+   *
+   * To change the `kind` of a completion item, override the `NodeKindProvider` service instead.
+   * To change the `documentation`, override the `DocumentationProvider` service instead.
+   *
+   * @param nodeDescription The description of a reference candidate
+   * @returns A partial completion item
+   */
+  protected override createReferenceCompletionItem(
+    nodeDescription: AstNodeDescription,
+  ): CompletionValueItem {
+    const kind = this.nodeKindProvider.getCompletionItemKind(nodeDescription);
+    const documentation = this.getReferenceDocumentation(nodeDescription);
+    const ancestry = nodeDescription.node ? getNodeAncestry(nodeDescription.node) : '';
+    const isAlias = ast.isNode(nodeDescription.node) && nodeDescription.node.alias;
+    const label = ast.isElement(nodeDescription.node)
+      ? Label_get_label(nodeDescription.node.label)
+      : '';
+    return {
+      nodeDescription,
+      kind,
+      documentation,
+      detail: `${nodeDescription.type}${isAlias ? ' (alias)' : ''}, ${ancestry.length === 0 ? 'at top level' : `in ${ancestry}`}${label.length === 0 ? '' : `: ${label}`}`,
+      sortText: '0',
+    };
   }
 }
