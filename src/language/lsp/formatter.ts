@@ -240,7 +240,6 @@ export class GraphFormatter extends AbstractFormatter {
   // Formatting Methods for Specific Node Types
   // ------------------------------
   private formatModel(node: ast.Model): void {
-    // const formatter = this.getNodeFormatter(node);
     this.log(
       `${this.formatModel.name}() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)}`,
     );
@@ -344,17 +343,15 @@ export class GraphFormatter extends AbstractFormatter {
       `formatNode() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
-    if (previousSiblingHasBlock(node)) {
-      // Prepend extra newline
-      this.doFmt(
-        this.formatNode.name,
-        node.alias ? "property('alias')" : "keyword('node')",
-        node.alias ? formatter.property('alias') : formatter.keyword('node'),
-        FormatVerb.Prepend,
-        FormatActionType.NewLines,
-        2,
-      );
-    }
+    // Prepend extra newline
+    this.doFmt(
+      this.formatNode.name,
+      node.alias ? "property('alias')" : "keyword('node')",
+      node.alias ? formatter.property('alias') : formatter.keyword('node'),
+      FormatVerb.Prepend,
+      FormatActionType.NewLines,
+      previousSiblingHasBlock(node) ? 2 : 1,
+    );
 
     this.doFmt(
       this.formatNode.name,
@@ -396,17 +393,15 @@ export class GraphFormatter extends AbstractFormatter {
       `formatLink() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)} [container index: ${node.$containerIndex} (${node.$container.$type})]`,
     );
 
-    if (previousSiblingHasBlock(node)) {
-      // Prepend extra newline
-      this.doFmt(
-        this.formatNode.name,
-        "keyword('node')",
-        formatter.keyword('link'),
-        FormatVerb.Prepend,
-        FormatActionType.NewLines,
-        2,
-      );
-    }
+    // Prepend extra newline
+    this.doFmt(
+      this.formatNode.name,
+      "keyword('link')",
+      formatter.keyword('link'),
+      FormatVerb.Prepend,
+      FormatActionType.NewLines,
+      previousSiblingHasBlock(node) ? 2 : 1,
+    );
 
     this.doFmt(
       this.formatLink.name,
