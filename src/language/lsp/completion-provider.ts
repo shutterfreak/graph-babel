@@ -157,7 +157,7 @@ export class GraphCompletionProvider extends DefaultCompletionProvider {
     const kind = this.nodeKindProvider.getCompletionItemKind(nodeDescription);
     const documentation = this.getReferenceDocumentation(nodeDescription);
     const ancestry = nodeDescription.node ? getNodeAncestry(nodeDescription.node) : '';
-    const isAlias = ast.isNode(nodeDescription.node) && nodeDescription.node.alias;
+    const isAlias = ast.isNode(nodeDescription.node) && nodeDescription.node.alias !== undefined;
     const label = ast.isElement(nodeDescription.node)
       ? Label_get_label(nodeDescription.node.label)
       : '';
