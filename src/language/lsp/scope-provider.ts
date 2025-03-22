@@ -10,7 +10,7 @@ import {
 } from 'langium';
 
 import { isGraph, isLink, isNode, isNodeAlias, isStyle } from '../generated/ast.js';
-import { path_get_file } from '../graph-util.js';
+import { path_get_file } from '../model-helpers.js';
 
 /**
  * GraphScopeProvider restricts reference resolution to definitions declared within the same file.

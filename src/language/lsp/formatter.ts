@@ -19,7 +19,7 @@ import { rangeToString } from 'langium/test';
 import type { TextEdit } from 'vscode-languageserver-protocol';
 
 import * as ast from '../generated/ast.js';
-import { groupAdjacentArrayIndexes, isCommentCstNode } from '../graph-util.js';
+import { groupAdjacentArrayIndexes, isCommentCstNode } from '../model-helpers.js';
 import { previousSiblingHasBlock } from '../model-helpers.js';
 
 /**

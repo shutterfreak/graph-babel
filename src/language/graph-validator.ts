@@ -10,7 +10,7 @@ import {
 
 import * as ast from './generated/ast.js';
 import type { GraphServices } from './graph-module.js';
-import { groupAdjacentArrayIndexes, isCommentCstNode } from './graph-util.js';
+import { groupAdjacentArrayIndexes, isCommentCstNode } from './model-helpers.js';
 import {
   ARROWHEADS,
   LENGTH_UNITS,

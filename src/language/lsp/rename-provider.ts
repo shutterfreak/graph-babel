@@ -21,7 +21,7 @@ import {
 } from 'vscode-languageserver';
 
 import { isElement, isNodeAlias } from '../generated/ast.js';
-import { render_text } from '../graph-util.js';
+import { render_text } from '../model-helpers.js';
 
 /**
  * Custom rename provider with validation for Graph language.

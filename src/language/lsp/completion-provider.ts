@@ -9,7 +9,7 @@ import {
 import { CompletionItemKind } from 'vscode-languageserver';
 
 import * as ast from '../generated/ast.js';
-import { positionToString } from '../graph-util.js';
+import { positionToString } from '../model-helpers.js';
 import {
   Label_get_label,
   NAMED_COLORS,
