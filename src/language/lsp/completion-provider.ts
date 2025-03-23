@@ -1,4 +1,4 @@
-import { AstNodeDescription, type MaybePromise } from 'langium';
+import { AstNodeDescription, type MaybePromise, stream } from 'langium';
 import {
   CompletionAcceptor,
   CompletionContext,
@@ -60,7 +60,7 @@ export class GraphCompletionProvider extends DefaultCompletionProvider {
         this.provideTopicCompletions(context, acceptor);
         return;
       }
-      if (next.property === 'value' && ast.isShapeStyleDefinition(node)) {
+      if (ast.isShapeStyleDefinition(node) && next.property === 'value') {
         // Provide shape completions for the value property of a ShapeStyleDefinition.
         this.provideShapeCompletions(context, acceptor);
         return;
@@ -69,10 +69,16 @@ export class GraphCompletionProvider extends DefaultCompletionProvider {
       // Provide completions for CSS color names for a TextColorDefinition.
       this.provideColorCompletions(context, acceptor);
       return;
+    } else if (this.isNodeDeclarationContext(context, next)) {
+      // Check if we are in a context where a node declaration is allowed.
+      console.log(
+        'GraphCompletionProvider: In node declaration context. Providing node declaration completions.',
+      );
+      return this.provideNodeDeclarationKeywordCompletions(context, acceptor);
     }
 
     console.log(
-      `GraphCompletionProvider.completionFor(): No custom completions found for node type "${node.$type}", property "${next.property}".`,
+      `GraphCompletionProvider.completionFor(${positionToString(context.position)}): No custom completions found for node type "${node.$type}", property "${next.property}".`,
     );
     // Delegate to the default completion provider for any other context.
     return super.completionFor(context, next, acceptor);
@@ -168,5 +174,110 @@ export class GraphCompletionProvider extends DefaultCompletionProvider {
       detail: `${nodeDescription.type}${isAlias ? ' (alias)' : ''}, ${ancestry.length === 0 ? 'at top level' : `in ${ancestry}`}${label.length === 0 ? '' : `: ${label}`}`,
       sortText: '0',
     };
+  }
+
+  /**
+   * Determines whether the current context is one where a node declaration is allowed.
+   * For our DSL, this is true if:
+   * - There is no current node (top-level declaration), or
+   * - The container is a Model or Graph (which allow declarations), or
+   * - The container is a Node and either:
+   *    - The expected property is explicitly 'alias', or
+   *    - The expected property is undefined and the already typed text (from tokenOffset to offset)
+   *      is non-empty (indicating the user has started typing a new declaration).
+   */
+  protected isNodeDeclarationContext(context: CompletionContext, next: NextFeature): boolean {
+    if (!context.node) {
+      console.log(
+        '⭐️ isNodeDeclarationContext: No current node – assuming top-level declaration.',
+      );
+      return true; // Top-level case.
+    }
+    const type = context.node.$type;
+    if (type === 'Model' || type === 'Graph') {
+      console.log(`⭐️ isNodeDeclarationContext: Container is ${type} – declaration allowed.`);
+      return true;
+    }
+    if (ast.isNode(context.node)) {
+      if (next.property === 'alias') {
+        console.log(
+          '⭐️ isNodeDeclarationContext: next.property === "alias" – declaration context.',
+        );
+        return true;
+      }
+      if (next.property === undefined) {
+        // Check if the user has already typed something in this token.
+        const tokenStart = context.textDocument.positionAt(context.tokenOffset);
+        const tokenEnd = context.textDocument.positionAt(context.offset);
+        const tokenText = context.textDocument.getText({ start: tokenStart, end: tokenEnd });
+        console.log(
+          `⭐️ isNodeDeclarationContext: Container is Node and typed text is "${tokenText}".`,
+        );
+        if (tokenText.length > 0) {
+          return true;
+        }
+      }
+    }
+    console.log('⭐️ isNodeDeclarationContext: No match – not a node declaration context.');
+    return false;
+  }
+
+  protected provideNodeDeclarationKeywordCompletions(
+    context: CompletionContext,
+    acceptor: CompletionAcceptor,
+  ): void {
+    // Always include the default 'node' keyword.
+    acceptor(context, {
+      label: 'node',
+      kind: CompletionItemKind.Keyword,
+      detail: 'Standard node declaration',
+      insertText: 'node',
+    });
+
+    // Create a dummy ReferenceInfo to query for NodeAlias definitions.
+    const tokenStart = context.textDocument.positionAt(context.tokenOffset);
+    const tokenEnd = context.textDocument.positionAt(context.offset);
+    const refInfo = {
+      reference: {
+        $refText: context.textDocument.getText({
+          start: tokenStart,
+          end: tokenEnd,
+        }),
+      },
+      container: context.node ?? { $type: 'Model' },
+      property: 'alias',
+    };
+
+    const candidates = this.scopeProvider.getScope(refInfo).getAllElements();
+    const aliases = stream(candidates)
+      .filter((desc) => ast.isNodeAlias(desc.node))
+      .toArray();
+
+    // Get the typed text for filtering (e.g. 'd')
+    const typedText = context.textDocument
+      .getText({
+        start: tokenStart,
+        end: tokenEnd,
+      })
+      .toLowerCase();
+
+    console.log(
+      `🟠 provideNodeDeclarationKeywordCompletions("${typedText}") - aliases found: "${aliases.length}"`,
+    );
+
+    for (const alias of aliases) {
+      console.log(
+        `🟠 provideNodeDeclarationKeywordCompletions("${typedText}") - checking alias "${alias.name}" at ${alias.path}`,
+      );
+      if (typedText.length > 0 && !alias.name.toLowerCase().includes(typedText)) {
+        continue;
+      }
+      acceptor(context, {
+        label: alias.name,
+        kind: CompletionItemKind.Keyword,
+        detail: 'Node alias',
+        insertText: alias.name,
+      });
+    }
   }
 }
