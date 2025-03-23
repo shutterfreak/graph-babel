@@ -139,7 +139,9 @@ export class GraphScopeProvider extends DefaultScopeProvider {
           const aliasScope = stream(allDescriptions).filter(
             (desc) =>
               isNodeAlias(desc.node) && // Must be a NodeAlias node
-              desc.name === context.reference.$refText && // Must have a matching name
+              (context.reference.$refText.length === 0 ||
+                desc.name.toLowerCase().includes(context.reference.$refText.toLowerCase())) && // Empty name or case-insensitive incomplete match
+              desc.documentUri.toString() === documentUri && // Must belong to the current file
               this.reflection.isSubtype(desc.type, referenceType) && // Must be a subtype of the expected type
               filterUnique(desc), // Deduplicate
           );
