@@ -5,6 +5,5 @@
     "noUnusedParameters": false,
     "noEmit": false,
     "rootDir": "src"
-  },
-  "include": ["src/**/*.ts"]
+  }
 }
