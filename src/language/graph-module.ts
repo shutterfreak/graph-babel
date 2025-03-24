@@ -1,4 +1,4 @@
-import { type Module, inject } from 'langium';
+import { DefaultNameProvider, type Module, inject } from 'langium';
 import {
   DefaultDefinitionProvider,
   type DefaultSharedModuleContext,
@@ -16,7 +16,6 @@ import { GraphCompletionProvider } from './lsp/completion-provider.js';
 import { GraphFoldingProvider } from './lsp/folding-range-provider.js';
 import { GraphFormatter } from './lsp/formatter.js';
 //import { GraphDefinitionProvider } from './lsp/definition-provider.js';
-import { GraphNameProvider } from './lsp/name-provider.js';
 import { GraphRenameProvider } from './lsp/rename-provider.js';
 import { GraphScopeComputation } from './lsp/scope-computation.js';
 //import { GraphTokenBuilder } from './lsp/token-builder.js';
@@ -34,14 +33,6 @@ import { GraphSemanticTokenProvider } from './lsp/semantic-token-provider.js';
  * NOTE: Make sure custom Graph services referenced in GraphModule are also declared here!
  */
 export interface GraphAddedServices {
-  // parser: {
-  /**
-   * Custom token builder for the Graph language.
-   * Overrides the default token builder to include whitespace tokens in the CST.
-   */
-  /* TokenBuilder: GraphTokenBuilder;
-  }; */
-
   validation: {
     /**
      * Custom validator for the Graph language.
@@ -62,12 +53,6 @@ export interface GraphAddedServices {
      * Provides a file-global scope in addition to local scopes.
      */
     ScopeProvider: GraphScopeProvider;
-
-    /**
-     * Custom name provider for the Graph language.
-     * Provides name-related operations such as name resolution.
-     */
-    NameProvider: GraphNameProvider;
   };
 
   lsp: {
@@ -128,8 +113,8 @@ export const GraphModule: Module<GraphServices, PartialLangiumServices & GraphAd
     GraphValidator: () => new GraphValidator(),
   },
   references: {
-    /** Registers the custom GraphNameProvider for name resolution. */
-    NameProvider: () => new GraphNameProvider(),
+    /** Registers the default name provider for name resolution. */
+    NameProvider: () => new DefaultNameProvider(),
     /** Registers the custom GraphScopeComputation for scope computation. */
     ScopeComputation: (services) => new GraphScopeComputation(services),
     /** Registers the custom scope provider, GraphScopeProvider, for enhanced scope access. */
