@@ -83,8 +83,8 @@ export class GraphFormatter extends AbstractFormatter {
 
     if (ast.isModel(node)) {
       this.formatModel(node);
-    } else if (ast.isNodeAlias(node)) {
-      this.formatNodeAlias(node);
+    } else if (ast.isElementAlias(node)) {
+      this.formatElementAlias(node);
     } else if (ast.isGraph(node)) {
       this.formatGraph(node);
     } else if (ast.isNode(node)) {
@@ -247,15 +247,15 @@ export class GraphFormatter extends AbstractFormatter {
     // TODO
   }
 
-  private formatNodeAlias(node: ast.NodeAlias): void {
+  private formatElementAlias(node: ast.ElementAlias): void {
     this.log(
-      `${this.formatNodeAlias.name}() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)}`,
+      `${this.formatElementAlias.name}() -- ${node.$cstNode ? rangeToString(node.$cstNode.range) : '?'} text: ${JSON.stringify(node.$cstNode?.text)}`,
     );
 
     const formatter = this.getNodeFormatter(node);
 
     this.doFmt(
-      this.formatNodeAlias.name,
+      this.formatElementAlias.name,
       "keyword('define')",
       formatter.keyword('define'),
       FormatVerb.Prepend,
@@ -264,7 +264,7 @@ export class GraphFormatter extends AbstractFormatter {
     );
 
     this.doFmt(
-      this.formatNodeAlias.name,
+      this.formatElementAlias.name,
       "property('name')",
       formatter.property('name'),
       FormatVerb.Surround,
@@ -273,7 +273,7 @@ export class GraphFormatter extends AbstractFormatter {
 
     if (node.styleref) {
       this.doFmt(
-        this.formatNodeAlias.name,
+        this.formatElementAlias.name,
         "keyword(':')",
         formatter.keyword(':'),
         FormatVerb.Surround,

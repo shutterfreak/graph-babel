@@ -576,16 +576,6 @@ function generate_filtered_style_definition(
 
   const topicIndexMap = new Map<string, number>();
 
-  /*
-  for (const ancestor of ancestry.reverse()) {
-    // Search for style definitions with the proper style identifier:
-    if (isModel(ancestor) || isGraph(ancestor)) {
-      // Useless check (required for linter)
-      for (const s of ancestor.styles) {
-        if (s.name === style_ref_text) {
-          // Matching style found - Process the style items, taking care of scope, redefinition and reset rules
-          for (const d of s.definition.items) {
-          */
   for (const d of flattened_style_items) {
     // First check reset topic:
     if (ast.isResetStyleDefinition(d)) {
@@ -611,11 +601,6 @@ function generate_filtered_style_definition(
         filtered_style_definitions[index] = d;
       }
     }
-    /*
-          }
-        }
-      }
-    }*/
   }
 
   return filtered_style_definitions;

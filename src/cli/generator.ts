@@ -7,11 +7,11 @@ import { inspect } from 'util';
 
 import {
   Element,
+  ElementAlias,
   Graph,
   Link,
   Model,
   Node,
-  NodeAlias,
   Style,
   isGraph,
   isLink,
@@ -113,7 +113,7 @@ export function generate_cleaned_graph(
 
   const fileNode = expandToNode`
       ${joinToNode(model.styles, (style) => render_Style(style, level), { appendNewLineIfNotEmpty: true })}
-      ${joinToNode(model.aliases, (alias) => render_NodeAlias(alias, level), { appendNewLineIfNotEmpty: true })}
+      ${joinToNode(model.aliases, (alias) => render_ElementAlias(alias, level), { appendNewLineIfNotEmpty: true })}
       ${joinToNode(model.elements, (element) => render_Element(element, level), { appendNewLineIfNotEmpty: true })}
   `.appendNewLineIfNotEmpty();
 
@@ -142,7 +142,7 @@ export function generate_cleaned_graph(
       `${INDENTATION.repeat(level)}graph${graph.styleref ? `:${graph.styleref.$refText}` : ''} ${graph.name}${label !== '' ? ` "${label}"` : ''} {\n` +
       graph.styles.map((style) => render_Style(style, level + 1)).join('\n') +
       (graph.styles.length > 0 ? '\n' : '') +
-      graph.aliases.map((alias) => render_NodeAlias(alias, level + 1)).join('\n') +
+      graph.aliases.map((alias) => render_ElementAlias(alias, level + 1)).join('\n') +
       (graph.elements.length > 0 ? '\n' : '') +
       graph.elements.map((element) => render_Element(element, level + 1)).join('\n') +
       (graph.elements.length > 0 ? '\n' : '') +
@@ -159,7 +159,7 @@ export function generate_cleaned_graph(
         inspect(Element_get_style_items(node)?.map((s) => StyleDefinition_toString([s]))),
       ),
     );
-    // Update node start keyword if a NodeAlias has been used:
+    // Update node start keyword if a ElementAlias has been used:
     const node_keyword = node.alias?.$refText ?? 'node';
 
     return `${INDENTATION.repeat(level)}${node_keyword}${node.styleref ? `:${node.styleref.$refText}` : ''} ${node.name}${label !== '' ? ` "${label}"` : ''}`;
@@ -209,11 +209,11 @@ export function generate_cleaned_graph(
       .join('\n')}\n${INDENTATION.repeat(level)}}`;
   }
 
-  function render_NodeAlias(nodeAlias: NodeAlias, level: number): string {
-    // Logic to render NodeAlias
+  function render_ElementAlias(elementAlias: ElementAlias, level: number): string {
+    // Logic to render ElementAlias
     // For Example, you could render it as a comment, or expand to the node it represents.
     // The below case renders it as a comment.
-    return `${INDENTATION.repeat(level)}// NodeAlias: ${nodeAlias.name} (styleref: ${nodeAlias.styleref?.$refText})`;
+    return `${INDENTATION.repeat(level)}// ElementAlias: ${elementAlias.name} (styleref: ${elementAlias.styleref?.$refText})`;
   }
 
   /*

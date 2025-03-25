@@ -1,39 +1,65 @@
 grammar Graph
 
 entry Model:
-    (elements+=Element | styles+=Style | aliases+=NodeAlias)*
+    GraphContent
 ;
 
+fragment GraphContent:
+    (elements+=Element | styles+=Style | aliases+=ElementAlias)*
+;
+
+
 Element:
-    Graph | Node | Link;
+    Graph | Node | Link
+;
+
+ElementAlias:
+    GraphAlias | NodeAlias | LinkAlias
+;
+
+GraphAlias:
+    keyword='define'
+    name=ID
+    element='graph'
+    StyleRef?
+    definition=StyleBlock?
+;
 
 NodeAlias:
-    'define'
+    keyword='define'
     name=ID
-    'node'
+    element='node'
+    StyleRef?
+    definition=StyleBlock?
+;
+
+LinkAlias:
+    keyword='define'
+    name=ID
+    element='link'
     StyleRef?
     definition=StyleBlock?
 ;
 
 Graph:
-    'graph'
+    (alias=[GraphAlias:ID] | keyword='graph')
     StyleRef?
     name=ID
     label=Label?
     '{'
-    (elements+=Element | styles+=Style | aliases+=NodeAlias)*
+    GraphContent
     '}'
 ;
 
 Node:
-    (alias=[NodeAlias:ID] | 'node')
+    (alias=[NodeAlias:ID] | keyword='node')
     StyleRef?
     name=ID
     label=Label?
 ;
 
 Link:
-    'link'
+    (alias=[LinkAlias:ID] | keyword='link')
     StyleRef?
     (
         '('
@@ -42,18 +68,18 @@ Link:
     )?
     src+=[Element:ID] ( ',' src+=[Element:ID] )*
     (':' src_arrowhead=ID)?
-    LinkType
+    LinkConnector
     dst+=[Element:ID] ( ',' dst+=[Element:ID] )*
     (':' dst_arrowhead=ID)?
     label=Label?
 ;
 
-fragment LinkType:
+fragment LinkConnector:
     relation=('to' | 'with') |
-    link=LINK_TYPE
+    link=LINK_CONNECTOR
 ;
 
-terminal LINK_TYPE:
+terminal LINK_CONNECTOR:
     /([xo]|[<][|>]?)?(-{2,}|\.{2,}|={2,}|~{2,}|-\.+-)([xo]|[|<]?[>])?/
 ;
 
@@ -62,7 +88,7 @@ fragment StyleRef:
 ;
 
 Style:
-    'style'
+    keyword='style'
     StyleRef?
 	name=ID
 	definition=StyleBlock
@@ -163,8 +189,7 @@ terminal WIDTH_UNIT:
     'pt' |
     'em' |
     'ex' |
-    'rem' |
-    'rex'
+    'rem'
 ;
 
 OpacityDefinition<isPct>:

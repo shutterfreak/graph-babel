@@ -37,7 +37,7 @@ export function registerValidationChecks(services: GraphServices) {
     Element: [validator.checkStyleRef],
     Link: [validator.checkLinkStyles],
     Style: [validator.checkStyleNames, validator.checkStyleSubstyles],
-    NodeAlias: [validator.checkStyleRef],
+    ElementAlias: [validator.checkStyleRef],
     StyleBlock: [validator.checkSpuriousSemicolons],
     StyleDefinition: [validator.checkStyleDefinitionTopics],
     HexColorDefinition: [validator.checkHexColorDefinitions],
@@ -192,15 +192,15 @@ export class GraphValidator {
       });
   };
   /**
-   * Validates that the style reference (styleref) on an Element or NodeAlias resolves to a valid Style.
+   * Validates that the style reference (styleref) on an Element or ElementAlias resolves to a valid Style.
    *
    * This check ensures that a style reference is not empty, is resolvable, and that the referenced
    * node is of type Style.
    *
-   * @param node The Element or NodeAlias to validate.
+   * @param node The Element or ElementAlias to validate.
    * @param accept The callback to report validation issues.
    */
-  checkStyleRef = (node: ast.Element | ast.NodeAlias, accept: ValidationAcceptor): void => {
+  checkStyleRef = (node: ast.Element | ast.ElementAlias, accept: ValidationAcceptor): void => {
     /*
     console.log(
       `checkStyleRef() called for ${node.$type}${isNamed(node) ? ` "${node.name}"` : '(unnamed)'} - Style reference '${node.styleref?.$refText}' (${node.styleref?.ref?.$cstNode?.astNode.$type ?? '<undefined>'})`,
@@ -286,7 +286,7 @@ export class GraphValidator {
     }
     // Link style (already captured by grammar) - ensure there are no arrowhead redefinitions in link style:
     if (link.link !== undefined) {
-      const match = ast.GraphTerminals.LINK_TYPE.exec(link.link);
+      const match = ast.GraphTerminals.LINK_CONNECTOR.exec(link.link);
       if (match) {
         // ESLint Bug: match[i] can be undefined!
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

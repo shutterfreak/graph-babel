@@ -8,9 +8,8 @@ import {
 import {
   isBracketedLabel,
   isElement,
+  isElementAlias,
   isLink,
-  isNode,
-  isNodeAlias,
   isStyle,
   isStyleDefinition,
 } from '../generated/ast.js';
@@ -54,7 +53,7 @@ namespace	For identifiers that declare or reference a namespace, module, or pack
  * the `highlightElement` method. It uses the provided token acceptor to push semantic tokens
  * for various features:
  *
- * - **NodeAlias nodes:** The "name" property is highlighted as a token of type "macro".
+ * - **ElementAlias nodes:** The "name" property is highlighted as a token of type "macro".
  * - **Named Element nodes:** The "name" property is highlighted as "property".
  * - **Link nodes:** In addition to their "name" property (if available),
  *   each element in the "src" and "dst" arrays is highlighted as "property".
@@ -64,7 +63,7 @@ namespace	For identifiers that declare or reference a namespace, module, or pack
  * - **BracketedLabel nodes:** Their "label_bracketed" property is rendered as "string".
  * - **Style definitions:** The "topic" property is rendered as "property", and for Style nodes,
  *   the "name" property is rendered as "class".
- * - **Style references:** For Elements, Styles, or NodeAliases that have a style reference, the "styleref"
+ * - **Style references:** For Elements, Styles, or ElementAliases that have a style reference, the "styleref"
  *   property is rendered as "class".
  */
 export class GraphSemanticTokenProvider extends AbstractSemanticTokenProvider {
@@ -73,7 +72,7 @@ export class GraphSemanticTokenProvider extends AbstractSemanticTokenProvider {
    *
    * This method examines the node and, if it matches a case of interest,
    * uses the token acceptor to push a semantic token. It supports:
-   * - NodeAlias nodes: highlighting the "name" property as "variable".
+   * - ElementAlias nodes: highlighting the "name" property as "variable".
    * - Link nodes: highlighting the "name" property as "property" plus each element
    *   in the "src" and "dst" arrays as "property".
    * - Node tokens (of $type "Node") that have an alias reference: highlighting the "alias"
@@ -84,8 +83,8 @@ export class GraphSemanticTokenProvider extends AbstractSemanticTokenProvider {
    * @returns Optionally, 'prune' to skip processing children.
    */
   protected highlightElement(node: AstNode, acceptor: SemanticTokenAcceptor): void | 'prune' {
-    // --- NodeAlias: Highlight the "name" property as "macro"
-    if (isNodeAlias(node)) {
+    // --- ElementAlias: Highlight the "name" property as "macro"
+    if (isElementAlias(node)) {
       const cstName = GrammarUtils.findNodeForProperty(node.$cstNode, 'name');
       if (cstName) {
         acceptor({
@@ -148,7 +147,7 @@ export class GraphSemanticTokenProvider extends AbstractSemanticTokenProvider {
     }
 
     // --- Node Alias Property: For Nodes (type "Node") that have an alias, highlight the "alias" property as "type"
-    if (isNode(node) && node.alias) {
+    if (isElement(node) && node.alias) {
       const cstAlias = GrammarUtils.findNodeForProperty(node.$cstNode, 'alias');
       if (cstAlias) {
         acceptor({
@@ -188,7 +187,7 @@ export class GraphSemanticTokenProvider extends AbstractSemanticTokenProvider {
     }
 
     // --- Style and StyleReference: Highlight the "styleref" property as "class"
-    if (isElement(node) || isStyle(node) || (isNodeAlias(node) && node.styleref)) {
+    if (isElement(node) || isStyle(node) || (isElementAlias(node) && node.styleref)) {
       const cstStyleRef = GrammarUtils.findNodeForProperty(node.$cstNode, 'styleref');
       if (cstStyleRef) {
         acceptor({

@@ -20,7 +20,7 @@ import {
   WorkspaceEdit,
 } from 'vscode-languageserver';
 
-import { isElement, isNodeAlias } from '../generated/ast.js';
+import { isElement, isElementAlias } from '../generated/ast.js';
 import { render_text } from '../model-helpers.js';
 
 /**
@@ -75,6 +75,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
 
   /**
    * Performs the rename operation, ensuring validity before applying changes.
+   * NOTE: currently only implemented for Element and ElementAlias (not for Style).
    * @param document - The Langium document.
    * @param params - The rename parameters including the new name.
    * @param cancelToken - Optional cancellation token.
@@ -92,7 +93,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       `GraphRenameProvider.rename() found node of type '${node?.$type}' defined as:\n${render_text(node?.$cstNode?.text, `'${node?.$type}' text`, '\\n', node?.$cstNode?.range.start.line)}\n`,
     );
 
-    if (!node || !(isElement(node) || isNodeAlias(node)) || !isNamed(node)) {
+    if (!node || !(isElement(node) || isElementAlias(node)) || !isNamed(node)) {
       return undefined;
     }
 
@@ -118,7 +119,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       if (isElement(childNode) && isNamed(childNode)) {
         elementNames.add(childNode.name);
       }
-      if (isNodeAlias(childNode) && isNamed(childNode)) {
+      if (isElementAlias(childNode) && isNamed(childNode)) {
         aliasNames.add(childNode.name);
       }
     }
@@ -132,11 +133,13 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       return false;
     }
     if (isElement(node) && elementNames.has(newName)) {
-      this.connection?.window.showErrorMessage(`"${newName}" is already used by an Element.`);
+      this.connection?.window.showErrorMessage(`"${newName}" is already used by a ${node.$type}.`);
       return false;
     }
-    if (isNodeAlias(node) && aliasNames.has(newName)) {
-      this.connection?.window.showErrorMessage(`"${newName}" is already used by a NodeAlias.`);
+    if (isElementAlias(node) && aliasNames.has(newName)) {
+      this.connection?.window.showErrorMessage(
+        `"${newName}" is already used by a ${node.$type}Alias.`,
+      );
       return false;
     }
 
@@ -217,7 +220,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
       // We found a possible match of type Element (Graph, Node, Link) or Style
       matches.push(astNode);
 
-      if (!(isElement(astNode) || isNodeAlias(astNode))) {
+      if (!(isElement(astNode) || isElementAlias(astNode))) {
         // rename not applicable
         console.log(' -- not in scope for renaming (skipped)');
         continue;
@@ -248,7 +251,7 @@ export class GraphRenameProvider extends DefaultRenameProvider {
     node: AstNode,
     newName: string,
   ): WorkspaceEdit | undefined {
-    if (!(isElement(node) || isNodeAlias(node)) || !isNamed(node)) {
+    if (!(isElement(node) || isElementAlias(node)) || !isNamed(node)) {
       return undefined;
     }
 

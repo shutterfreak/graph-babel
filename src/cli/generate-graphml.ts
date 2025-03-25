@@ -542,10 +542,13 @@ export function generate_graphml_graph(
     } else {
       // 'link' defined:
       if (link.link !== undefined && link.link.length > 0) {
-        const match = GraphTerminals.LINK_TYPE.exec(link.link);
+        const match = GraphTerminals.LINK_CONNECTOR.exec(link.link);
         if (match) {
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           const src_head = match[1] ?? '';
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           const line = match[2] ?? '';
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           let dst_head = match[3] ?? '';
 
           // Arrowhead at source:
